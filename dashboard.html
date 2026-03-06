@@ -1985,11 +1985,21 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
   const w=isMobile?236:(collapsed?64:236);
   const statusLabel=saveStatus==='saving'?'Kaydediliyor…':saveStatus==='saved'?'✓ Sunucuya Kaydedildi':saveStatus==='error'?'Kayıt Hatası':'Hazır';
   const statusColor=saveStatus==='saved'?'#22c55e':saveStatus==='saving'?'#f59e0b':saveStatus==='error'?'#ef4444':'#64748b';
-  const navClick=(id)=>{setPage(id);if(isMobile&&onMobileClose)onMobileClose();};
+  const navClick=function(id){setPage(id);if(isMobile&&onMobileClose)onMobileClose();};
+  const sidebarStyle={width:w,minWidth:w,background:'#0c1021',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',height:'100vh',flexShrink:0,transition:'width 0.2s'};
+  if(isMobile){
+    sidebarStyle.position='fixed';
+    sidebarStyle.top=0;
+    sidebarStyle.left=0;
+    sidebarStyle.zIndex=200;
+    sidebarStyle.transform=mobileOpen?'translateX(0)':'translateX(-100%)';
+    sidebarStyle.transition='transform 0.25s ease';
+  }else{
+    sidebarStyle.position='sticky';
+    sidebarStyle.top=0;
+  }
   return(
-    <>
-      {isMobile&&<div className={`sidebar-overlay${mobileOpen?' open':''}`} onClick={onMobileClose}/>}
-      <div className={`sidebar-drawer${isMobile&&mobileOpen?' open':''}`} style={{width:w,minWidth:w,background:'#0c1021',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',height:'100vh',flexShrink:0,transition:'width 0.2s'}}>
+    <div style={sidebarStyle}>
       <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0}}>
         {!collapsed&&<span style={{fontWeight:800,fontSize:'18px',letterSpacing:'-0.5px',color:'#e2e8f0'}}>ZY<span style={{color:'#4f8ef7'}}>REOS</span></span>}
         {collapsed&&<div style={{width:'32px',height:'32px',borderRadius:'8px',background:'#4f8ef7',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'14px',color:'#fff'}}>Z</div>}
@@ -2049,7 +2059,6 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
         </button>
       </div>
     </div>
-    </>
   );
 }
 
@@ -2350,6 +2359,7 @@ function App(){
 
   return(
     <div style={{display:'flex',minHeight:'100vh',background:'#0a0d14'}}>
+      {isMobile&&mobileSidebarOpen&&<div onClick={()=>setMobileSidebarOpen(false)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',zIndex:199}}/>}
       <Sidebar page={activePage} setPage={p=>navigate(p)} collapsed={collapsed} setCollapsed={setCollapsed}
         onReset={handleReset} saveStatus={saveStatus}
         onExport={exportBackup} onImport={importBackup} onLogout={logout}

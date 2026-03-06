@@ -328,3 +328,4 @@ app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));
 
 const PORT=process.env.PORT||3000;
 app.listen(PORT,()=>console.log(`ZYREOS http://localhost:${PORT} adresinde çalışıyor`));
+EAAUbMIz8KyEBQ4KFApZCWCemMAZCXeluB9P7DUxMa1Ay5A1UnzewCFZB9gGAXvE3RPljFiRAw9t3cgyYvGJvXzIwYTJxWThz0mVNkASI2T9ZBE5RxZCAXZAjGNCVjUFOT31InLaA9FbH4tSP3G6Eokg7xuqYD4AbfllRveEZBNmBok8d9KULNrFsp3hplp2c7YlZB7rEUKU0iEnJlIYyIFIcDF5iX7HEdPPS7QNRxAZAWGBtyVqkj6TZChBqS2qiQJ9wB6hahsHNdfqYJ6Hoh6ytaw

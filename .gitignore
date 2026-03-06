@@ -1,0 +1,8 @@
+node_modules/
+users.json
+data_*.json
+data.json
+veri/
+site/
+.DS_Store
+*.zip

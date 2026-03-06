@@ -102,6 +102,19 @@ async function apiDeleteUser(token,username){
   const r=await fetch(`/api/admin/users/${username}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
   if(!r.ok){const d=await r.json();throw new Error(d.error||'İşlem başarısız');}
 }
+async function apiWAQueue(token){
+  const r=await fetch('/api/whatsapp/queue',{headers:{Authorization:'Bearer '+token}});
+  if(!r.ok)throw new Error('Kuyruk alınamadı');
+  return r.json();
+}
+async function apiWAAssign(token,id,customerId,username){
+  const r=await fetch(`/api/whatsapp/queue/${id}/assign`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({customerId,username})});
+  if(!r.ok){const d=await r.json();throw new Error(d.error||'Atama başarısız');}
+}
+async function apiWADelete(token,id){
+  const r=await fetch(`/api/whatsapp/queue/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+  if(!r.ok){const d=await r.json();throw new Error(d.error||'Silme başarısız');}
+}
 
 /* ── FILE SYSTEM HELPERS ── */
 const FS_SUPPORTED=typeof window!=='undefined'&&'showDirectoryPicker' in window;
@@ -1970,7 +1983,7 @@ function BankSettingsPage({banks,onUpdateBanks}){
 /* ════════════════════════════════════
    SIDEBAR
 ════════════════════════════════════ */
-function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExport,onImport,onLogout,role,username,mobileOpen,onMobileClose}){
+function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExport,onImport,onLogout,role,username,mobileOpen,onMobileClose,waqCount}){
   const isMobile=useIsMobile();
   const nav=[
     {id:'dashboard',label:'Dashboard',icon:<IcoHome/>},
@@ -1980,7 +1993,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
     {id:'profit',label:'Kar Analizi',icon:<IcoChart/>},
     {id:'dekont',label:'Dekont Yükle',icon:<IcoUpload/>},
     {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
-    ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>}]:[]),
+    ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>},{id:'waq',label:'WA Kuyruk',icon:<IcoUpload/>}]:[]),
   ];
   const w=isMobile?236:(collapsed?64:236);
   const statusLabel=saveStatus==='saving'?'Kaydediliyor…':saveStatus==='saved'?'✓ Sunucuya Kaydedildi':saveStatus==='error'?'Kayıt Hatası':'Hazır';
@@ -2020,7 +2033,8 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
             <button key={n.id} onClick={()=>navClick(n.id)} title={collapsed?n.label:''}
               style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':'10px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':'#64748b',cursor:'pointer',fontWeight:active?700:500,fontSize:'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
               <span style={{flexShrink:0}}>{n.icon}</span>
-              {!collapsed&&<span>{n.label}</span>}
+              {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
+              {!collapsed&&n.id==='waq'&&waqCount>0&&<span style={{background:'#ef4444',color:'#fff',borderRadius:'10px',padding:'1px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}}>{waqCount}</span>}
             </button>
           );
         })}
@@ -2222,8 +2236,103 @@ function AdminUsersPage({token}){
   );
 }
 
+/* ── WHATSAPP QUEUE PAGE ── */
+function WhatsAppQueuePage({token,allUsers,customers}){
+  const[queue,setQueue]=React.useState([]);
+  const[loading,setLoading]=React.useState(true);
+  const[error,setError]=React.useState('');
+  const[assignState,setAssignState]=React.useState({});
+  const[selectedUser,setSelectedUser]=React.useState('');
+  const[selectedCustomer,setSelectedCustomer]=React.useState({});
+  const[userCustomers,setUserCustomers]=React.useState({});
+
+  const loadQueue=async()=>{
+    setLoading(true);setError('');
+    try{setQueue(await apiWAQueue(token));}
+    catch(e){setError(e.message);}
+    finally{setLoading(false);}
+  };
+
+  React.useEffect(()=>{loadQueue();},[]);
+
+  const handleAssign=async(item)=>{
+    const custId=selectedCustomer[item.id];
+    const uname=assignState[item.id]?.username||selectedUser;
+    if(!custId||!uname)return;
+    try{
+      await apiWAAssign(token,item.id,custId,uname);
+      loadQueue();
+    }catch(e){setError(e.message);}
+  };
+
+  const handleDelete=async(id)=>{
+    if(!confirm('Bu kaydı kuyruktan silmek istediğinize emin misiniz?'))return;
+    try{await apiWADelete(token,id);loadQueue();}
+    catch(e){setError(e.message);}
+  };
+
+  const loadUserCustomers=async(username)=>{
+    if(userCustomers[username])return;
+    try{
+      const r=await fetch(`/api/admin/user-data/${username}`,{headers:{Authorization:'Bearer '+token}});
+      if(r.ok){const d=await r.json();setUserCustomers(p=>({...p,[username]:d.customers||[]}));}
+    }catch(e){}
+  };
+
+  const card={background:'#131929',borderRadius:'12px',padding:'20px',marginBottom:'16px',border:'1px solid rgba(255,255,255,0.07)'};
+  const label={fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'};
+  const val={fontSize:'14px',color:'#e2e8f0',fontWeight:600};
+
+  return(
+    <div style={{padding:'24px',maxWidth:'900px',margin:'0 auto'}}>
+      <h2 style={{fontWeight:700,fontSize:'20px',color:'#e2e8f0',marginBottom:'20px'}}>WhatsApp Kuyruk</h2>
+      {error&&<div style={{background:'rgba(239,68,68,0.1)',border:'1px solid #ef4444',borderRadius:'8px',padding:'12px',color:'#ef4444',marginBottom:'16px',fontSize:'13px'}}>{error}</div>}
+      {loading&&<div style={{color:'#64748b',textAlign:'center',padding:'40px'}}>Yükleniyor...</div>}
+      {!loading&&queue.length===0&&<div style={{color:'#64748b',textAlign:'center',padding:'40px',background:'#131929',borderRadius:'12px'}}>Bekleyen dekont yok</div>}
+      {queue.map(item=>(
+        <div key={item.id} style={card}>
+          <div style={{display:'flex',gap:'16px',flexWrap:'wrap',marginBottom:'16px'}}>
+            <div><div style={label}>Gönderen</div><div style={val}>{item.from}</div></div>
+            <div><div style={label}>Tarih</div><div style={val}>{item.receivedAt?new Date(item.receivedAt).toLocaleString('tr-TR'):'-'}</div></div>
+            <div><div style={label}>Tutar</div><div style={{...val,color:'#4f8ef7'}}>₺{item.ocr?.tutar?Number(item.ocr.tutar).toLocaleString('tr-TR'):'-'}</div></div>
+            <div><div style={label}>Taksit</div><div style={val}>{item.ocr?.taksit&&item.ocr.taksit>1?item.ocr.taksit+' Taksit':'Peşin'}</div></div>
+            <div><div style={label}>Banka</div><div style={val}>{item.ocr?.banka||'-'}</div></div>
+          </div>
+          {item.imageUrl&&<div style={{marginBottom:'12px'}}><a href={item.imageUrl} target="_blank" rel="noreferrer" style={{fontSize:'12px',color:'#4f8ef7',textDecoration:'none'}}>Dekontu Görüntüle →</a></div>}
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'flex-end'}}>
+            <div>
+              <div style={label}>Kullanıcı</div>
+              <select value={assignState[item.id]?.username||''} onChange={e=>{const u=e.target.value;setAssignState(p=>({...p,[item.id]:{...p[item.id],username:u}}));if(u)loadUserCustomers(u);}}
+                style={{background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',padding:'8px 10px',fontSize:'13px',minWidth:'140px'}}>
+                <option value=''>Kullanıcı seç</option>
+                {allUsers.map(u=><option key={u.username} value={u.username}>{u.username}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={label}>Müşteri</div>
+              <select value={selectedCustomer[item.id]||''} onChange={e=>setSelectedCustomer(p=>({...p,[item.id]:e.target.value}))}
+                style={{background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',padding:'8px 10px',fontSize:'13px',minWidth:'180px'}}>
+                <option value=''>Müşteri seç</option>
+                {(userCustomers[assignState[item.id]?.username||'']||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <button onClick={()=>handleAssign(item)} disabled={!assignState[item.id]?.username||!selectedCustomer[item.id]}
+              style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:(!assignState[item.id]?.username||!selectedCustomer[item.id])?0.4:1}}>
+              Müşteriye Ata
+            </button>
+            <button onClick={()=>handleDelete(item.id)}
+              style={{padding:'8px 14px',background:'rgba(239,68,68,0.15)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+              Sil
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── TOPBAR ── */
-const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',admin:'Kullanıcı Yönetimi'};
+const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
 function Topbar({page,saved,onMenuToggle}){
   const isMobile=useIsMobile();
   return(
@@ -2285,6 +2394,8 @@ function App(){
   const{page:activePage,param:detailCustomerId}=route;
   const saveTimerRef=useRef(null);
   const initRef=useRef(false);
+  const[waqCount,setWaqCount]=useState(0);
+  const[allAdminUsers,setAllAdminUsers]=useState([]);
 
   const logout=()=>{clearAuth();setAuth(null);setAuthScreen('login');setInitialized(false);initRef.current=false;};
 
@@ -2320,6 +2431,19 @@ function App(){
     },800);
     return()=>clearTimeout(saveTimerRef.current);
   },[customers,banks,initialized]);
+
+  useEffect(()=>{
+    if(!auth||auth.role!=='admin')return;
+    const fetchWAQ=()=>apiWAQueue(auth.token).then(q=>setWaqCount(q.filter(i=>i.status==='pending').length)).catch(()=>{});
+    fetchWAQ();
+    const interval=setInterval(fetchWAQ,30000);
+    return()=>clearInterval(interval);
+  },[auth?.token,auth?.role]);
+
+  useEffect(()=>{
+    if(!auth||auth.role!=='admin')return;
+    apiAdminUsers(auth.token).then(setAllAdminUsers).catch(()=>{});
+  },[auth?.token,auth?.role]);
 
   const exportBackup=()=>{
     const blob=new Blob([JSON.stringify({customers,banks,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
@@ -2364,7 +2488,8 @@ function App(){
         onReset={handleReset} saveStatus={saveStatus}
         onExport={exportBackup} onImport={importBackup} onLogout={logout}
         role={auth.role} username={auth.username}
-        mobileOpen={mobileSidebarOpen} onMobileClose={()=>setMobileSidebarOpen(false)}/>
+        mobileOpen={mobileSidebarOpen} onMobileClose={()=>setMobileSidebarOpen(false)}
+        waqCount={waqCount}/>
       <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,overflow:'hidden'}}>
         <Topbar page={activePage} saved={savedTime} onMenuToggle={()=>setMobileSidebarOpen(o=>!o)}/>
         <main style={{flex:1,overflowY:'auto',padding:isMobile?'12px':'24px'}}>
@@ -2382,6 +2507,10 @@ function App(){
           {activePage==='banks'&&<BankSettingsPage banks={banks} onUpdateBanks={setBanks}/>}
           {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
+          )}
+          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} customers={customers}/>}
+          {activePage==='waq'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}
         </main>

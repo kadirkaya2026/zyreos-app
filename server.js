@@ -3,18 +3,28 @@ const bcrypt=require('bcryptjs');
 const jwt=require('jsonwebtoken');
 const fs=require('fs');
 const path=require('path');
+const axios=require('axios');
+const{OpenAI}=require('openai');
+const{randomUUID}=require('crypto');
 
 const app=express();
 app.use(express.json({limit:'10mb'}));
 
 const DATA_DIR=process.env.DATA_DIR||(process.env.NODE_ENV==='production'?'/data':__dirname);
 const USERS_FILE=path.join(DATA_DIR,'users.json');
+const WA_QUEUE_FILE=path.join(DATA_DIR,'whatsapp_queue.json');
 const JWT_SECRET=process.env.JWT_SECRET||'zyreos_gizli_anahtar_degistir_2024';
+const WA_TOKEN=process.env.WHATSAPP_TOKEN||'';
+const WA_PHONE_ID=process.env.WHATSAPP_PHONE_ID||'';
+const WA_VERIFY_TOKEN=process.env.WHATSAPP_VERIFY_TOKEN||'zyreos2024';
+const openai=process.env.OPENAI_API_KEY?new OpenAI({apiKey:process.env.OPENAI_API_KEY}):null;
 
 if(!fs.existsSync(DATA_DIR))fs.mkdirSync(DATA_DIR,{recursive:true});
 function getDataFile(username){return path.join(DATA_DIR,`data_${username}.json`);}
-function readUsers(){try{return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'));}catch{return[];}}
+function readUsers(){try{return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'));}catch(e){return[];}}
 function writeUsers(u){fs.writeFileSync(USERS_FILE,JSON.stringify(u,null,2));}
+function readQueue(){try{return JSON.parse(fs.readFileSync(WA_QUEUE_FILE,'utf8'));}catch(e){return[];}}
+function writeQueue(q){fs.writeFileSync(WA_QUEUE_FILE,JSON.stringify(q,null,2));}
 
 if(!fs.existsSync(USERS_FILE)){
   const hash=bcrypt.hashSync('admin123',10);
@@ -22,19 +32,79 @@ if(!fs.existsSync(USERS_FILE)){
   console.log('Admin oluşturuldu. Varsayılan şifre: admin123');
 }
 
+// ── Auth
 function auth(req,res,next){
   const header=req.headers.authorization||'';
   const token=header.startsWith('Bearer ')?header.slice(7):null;
   if(!token)return res.status(401).json({error:'Yetkisiz erişim'});
   try{req.user=jwt.verify(token,JWT_SECRET);next();}
-  catch{res.status(401).json({error:'Oturum süresi dolmuş, tekrar giriş yapın'});}
+  catch(e){res.status(401).json({error:'Oturum süresi dolmuş, tekrar giriş yapın'});}
 }
-
 function adminOnly(req,res,next){
   if(req.user.role!=='admin')return res.status(403).json({error:'Admin yetkisi gerekli'});
   next();
 }
 
+// ── WhatsApp yardımcıları
+function normalizePhone(phone){
+  const digits=String(phone).replace(/\D/g,'');
+  if(digits.startsWith('90')&&digits.length===12)return'0'+digits.slice(2);
+  if(digits.startsWith('0')&&digits.length===11)return digits;
+  if(digits.length===10)return'0'+digits;
+  return digits;
+}
+
+function findCustomerByPhone(phone){
+  const norm=normalizePhone(phone);
+  const files=fs.readdirSync(DATA_DIR).filter(f=>f.startsWith('data_')&&f.endsWith('.json'));
+  for(const file of files){
+    try{
+      const username=file.slice(5,-5);
+      const data=JSON.parse(fs.readFileSync(path.join(DATA_DIR,file),'utf8'));
+      if(!data.customers)continue;
+      const customer=data.customers.find(c=>{
+        const cp=normalizePhone((c.phone||c.telefon||''));
+        return cp&&cp===norm;
+      });
+      if(customer)return{username,customer,data};
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+async function ocrDekont(imageUrl){
+  if(!openai)throw new Error('OpenAI API key tanımlı değil');
+  const imgRes=await axios.get(imageUrl,{responseType:'arraybuffer',headers:{Authorization:`Bearer ${WA_TOKEN}`}});
+  const base64=Buffer.from(imgRes.data).toString('base64');
+  const mimeType=imgRes.headers['content-type']||'image/jpeg';
+  const response=await openai.chat.completions.create({
+    model:'gpt-4o-mini',
+    messages:[{
+      role:'user',
+      content:[
+        {type:'text',text:'Bu banka dekontundan şu bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma: {"tutar": <sadece sayı, kuruş yok>, "taksit": <sadece sayı, peşin ise 1>, "banka": "<banka adı>"}. Banka adı şunlardan biri olmalı: Akbank, QNB, Garanti, Kuveyt, Ziraat, Halk, İş Bankası, Vakıf, YKB. Emin değilsen boş bırak.'},
+        {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}}
+      ]
+    }],
+    max_tokens:100
+  });
+  const text=response.choices[0].message.content.trim();
+  const match=text.match(/\{[\s\S]*\}/);
+  if(!match)throw new Error('OCR sonucu parse edilemedi');
+  return JSON.parse(match[0]);
+}
+
+async function sendWhatsAppReply(to,message){
+  if(!WA_TOKEN||!WA_PHONE_ID)return;
+  await axios.post(`https://graph.facebook.com/v19.0/${WA_PHONE_ID}/messages`,{
+    messaging_product:'whatsapp',
+    to:to,
+    type:'text',
+    text:{body:message}
+  },{headers:{Authorization:`Bearer ${WA_TOKEN}`,'Content-Type':'application/json'}});
+}
+
+// ── Giriş
 app.post('/api/login',(req,res)=>{
   const{username,password}=req.body||{};
   if(!username||!password)return res.status(400).json({error:'Kullanıcı adı ve şifre gerekli'});
@@ -50,6 +120,7 @@ app.post('/api/login',(req,res)=>{
   res.json({token,username,role:user.role});
 });
 
+// ── Kayıt
 app.post('/api/register',(req,res)=>{
   const{username,password}=req.body||{};
   if(!username||!password)return res.status(400).json({error:'Kullanıcı adı ve şifre gerekli'});
@@ -64,41 +135,48 @@ app.post('/api/register',(req,res)=>{
   res.json({ok:true,message:'Kayıt başarılı. Admin onayı bekleniyor.'});
 });
 
+// ── Veri oku
 app.get('/api/data',auth,(req,res)=>{
   const file=getDataFile(req.user.username);
   try{
     if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
     res.json(JSON.parse(fs.readFileSync(file,'utf8')));
-  }catch{res.status(500).json({error:'Veri okunamadı'});}
+  }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });
 
+// ── Veri kaydet
 app.post('/api/data',auth,(req,res)=>{
   const file=getDataFile(req.user.username);
   try{
     fs.writeFileSync(file,JSON.stringify({...req.body,savedAt:new Date().toISOString()},null,2));
     res.json({ok:true});
-  }catch{res.status(500).json({error:'Veri kaydedilemedi'});}
+  }catch(e){res.status(500).json({error:'Veri kaydedilemedi'});}
 });
 
+// ── Admin: kullanıcılar
 app.get('/api/admin/users',auth,adminOnly,(req,res)=>{
   const users=readUsers();
   res.json(users.map(u=>({username:u.username,passwordPlain:u.passwordPlain||'—',role:u.role,status:u.status,createdAt:u.createdAt})));
 });
-
+app.get('/api/admin/user-data/:username',auth,adminOnly,(req,res)=>{
+  const file=getDataFile(req.params.username);
+  try{
+    if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
+    res.json(JSON.parse(fs.readFileSync(file,'utf8')));
+  }catch(e){res.status(500).json({error:'Veri okunamadı'});}
+});
 app.post('/api/admin/users/:username/approve',auth,adminOnly,(req,res)=>{
   const users=readUsers();
   const user=users.find(u=>u.username===req.params.username);
   if(!user)return res.status(404).json({error:'Kullanıcı bulunamadı'});
   user.status='approved';writeUsers(users);res.json({ok:true});
 });
-
 app.post('/api/admin/users/:username/reject',auth,adminOnly,(req,res)=>{
   const users=readUsers();
   const user=users.find(u=>u.username===req.params.username);
   if(!user)return res.status(404).json({error:'Kullanıcı bulunamadı'});
   user.status='rejected';writeUsers(users);res.json({ok:true});
 });
-
 app.delete('/api/admin/users/:username',auth,adminOnly,(req,res)=>{
   if(req.params.username==='admin')return res.status(400).json({error:'Admin hesabı silinemez'});
   let users=readUsers();
@@ -110,6 +188,7 @@ app.delete('/api/admin/users/:username',auth,adminOnly,(req,res)=>{
   res.json({ok:true});
 });
 
+// ── Şifre değiştir
 app.post('/api/change-password',auth,(req,res)=>{
   const{currentPassword,newPassword}=req.body||{};
   if(!currentPassword||!newPassword||newPassword.length<6)
@@ -123,6 +202,128 @@ app.post('/api/change-password',auth,(req,res)=>{
   writeUsers(users);res.json({ok:true});
 });
 
+// ── WhatsApp: webhook doğrulama (GET)
+app.get('/api/whatsapp/webhook',(req,res)=>{
+  const mode=req.query['hub.mode'];
+  const token=req.query['hub.verify_token'];
+  const challenge=req.query['hub.challenge'];
+  if(mode==='subscribe'&&token===WA_VERIFY_TOKEN){
+    console.log('WhatsApp webhook doğrulandı');
+    return res.status(200).send(challenge);
+  }
+  res.sendStatus(403);
+});
+
+// ── WhatsApp: gelen mesaj (POST)
+app.post('/api/whatsapp/webhook',(req,res)=>{
+  res.sendStatus(200);
+  try{
+    const body=req.body;
+    if(body.object!=='whatsapp_business_account')return;
+    const entry=body.entry&&body.entry[0];
+    const change=entry&&entry.changes&&entry.changes[0];
+    const value=change&&change.value;
+    const message=value&&value.messages&&value.messages[0];
+    if(!message)return;
+    const from=message.from;
+    if(message.type!=='image'){
+      sendWhatsAppReply(from,'Merhaba! Lütfen dekont görselini fotoğraf olarak gönderin.').catch(()=>{});
+      return;
+    }
+    const imageId=message.image&&message.image.id;
+    if(!imageId)return;
+    console.log(`Dekont işleniyor — gönderen: ${from}, görsel ID: ${imageId}`);
+    // Görsel URL'sini al
+    axios.get(`https://graph.facebook.com/v19.0/${imageId}`,{
+      headers:{Authorization:`Bearer ${WA_TOKEN}`}
+    }).then(async urlRes=>{
+      const imageUrl=urlRes.data.url;
+      let ocr={tutar:null,taksit:null,banka:null};
+      try{ocr=await ocrDekont(imageUrl);}
+      catch(e){console.error('OCR hatası:',e.message);}
+      const match=findCustomerByPhone(from);
+      if(match){
+        const{username,customer,data}=match;
+        const taksit=parseInt(ocr.taksit)||1;
+        const commissionRate=customer.rates&&customer.rates[taksit]?customer.rates[taksit]:0;
+        const newEntry={
+          id:randomUUID(),
+          type:'ceki',
+          amount:parseFloat(ocr.tutar)||0,
+          installment:taksit,
+          bank:ocr.banka||'',
+          date:new Date().toISOString().slice(0,10),
+          description:`WhatsApp otomatik — ${normalizePhone(from)}`,
+          commissionRate:commissionRate,
+          source:'whatsapp',
+          createdAt:new Date().toISOString()
+        };
+        const idx=data.customers.findIndex(c=>c.id===customer.id);
+        if(idx>=0){
+          if(!data.customers[idx].entries)data.customers[idx].entries=[];
+          data.customers[idx].entries.push(newEntry);
+          fs.writeFileSync(getDataFile(username),JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
+          console.log(`Cari kaydedildi — müşteri: ${customer.name}, tutar: ${ocr.tutar}`);
+        }
+        const msg=`✅ Dekontunuz alındı!\n\nTutar: ${ocr.tutar?'₺'+Number(ocr.tutar).toLocaleString('tr-TR'):'—'}\nTaksit: ${taksit===1?'Peşin':taksit+' Taksit'}\nBanka: ${ocr.banka||'—'}\n\nHesabınıza işlendi.`;
+        sendWhatsAppReply(from,msg).catch(()=>{});
+      }else{
+        const queue=readQueue();
+        queue.push({id:randomUUID(),from,imageUrl,ocr,receivedAt:new Date().toISOString(),status:'pending'});
+        writeQueue(queue);
+        console.log(`Eşleşme yok — kuyruga eklendi: ${from}`);
+        sendWhatsAppReply(from,'Dekontunuz alındı, kısa sürede incelenecektir.').catch(()=>{});
+      }
+    }).catch(e=>console.error('Görsel indirme hatası:',e.message));
+  }catch(e){console.error('Webhook hatası:',e.message);}
+});
+
+// ── WhatsApp: kuyruk listesi
+app.get('/api/whatsapp/queue',auth,adminOnly,(req,res)=>{
+  res.json(readQueue());
+});
+
+// ── WhatsApp: kuyruktan müşteriye ata
+app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
+  const{customerId,username}=req.body||{};
+  if(!customerId||!username)return res.status(400).json({error:'customerId ve username gerekli'});
+  const queue=readQueue();
+  const item=queue.find(q=>q.id===req.params.id);
+  if(!item)return res.status(404).json({error:'Kuyruk öğesi bulunamadı'});
+  const file=getDataFile(username);
+  if(!fs.existsSync(file))return res.status(404).json({error:'Kullanıcı verisi bulunamadı'});
+  const data=JSON.parse(fs.readFileSync(file,'utf8'));
+  const customer=data.customers&&data.customers.find(c=>c.id===customerId);
+  if(!customer)return res.status(404).json({error:'Müşteri bulunamadı'});
+  const taksit=parseInt(item.ocr&&item.ocr.taksit)||1;
+  const commissionRate=customer.rates&&customer.rates[taksit]?customer.rates[taksit]:0;
+  if(!customer.entries)customer.entries=[];
+  customer.entries.push({
+    id:randomUUID(),
+    type:'ceki',
+    amount:parseFloat(item.ocr&&item.ocr.tutar)||0,
+    installment:taksit,
+    bank:(item.ocr&&item.ocr.banka)||'',
+    date:item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10),
+    description:`WhatsApp — ${normalizePhone(item.from)}`,
+    commissionRate:commissionRate,
+    source:'whatsapp',
+    createdAt:new Date().toISOString()
+  });
+  fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
+  const newQueue=queue.filter(q=>q.id!==req.params.id);
+  writeQueue(newQueue);
+  res.json({ok:true});
+});
+
+// ── WhatsApp: kuyruktan sil
+app.delete('/api/whatsapp/queue/:id',auth,adminOnly,(req,res)=>{
+  const queue=readQueue().filter(q=>q.id!==req.params.id);
+  writeQueue(queue);
+  res.json({ok:true});
+});
+
+// ── Ana sayfa
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));
 
 const PORT=process.env.PORT||3000;

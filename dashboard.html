@@ -2158,7 +2158,50 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
 }
 
 /* ── ADMIN USERS PAGE ── */
-function AdminUsersPage({token}){
+const _adminInpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
+const _adminOverlayS={position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'};
+const _adminModalS={background:'#1e2433',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'400px',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',gap:'16px'};
+
+function AdminUserModal({title,onClose,onSubmit,submitLabel,form,setForm,formErr,editModal,addModal}){
+  return(
+    <div style={_adminOverlayS} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={_adminModalS}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0'}}>{title}</span>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'20px',lineHeight:1}}>×</button>
+        </div>
+        {formErr&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{formErr}</div>}
+        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          <div>
+            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
+            <input style={_adminInpS} value={form.username||''} onChange={e=>setForm(p=>({...p,username:e.target.value}))} placeholder="kullaniciadi"/>
+          </div>
+          <div>
+            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>
+              {editModal?'Yeni Şifre (boş bırakırsan değişmez)':'Şifre'}
+            </label>
+            <input style={_adminInpS} type="password" value={form.password||''} onChange={e=>setForm(p=>({...p,password:e.target.value}))} placeholder={editModal?'Değiştirmek için gir…':'Min 6 karakter'}/>
+          </div>
+          {addModal&&(
+            <div>
+              <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Rol</label>
+              <select style={_adminInpS} value={form.role||'user'} onChange={e=>setForm(p=>({...p,role:e.target.value}))}>
+                <option value="user">Kullanıcı</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          )}
+        </div>
+        <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
+          <button onClick={onSubmit} style={{padding:'10px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',cursor:'pointer',fontWeight:700}}>{submitLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminUsersPage({token,onUsernameChanged,currentUsername}){
   const[users,setUsers]=useState([]);
   const[loading,setLoading]=useState(true);
   const[error,setError]=useState('');
@@ -2195,7 +2238,9 @@ function AdminUsersPage({token}){
       const r=await fetch(`/api/admin/users/${editModal}`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({newUsername:form.username.trim(),newPassword:form.password||undefined})});
       const d=await r.json();
       if(!r.ok){setFormErr(d.error||'Hata');return;}
+      const newUn=form.username.trim();
       setEditModal(null);await load();
+      if(onUsernameChanged&&editModal===currentUsername)onUsernameChanged(newUn);
     }catch(e){setFormErr(e.message);}
   };
 
@@ -2217,48 +2262,9 @@ function AdminUsersPage({token}){
     return<span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:c.bg,color:c.color,border:`1px solid ${c.color}44`}}>{c.label}</span>;
   };
 
-  const inpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
+  const inpS=_adminInpS;
   const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
   const td={padding:'10px 14px',fontSize:'13px'};
-  const overlayS={position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'};
-  const modalS={background:'#1e2433',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'400px',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',gap:'16px'};
-
-  const Modal=({title,onClose,onSubmit,submitLabel})=>(
-    <div style={overlayS} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={modalS}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0'}}>{title}</span>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'20px',lineHeight:1}}>×</button>
-        </div>
-        {formErr&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{formErr}</div>}
-        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
-            <input style={inpS} value={form.username||''} onChange={e=>setForm(p=>({...p,username:e.target.value}))} placeholder="kullaniciadi"/>
-          </div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>
-              {editModal?'Yeni Şifre (boş bırakırsan değişmez)':'Şifre'}
-            </label>
-            <input style={inpS} type="password" value={form.password||''} onChange={e=>setForm(p=>({...p,password:e.target.value}))} placeholder={editModal?'Değiştirmek için gir…':'Min 6 karakter'}/>
-          </div>
-          {addModal&&(
-            <div>
-              <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Rol</label>
-              <select style={inpS} value={form.role||'user'} onChange={e=>setForm(p=>({...p,role:e.target.value}))}>
-                <option value="user">Kullanıcı</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          )}
-        </div>
-        <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
-          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
-          <button onClick={onSubmit} style={{padding:'10px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',cursor:'pointer',fontWeight:700}}>{submitLabel}</button>
-        </div>
-      </div>
-    </div>
-  );
 
   const pending=users.filter(u=>u.status==='pending');
 
@@ -2366,8 +2372,8 @@ function AdminUsersPage({token}){
         </div>
       </Card>
 
-      {editModal&&<Modal title={`Düzenle — ${editModal}`} onClose={()=>setEditModal(null)} onSubmit={submitEdit} submitLabel="Kaydet"/>}
-      {addModal&&<Modal title="Yeni Kullanıcı Ekle" onClose={()=>setAddModal(false)} onSubmit={submitAdd} submitLabel="Ekle"/>}
+      {editModal&&<AdminUserModal title={`Düzenle — ${editModal}`} onClose={()=>setEditModal(null)} onSubmit={submitEdit} submitLabel="Kaydet" form={form} setForm={setForm} formErr={formErr} editModal={editModal} addModal={false}/>}
+      {addModal&&<AdminUserModal title="Yeni Kullanıcı Ekle" onClose={()=>setAddModal(false)} onSubmit={submitAdd} submitLabel="Ekle" form={form} setForm={setForm} formErr={formErr} editModal={null} addModal={true}/>}
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
     </div>
   );
@@ -2779,7 +2785,7 @@ function App(){
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
           {activePage==='dekont'&&<DekontPage customers={customers} banks={banks} onUpdateCustomers={setCustomers}/>}
           {activePage==='banks'&&<BankSettingsPage banks={banks} onUpdateBanks={setBanks}/>}
-          {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token}/>}
+          {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}

@@ -1462,18 +1462,24 @@ function ProfitPage({customers}){
   const totalC=rows.reduce((s,r)=>s+r.amount,0);
   const totalKom=rows.reduce((s,r)=>s+(r.customerComm||0),0);
   const totalBank=rows.reduce((s,r)=>s+(r.bankCost||0),0);
-  const totalNet=rows.reduce((s,r)=>s+(r.profit||0),0);
-  const totals={totalC,totalKom,totalBank,totalNet};
+  const totalOwner=rows.reduce((s,r)=>s++(((r.amount-(r.bankCost||0))*0.01)).toFixed(2)*1,0);
+  const totalNet=rows.reduce((s,r)=>{
+    const ownerShare=+((r.amount-(r.bankCost||0))*0.01).toFixed(2);
+    return s+(r.profit||0)-ownerShare;
+  },0);
+  const totals={totalC,totalKom,totalBank,totalOwner,totalNet};
 
   // Müşteri bazlı özet
   const custMap={};
   rows.forEach(r=>{
+    const ownerShare=+((r.amount-(r.bankCost||0))*0.01).toFixed(2);
+    const realProfit=(r.profit||0)-ownerShare;
     if(!custMap[r.customerId])custMap[r.customerId]={id:r.customerId,name:r.customerName,code:r.customerCode,cnt:0,totalC:0,kom:0,bank:0,profit:0};
     custMap[r.customerId].cnt++;
     custMap[r.customerId].totalC+=r.amount;
     custMap[r.customerId].kom+=(r.customerComm||0);
     custMap[r.customerId].bank+=(r.bankCost||0);
-    custMap[r.customerId].profit+=(r.profit||0);
+    custMap[r.customerId].profit+=realProfit;
   });
   const custStats=Object.values(custMap).map(r=>({...r,margin:r.totalC>0?+(r.profit/r.totalC*100).toFixed(2):0})).sort((a,b)=>b.profit-a.profit);
 
@@ -1570,7 +1576,7 @@ function ProfitPage({customers}){
                     <div style={{color:'#ef4444',fontWeight:600}}>{fmtTL(r.bankCost)}</div>
                     <div style={{color:'#64748b',fontSize:'11px'}}>%{r.bankRate}</div>
                   </td>
-                  <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'14px',color:r.profit>=0?'#22c55e':'#ef4444'}}>{fmtTL(r.profit)}</td>
+                  <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'14px',color:((r.profit||0)-+((r.amount-(r.bankCost||0))*0.01).toFixed(2))>=0?'#22c55e':'#ef4444'}}>{fmtTL((r.profit||0)-+((r.amount-(r.bankCost||0))*0.01).toFixed(2))}</td>
                 </tr>
               ))}
               {rows.length===0&&<tr><td colSpan={8} style={{padding:'40px',textAlign:'center',color:'#64748b'}}>Seçilen dönemde işlem bulunamadı</td></tr>}

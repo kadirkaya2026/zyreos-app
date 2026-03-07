@@ -470,6 +470,8 @@ app.delete('/api/whatsapp/queue/:id',auth,adminOnly,(req,res)=>{
 });
 
 // ── Ana sayfa
+app.get('/favicon.png',(req,res)=>res.sendFile(path.join(__dirname,'favicon.png')));
+app.get('/manifest.json',(req,res)=>res.sendFile(path.join(__dirname,'manifest.json')));
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));
 
 const PORT=process.env.PORT||3000;

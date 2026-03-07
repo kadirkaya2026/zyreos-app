@@ -4,6 +4,13 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ZYREOS — Finansal Takip Sistemi</title>
+<link rel="icon" type="image/png" href="/favicon.png"/>
+<link rel="apple-touch-icon" href="/favicon.png"/>
+<link rel="manifest" href="/manifest.json"/>
+<meta name="theme-color" content="#4f8ef7"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="ZYREOS"/>
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -2697,20 +2704,57 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
 const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
 function Topbar({page,saved,onMenuToggle}){
   const isMobile=useIsMobile();
+  const[installPrompt,setInstallPrompt]=React.useState(null);
+  const[isIOS,setIsIOS]=React.useState(false);
+  const[showIOSHint,setShowIOSHint]=React.useState(false);
+  React.useEffect(()=>{
+    const handler=e=>{e.preventDefault();setInstallPrompt(e);};
+    window.addEventListener('beforeinstallprompt',handler);
+    const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.navigator.standalone;
+    setIsIOS(ios);
+    return()=>window.removeEventListener('beforeinstallprompt',handler);
+  },[]);
+  const handleInstall=async()=>{
+    if(installPrompt){
+      installPrompt.prompt();
+      const{outcome}=await installPrompt.userChoice;
+      if(outcome==='accepted')setInstallPrompt(null);
+    }else if(isIOS){
+      setShowIOSHint(p=>!p);
+    }
+  };
+  const showBtn=installPrompt||(isIOS&&!window.navigator.standalone);
   return(
-    <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',borderBottom:'1px solid rgba(255,255,255,0.07)',background:'#0c1021',position:'sticky',top:0,zIndex:100,flexShrink:0}}>
-      <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-        {isMobile&&(
-          <button onClick={onMenuToggle} style={{background:'none',border:'none',color:'#94a3b8',cursor:'pointer',padding:'6px',display:'flex',alignItems:'center',borderRadius:'8px'}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          </button>
-        )}
-        <h1 style={{fontWeight:700,fontSize:isMobile?'14px':'16px',color:'#e2e8f0'}}>{PAGE_TITLES[page]||page}</h1>
+    <div style={{position:'relative'}}>
+      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',borderBottom:'1px solid rgba(255,255,255,0.07)',background:'#0c1021',position:'sticky',top:0,zIndex:100,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+          {isMobile&&(
+            <button onClick={onMenuToggle} style={{background:'none',border:'none',color:'#94a3b8',cursor:'pointer',padding:'6px',display:'flex',alignItems:'center',borderRadius:'8px'}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+          )}
+          <h1 style={{fontWeight:700,fontSize:isMobile?'14px':'16px',color:'#e2e8f0'}}>{PAGE_TITLES[page]||page}</h1>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+          {saved&&(
+            <div style={{display:'flex',alignItems:'center',gap:'6px',color:'#22c55e',fontSize:'12px',fontWeight:600}}>
+              <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#22c55e'}}/>
+              {!isMobile&&'Kaydedildi '}{saved}
+            </div>
+          )}
+          {showBtn&&(
+            <button onClick={handleInstall} style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',borderRadius:'8px',border:'1px solid rgba(79,142,247,0.4)',background:'rgba(79,142,247,0.1)',color:'#4f8ef7',cursor:'pointer',fontWeight:600,fontSize:'12px',whiteSpace:'nowrap'}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v13"/><polyline points="17 11 12 16 7 11"/><path d="M3 19h18"/></svg>
+              {!isMobile&&'Ana Ekrana Ekle'}
+            </button>
+          )}
+        </div>
       </div>
-      {saved&&(
-        <div style={{display:'flex',alignItems:'center',gap:'6px',color:'#22c55e',fontSize:'12px',fontWeight:600}}>
-          <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#22c55e'}}/>
-          {!isMobile&&'Kaydedildi '}{saved}
+      {showIOSHint&&(
+        <div style={{position:'absolute',top:'60px',right:'12px',background:'#1e2433',border:'1px solid rgba(79,142,247,0.3)',borderRadius:'12px',padding:'14px 16px',zIndex:200,maxWidth:'240px',boxShadow:'0 8px 32px rgba(0,0,0,0.4)'}}>
+          <div style={{fontWeight:700,fontSize:'13px',color:'#e2e8f0',marginBottom:'8px'}}>Ana Ekrana Ekle</div>
+          <div style={{fontSize:'12px',color:'#94a3b8',lineHeight:'1.5'}}>Safari'de alttaki <strong style={{color:'#4f8ef7'}}>Paylaş</strong> butonuna bas, ardından <strong style={{color:'#4f8ef7'}}>Ana Ekrana Ekle</strong>'yi seç.</div>
+          <button onClick={()=>setShowIOSHint(false)} style={{marginTop:'10px',width:'100%',padding:'7px',borderRadius:'8px',border:'none',background:'rgba(79,142,247,0.15)',color:'#4f8ef7',cursor:'pointer',fontWeight:600,fontSize:'12px'}}>Tamam</button>
         </div>
       )}
     </div>

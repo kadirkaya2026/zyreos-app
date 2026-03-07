@@ -266,17 +266,25 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
         const amount=parseFloat(ocr.tutar)||0;
         const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
         const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
+        const bankName=ocr.banka||'';
+        const bankObj=(data.banks||[]).find(b=>b.name&&b.name.toLowerCase()===bankName.toLowerCase());
+        const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]?parseFloat(bankObj.rates[taksit-1]):0;
+        const bankCost=parseFloat((amount*bankRate/100).toFixed(2));
+        const profit=parseFloat((amount*(customerRate-bankRate)/100).toFixed(2));
         const newEntry={
           id:randomUUID(),
           type:'cekim',
           amount:amount,
           installment:taksit,
-          bank:ocr.banka||'',
+          bank:bankName,
           date:new Date().toISOString().slice(0,10),
           description:`WhatsApp otomatik — ${normalizePhone(from)}`,
           customerRate:customerRate,
           customerComm:customerComm,
           netToCustomer:netToCustomer,
+          bankRate:bankRate,
+          bankCost:bankCost,
+          profit:profit,
           source:'whatsapp',
           createdAt:new Date().toISOString()
         };
@@ -324,18 +332,26 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
   const amount=parseFloat(ocrData.tutar)||0;
   const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
   const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
+  const bankName=ocrData.banka||'';
+  const bankObj=(data.banks||[]).find(b=>b.name&&b.name.toLowerCase()===bankName.toLowerCase());
+  const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]?parseFloat(bankObj.rates[taksit-1]):0;
+  const bankCost=parseFloat((amount*bankRate/100).toFixed(2));
+  const profit=parseFloat((amount*(customerRate-bankRate)/100).toFixed(2));
   if(!data.customers[customerIdx].cariEntries)data.customers[customerIdx].cariEntries=[];
   data.customers[customerIdx].cariEntries.push({
     id:randomUUID(),
     type:'cekim',
     amount:amount,
     installment:taksit,
-    bank:ocrData.banka||'',
+    bank:bankName,
     date:item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10),
     description:`WhatsApp — ${normalizePhone(item.from)}`,
     customerRate:customerRate,
     customerComm:customerComm,
     netToCustomer:netToCustomer,
+    bankRate:bankRate,
+    bankCost:bankCost,
+    profit:profit,
     source:'whatsapp',
     createdAt:new Date().toISOString()
   });

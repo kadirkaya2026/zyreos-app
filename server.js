@@ -193,6 +193,7 @@ app.post('/api/register',(req,res)=>{
 
 // ── Veri oku
 app.get('/api/data',auth,(req,res)=>{
+  res.set('Cache-Control','no-store');
   const file=getDataFile(req.user.username);
   try{
     if(!fs.existsSync(file))return res.json({customers:[],banks:[]});

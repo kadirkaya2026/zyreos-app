@@ -2238,7 +2238,7 @@ function AdminUsersPage({token}){
 }
 
 /* ── WHATSAPP QUEUE PAGE ── */
-function WhatsAppQueuePage({token,allUsers}){
+function WhatsAppQueuePage({token,allUsers,onReload}){
   const[queue,setQueue]=React.useState([]);
   const[loading,setLoading]=React.useState(true);
   const[error,setError]=React.useState('');
@@ -2291,6 +2291,7 @@ function WhatsAppQueuePage({token,allUsers}){
       setDupWarning(p=>({...p,[item.id]:null}));
       setError('');
       loadQueue();
+      if(onReload)onReload();
     }catch(e){
       if(e.code==='mükerrer'){
         setDupWarning(p=>({...p,[item.id]:{message:e.message,item,custId,cust,ocr}}));
@@ -2587,7 +2588,7 @@ function App(){
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}
-          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} customers={customers}/>}
+          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} onReload={()=>apiFetchData(auth.token).then(d=>{if(d.customers)setCustomers(d.customers);if(d.banks)setBanks(d.banks);})}/>}
           {activePage==='waq'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}

@@ -2562,7 +2562,7 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
     if(statusFilter==='pending')return item.status!=='assigned';
     if(statusFilter==='assigned')return item.status==='assigned';
     return true;
-  });
+  }).sort((a,b)=>new Date(b.receivedAt||0)-new Date(a.receivedAt||0));
 
   const pendingCount=queue.filter(i=>i.status!=='assigned').length;
   const assignedCount=queue.filter(i=>i.status==='assigned').length;

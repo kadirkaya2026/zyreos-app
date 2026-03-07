@@ -233,7 +233,7 @@ function LoginPage({onLogin,onGoRegister}){
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#0a0d14'}}>
       <div style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
         <div style={{textAlign:'center',marginBottom:'32px'}}>
-          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZY<span style={{color:'#4f8ef7'}}>REOS</span></div>
+          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></div>
           <div style={{color:'#64748b',fontSize:'13px',marginTop:'6px'}}>Finansal Takip Sistemi</div>
         </div>
         <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:'16px'}}>
@@ -284,7 +284,7 @@ function RegisterPage({onGoLogin}){
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#0a0d14'}}>
       <div style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
         <div style={{textAlign:'center',marginBottom:'32px'}}>
-          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZY<span style={{color:'#4f8ef7'}}>REOS</span></div>
+          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></div>
           <div style={{color:'#64748b',fontSize:'13px',marginTop:'6px'}}>Yeni Hesap Oluştur</div>
         </div>
         {done?(
@@ -2069,12 +2069,16 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
     {id:'dashboard',label:'Dashboard',icon:<IcoHome/>},
     {id:'customers',label:'Müşteriler',icon:<IcoUsers/>},
     {id:'reports',label:'Raporlamalar',icon:<IcoPDF/>},
-    {id:'pos',label:'POS Hesap',icon:<IcoChart/>},
-    {id:'profit',label:'Kar Analizi',icon:<IcoChart/>},
+    {id:'pos',label:'POS Hesap',icon:<IcoChart/>,sub:true},
+    {id:'profit',label:'Kar Analizi',icon:<IcoChart/>,sub:true},
     {id:'dekont',label:'Dekont Yükle',icon:<IcoUpload/>},
+    ...(role==='admin'?[{id:'waq',label:'WhatsApp',icon:<IcoUpload/>,sub:true}]:[]),
     {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
     {id:'hesabim',label:'Hesabım',icon:<IcoCog/>},
-    ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>},{id:'waq',label:'WA Kuyruk',icon:<IcoUpload/>}]:[]),
+    ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>,sub:true}]:[]),
+    {id:'__export',label:'Yedek Al',icon:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,sub:true,action:onExport,color:'#22c55e'},
+    {id:'__import',label:'Geri Yükle',icon:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,sub:true,isImport:true,color:'#f59e0b'},
+    {id:'__reset',label:'Verileri Sıfırla',icon:<IcoRefresh size={14}/>,sub:true,action:onReset,color:'#ef4444'},
   ];
   const w=isMobile?236:(collapsed?64:236);
   const statusLabel=saveStatus==='saving'?'Kaydediliyor…':saveStatus==='saved'?'✓ Sunucuya Kaydedildi':saveStatus==='error'?'Kayıt Hatası':'Hazır';
@@ -2094,8 +2098,8 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
   }
   return(
     <div style={sidebarStyle}>
-      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0}}>
-        {!collapsed&&<span style={{fontWeight:800,fontSize:'18px',letterSpacing:'-0.5px',color:'#e2e8f0'}}>ZY<span style={{color:'#4f8ef7'}}>REOS</span></span>}
+      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0,cursor:'pointer'}} onClick={()=>setPage('dashboard')}>
+        {!collapsed&&<span style={{fontWeight:800,fontSize:'18px',letterSpacing:'-0.5px',color:'#e2e8f0'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></span>}
         {collapsed&&<div style={{width:'32px',height:'32px',borderRadius:'8px',background:'#4f8ef7',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'14px',color:'#fff'}}>Z</div>}
       </div>
       {!collapsed&&username&&(
@@ -2110,9 +2114,30 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
       <nav style={{flex:1,padding:'12px 8px',overflowY:'auto'}}>
         {nav.map(n=>{
           const active=page===n.id;
+          const isSub=n.sub;
+          if(n.isImport){
+            return(
+              <label key={n.id} title={collapsed?n.label:''}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'8px 0':`6px 14px 6px ${isSub?'28px':'14px'}`,justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#64748b',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
+                <span style={{flexShrink:0}}>{n.icon}</span>
+                {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
+                <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
+              </label>
+            );
+          }
+          if(n.action){
+            return(
+              <button key={n.id} onClick={n.action} title={collapsed?n.label:''}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'8px 0':`6px 14px 6px ${isSub?'28px':'14px'}`,justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#64748b',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
+                <span style={{flexShrink:0}}>{n.icon}</span>
+                {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
+              </button>
+            );
+          }
           return(
             <button key={n.id} onClick={()=>navClick(n.id)} title={collapsed?n.label:''}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':'10px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':'#64748b',cursor:'pointer',fontWeight:active?700:500,fontSize:'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
+              style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':`${isSub?'6px':'10px'} 14px ${isSub?'6px':'10px'} ${isSub?'28px':'14px'}`,justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':(isSub?'#94a3b8':'#64748b'),cursor:'pointer',fontWeight:active?700:(isSub?500:500),fontSize:isSub?'12px':'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
+              {isSub&&!collapsed&&<span style={{color:'rgba(255,255,255,0.15)',marginRight:'-4px',fontSize:'10px'}}>└</span>}
               <span style={{flexShrink:0}}>{n.icon}</span>
               {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
               {!collapsed&&n.id==='waq'&&waqCount>0&&<span style={{background:'#ef4444',color:'#fff',borderRadius:'10px',padding:'1px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}}>{waqCount}</span>}
@@ -2127,21 +2152,6 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
             <span style={{fontSize:'10px',color:statusColor,fontWeight:600,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{statusLabel}</span>
           </div>
         )}
-        <button onClick={onExport} title={collapsed?'Yedek Al':''}
-          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'1px solid rgba(34,197,94,0.2)',background:'rgba(34,197,94,0.06)',color:'#22c55e',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          {!collapsed&&'Yedek Al'}
-        </button>
-        <label title={collapsed?'Geri Yükle':''}
-          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'1px solid rgba(245,158,11,0.2)',background:'rgba(245,158,11,0.06)',color:'#f59e0b',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          {!collapsed&&'Geri Yükle'}
-          <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
-        </label>
-        <button onClick={onReset} title={collapsed?'Sıfırla':''}
-          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:'#ef4444',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
-          <IcoRefresh size={14}/>{!collapsed&&'Verileri Sıfırla'}
-        </button>
         <button onClick={onLogout} title={collapsed?'Çıkış':''}
           style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'1px solid rgba(100,116,139,0.2)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>

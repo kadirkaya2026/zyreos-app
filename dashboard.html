@@ -895,7 +895,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
       {tab==='bilgi'&&(
         <Card>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-            {[['Ad Soyad',customer.name],['Telefon',customer.phone||'—']].map(([l,v])=>(
+            {[['Ad Soyad',customer.name],['Müşteri Kodu',customer.code||'—'],['Telefon',customer.phone||'—'],['E-posta',customer.email||'—'],['Adres',customer.address||'—'],['Vergi No',customer.taxNo||'—']].map(([l,v])=>(
               <div key={l}>
                 <div style={{color:'#64748b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>{l}</div>
                 <div style={{fontWeight:600}}>{v}</div>
@@ -903,9 +903,20 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
             ))}
           </div>
           <div style={{marginTop:'20px',background:'#2d1f04',border:'1px solid #f59e0b44',borderRadius:'10px',padding:'16px'}}>
-            <div style={{color:'#f59e0b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'6px'}}>Komisyon Oranı</div>
-            <div className="tabular-nums" style={{fontSize:'28px',fontWeight:800,color:'#f59e0b'}}>%{customer.commissionRate}</div>
-            <div style={{color:'#d97706',fontSize:'12px',marginTop:'4px'}}>Kart çekimlerinde uygulanan müşteri komisyon oranı</div>
+            <div style={{color:'#f59e0b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'12px'}}>Komisyon Oranları</div>
+            {customer.installmentRates&&customer.installmentRates.some(r=>r>0)?(
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(80px,1fr))',gap:'8px'}}>
+                {customer.installmentRates.map((r,i)=>r>0?(
+                  <div key={i} style={{background:'rgba(245,158,11,0.12)',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
+                    <div style={{color:'#d97706',fontSize:'10px',fontWeight:700,marginBottom:'2px'}}>{i===0?'Peşin':`${i+1} Taksit`}</div>
+                    <div style={{color:'#f59e0b',fontSize:'16px',fontWeight:800}}>%{r}</div>
+                  </div>
+                ):null)}
+              </div>
+            ):(
+              <div className="tabular-nums" style={{fontSize:'28px',fontWeight:800,color:'#f59e0b'}}>%{customer.commissionRate}</div>
+            )}
+            <div style={{color:'#d97706',fontSize:'12px',marginTop:'8px'}}>Kart çekimlerinde uygulanan müşteri komisyon oranları</div>
           </div>
           {customer.notes&&(
             <div style={{marginTop:'16px',background:'#131929',borderRadius:'10px',padding:'14px',border:'1px solid rgba(255,255,255,0.06)'}}>
@@ -1462,7 +1473,7 @@ function ProfitPage({customers}){
   const totalC=rows.reduce((s,r)=>s+r.amount,0);
   const totalKom=rows.reduce((s,r)=>s+(r.customerComm||0),0);
   const totalBank=rows.reduce((s,r)=>s+(r.bankCost||0),0);
-  const totalOwner=rows.reduce((s,r)=>s++(((r.amount-(r.bankCost||0))*0.01)).toFixed(2)*1,0);
+  const totalOwner=rows.reduce((s,r)=>s+(((r.amount-(r.bankCost||0))*0.01).toFixed(2)*1),0);
   const totalNet=rows.reduce((s,r)=>{
     const ownerShare=+((r.amount-(r.bankCost||0))*0.01).toFixed(2);
     return s+(r.profit||0)-ownerShare;

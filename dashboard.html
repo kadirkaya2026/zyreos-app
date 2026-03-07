@@ -796,7 +796,11 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
     onUpdateCustomer({...customer,cariEntries:[...entries,entry]});
   };
   const handleDeleteEntry=id=>{
+    const entry=entries.find(e=>e.id===id);
     onUpdateCustomer({...customer,cariEntries:entries.filter(e=>e.id!==id)});
+    if(entry&&entry.queueId&&entry.source==='whatsapp'){
+      fetch(`/api/whatsapp/queue/${entry.queueId}/unassign`,{method:'PATCH',headers:{Authorization:'Bearer '+(localStorage.getItem('zyreos_token')||'')}}).catch(()=>{});
+    }
   };
   // running balance rows
   let running=0;

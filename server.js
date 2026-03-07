@@ -454,6 +454,7 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
     bankCost:bankCost,
     profit:profit,
     source:'whatsapp',
+    queueId:req.params.id,
     createdAt:new Date().toISOString()
   });
   fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
@@ -465,6 +466,17 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
 // ── WhatsApp: kuyruktan sil
 app.delete('/api/whatsapp/queue/:id',auth,adminOnly,(req,res)=>{
   const queue=readQueue().filter(q=>q.id!==req.params.id);
+  writeQueue(queue);
+  res.json({ok:true});
+});
+
+app.patch('/api/whatsapp/queue/:id/unassign',auth,adminOnly,(req,res)=>{
+  const queue=readQueue();
+  const idx=queue.findIndex(q=>q.id===req.params.id);
+  if(idx===-1)return res.status(404).json({error:'Kayıt bulunamadı'});
+  queue[idx].status='pending';
+  delete queue[idx].assignedAt;
+  delete queue[idx].assignedTo;
   writeQueue(queue);
   res.json({ok:true});
 });

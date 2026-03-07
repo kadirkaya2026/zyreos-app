@@ -80,7 +80,7 @@ async function ocrDekont(mediaId){
   });
   const imageUrl=metaRes.data.url;
   if(!imageUrl)throw new Error('Görsel URL alınamadı');
-  const imgRes=await axios.get(imageUrl,{responseType:'arraybuffer',headers:{Authorization:`Bearer ${WA_TOKEN}`}});
+  const imgRes=await axios.get(imageUrl,{responseType:'arraybuffer',headers:{Authorization:`Bearer ${WA_TOKEN}`},params:{access_token:WA_TOKEN}});
   const base64=Buffer.from(imgRes.data).toString('base64');
   const mimeType=imgRes.headers['content-type']||'image/jpeg';
   const response=await openai.chat.completions.create({

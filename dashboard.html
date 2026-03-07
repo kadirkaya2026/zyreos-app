@@ -2263,8 +2263,9 @@ function WhatsAppQueuePage({token,allUsers}){
         try{
           const r=await fetch(`/api/admin/user-data/${u.username}`,{headers:{Authorization:'Bearer '+token}});
           if(r.ok){const d=await r.json();(d.customers||[]).forEach(c=>list.push({...c,_username:u.username}));}
-        }catch(e){}
+        }catch(e){console.error('Müşteri yüklenemedi:',u.username,e);}
       }
+      console.log('Yüklenen müşteriler:',list.length,list.map(c=>c.name+'('+c._username+')'));
       setAllCustomers(list);
     };
     loadAll();

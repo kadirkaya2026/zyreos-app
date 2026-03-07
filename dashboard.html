@@ -2253,11 +2253,13 @@ function WhatsAppQueuePage({token,allUsers}){
     finally{setLoading(false);}
   };
 
+  React.useEffect(()=>{loadQueue();},[]);
+
   React.useEffect(()=>{
-    loadQueue();
+    if(!allUsers||allUsers.length===0)return;
     const loadAll=async()=>{
       const list=[];
-      for(const u of allUsers){
+      for(const u of allUsers.filter(u=>u.status==='approved')){
         try{
           const r=await fetch(`/api/admin/user-data/${u.username}`,{headers:{Authorization:'Bearer '+token}});
           if(r.ok){const d=await r.json();(d.customers||[]).forEach(c=>list.push({...c,_username:u.username}));}
@@ -2265,8 +2267,8 @@ function WhatsAppQueuePage({token,allUsers}){
       }
       setAllCustomers(list);
     };
-    if(allUsers.length)loadAll();
-  },[allUsers.length]);
+    loadAll();
+  },[JSON.stringify(allUsers)]);
 
   const getEdit=(id,field,fallback)=>edits[id]&&edits[id][field]!==undefined?edits[id][field]:fallback;
   const setEdit=(id,field,val)=>setEdits(p=>({...p,[id]:{...p[id],[field]:val}}));
@@ -2275,17 +2277,14 @@ function WhatsAppQueuePage({token,allUsers}){
     const custId=selectedCustomer[item.id];
     if(!custId){setError('Müşteri seçiniz');return;}
     const cust=allCustomers.find(c=>c.id===custId);
-    if(!cust){setError('Müşteri bulunamadı');return;}
-    const payload={
-      ...item,
-      ocr:{
-        tutar:getEdit(item.id,'tutar',item.ocr?.tutar),
-        taksit:getEdit(item.id,'taksit',item.ocr?.taksit),
-        banka:getEdit(item.id,'banka',item.ocr?.banka)
-      }
+    if(!cust||!cust._username){setError('Müşteri bulunamadı, sayfayı yenileyip tekrar deneyin');return;}
+    const ocr={
+      tutar:Number(getEdit(item.id,'tutar',item.ocr?.tutar))||0,
+      taksit:parseInt(getEdit(item.id,'taksit',item.ocr?.taksit))||1,
+      banka:getEdit(item.id,'banka',item.ocr?.banka)||''
     };
     try{
-      await apiWAAssign(token,item.id,custId,cust._username,payload.ocr);
+      await apiWAAssign(token,item.id,custId,cust._username,ocr);
       setError('');
       loadQueue();
     }catch(e){setError(e.message);}

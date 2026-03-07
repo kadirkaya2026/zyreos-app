@@ -20,6 +20,43 @@ const WA_VERIFY_TOKEN=process.env.WHATSAPP_VERIFY_TOKEN||'zyreos2024';
 const openai=process.env.OPENAI_API_KEY?new OpenAI({apiKey:process.env.OPENAI_API_KEY}):null;
 
 if(!fs.existsSync(DATA_DIR))fs.mkdirSync(DATA_DIR,{recursive:true});
+
+const BANK_ALIASES={
+  'akbank':'Akbank','axess':'Akbank','ak bank':'Akbank',
+  'garanti':'Garanti','bonus':'Garanti','garanti bbva':'Garanti',
+  'halk':'Halk','halkbank':'Halk','halk bank':'Halk','paraf':'Halk',
+  'ziraat':'Ziraat','ziraat bankası':'Ziraat','ziraatbank':'Ziraat','bankkart':'Ziraat',
+  'qnb':'QNB','finansbank':'QNB','qnb finansbank':'QNB','cardfinans':'QNB','card finans':'QNB','enpara':'QNB',
+  'kuveyt':'Kuveyt','kuveyt türk':'Kuveyt','kuveytturk':'Kuveyt','kuveyt turk':'Kuveyt','ktbank':'Kuveyt',
+  'ykb':'YKB','yapı kredi':'YKB','yapi kredi':'YKB','worldcard':'YKB','world card':'YKB',
+  'iş bankası':'İş Bankası','isbank':'İş Bankası','işbank':'İş Bankası','maximum':'İş Bankası','is bankasi':'İş Bankası',
+  'vakıf':'Vakıf','vakif':'Vakıf','vakıfbank':'Vakıf','vakifbank':'Vakıf'
+};
+
+function findBank(name,banks){
+  if(!name||!banks||!banks.length)return null;
+  const n=name.toLowerCase().trim();
+  const direct=banks.find(b=>b.name&&b.name.toLowerCase()===n);
+  if(direct)return direct;
+  const canonical=BANK_ALIASES[n];
+  if(canonical){const aliased=banks.find(b=>b.name===canonical);if(aliased)return aliased;}
+  const partial=banks.find(b=>b.name&&(b.name.toLowerCase().includes(n)||n.includes(b.name.toLowerCase())));
+  return partial||null;
+}
+
+function isDuplicate(queue,from,tutar,receivedAt){
+  const LIMIT_MS=30*60*1000;
+  const t2=parseFloat(tutar)||0;
+  if(!t2)return false;
+  const now=new Date(receivedAt).getTime();
+  return queue.some(q=>{
+    if(normalizePhone(q.from)!==normalizePhone(from))return false;
+    if(Math.abs(now-new Date(q.receivedAt).getTime())>LIMIT_MS)return false;
+    const t1=parseFloat(q.ocr&&q.ocr.tutar)||0;
+    if(!t1)return false;
+    return Math.abs(t1-t2)/Math.max(t1,t2)<=0.01;
+  });
+}
 function getDataFile(username){return path.join(DATA_DIR,`data_${username}.json`);}
 function readUsers(){try{return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'));}catch(e){return[];}}
 function writeUsers(u){fs.writeFileSync(USERS_FILE,JSON.stringify(u,null,2));}
@@ -101,7 +138,7 @@ async function ocrDekont(mediaId){
     messages:[{
       role:'user',
       content:[
-        {type:'text',text:'Bu banka dekontundan şu bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma: {"tutar": <sadece sayı, kuruş yok>, "taksit": <sadece sayı, peşin ise 1>, "banka": "<banka adı>"}. Banka adı şunlardan biri olmalı: Akbank, QNB, Garanti, Kuveyt, Ziraat, Halk, İş Bankası, Vakıf, YKB. Emin değilsen boş bırak.'},
+        {type:'text',text:'Bu banka dekontundan şu bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma: {"tutar": <sadece sayı, kuruş yok>, "taksit": <sadece sayı, peşin ise 1>, "banka": "<banka adı>"}. Banka adı SADECE şunlardan biri olmalı (parantezdeki kart/takma adlara dikkat et): Akbank (Axess), QNB (CardFinans, Finansbank, Enpara), Garanti (Bonus), Halk (Paraf), Ziraat (Ziraat Bankası, Bankkart), Kuveyt (Kuveyt Türk), YKB (WorldCard, Yapı Kredi), İş Bankası (Maximum, Maxipuan), Vakıf (Vakıfbank). Emin değilsen boş bırak.'},
         {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}}
       ]
     }],
@@ -267,7 +304,7 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
         const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
         const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
         const bankName=ocr.banka||'';
-        const bankObj=(data.banks||[]).find(b=>b.name&&b.name.toLowerCase()===bankName.toLowerCase());
+        const bankObj=findBank(bankName,data.banks||[]);
         const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]?parseFloat(bankObj.rates[taksit-1]):0;
         const bankCost=parseFloat((amount*bankRate/100).toFixed(2));
         const profit=parseFloat((amount*(customerRate-bankRate)/100).toFixed(2));
@@ -299,9 +336,14 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
         sendWhatsAppReply(from,msg).catch(()=>{});
       }else{
         const queue=readQueue();
-        queue.push({id:randomUUID(),from,imageUrl:'',ocr,receivedAt:new Date().toISOString(),status:'pending'});
-        writeQueue(queue);
-        console.log(`Eşleşme yok — kuyruga eklendi: ${from}`);
+        const now=new Date().toISOString();
+        if(isDuplicate(queue,from,ocr.tutar,now)){
+          console.log(`Mükerrer dekont atlandı — gönderen: ${from}, tutar: ${ocr.tutar}`);
+        }else{
+          queue.push({id:randomUUID(),from,imageUrl:'',ocr,receivedAt:now,status:'pending'});
+          writeQueue(queue);
+          console.log(`Eşleşme yok — kuyruga eklendi: ${from}`);
+        }
         sendWhatsAppReply(from,'Dekontunuz alındı, kısa sürede incelenecektir.').catch(()=>{});
       }
     })().catch(e=>console.error('Webhook işleme hatası:',e.message));
@@ -315,7 +357,7 @@ app.get('/api/whatsapp/queue',auth,adminOnly,(req,res)=>{
 
 // ── WhatsApp: kuyruktan müşteriye ata
 app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
-  const{customerId,username,ocr:ocrOverride}=req.body||{};
+  const{customerId,username,ocr:ocrOverride,force}=req.body||{};
   if(!customerId||!username)return res.status(400).json({error:'customerId ve username gerekli'});
   const queue=readQueue();
   const item=queue.find(q=>q.id===req.params.id);
@@ -328,12 +370,22 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
   const customer=data.customers[customerIdx];
   const ocrData=ocrOverride||item.ocr||{};
   const taksit=parseInt(ocrData.taksit)||1;
-  const customerRate=customer.rates&&customer.rates[taksit]?parseFloat(customer.rates[taksit]):0;
   const amount=parseFloat(ocrData.tutar)||0;
+  if(!force){
+    const LIMIT_MS=30*60*1000;
+    const existing=(customer.cariEntries||[]).find(e=>{
+      if(e.source!=='whatsapp')return false;
+      if(Math.abs(new Date().getTime()-new Date(e.createdAt).getTime())>LIMIT_MS)return false;
+      const t1=parseFloat(e.amount)||0;
+      return t1>0&&Math.abs(t1-amount)/Math.max(t1,amount)<=0.01;
+    });
+    if(existing)return res.status(400).json({error:'mükerrer',message:`Bu tutar (₺${amount.toLocaleString('tr-TR')}) son 30 dakika içinde zaten işlendi.`,amount});
+  }
+  const customerRate=customer.rates&&customer.rates[taksit]?parseFloat(customer.rates[taksit]):0;
   const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
   const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
   const bankName=ocrData.banka||'';
-  const bankObj=(data.banks||[]).find(b=>b.name&&b.name.toLowerCase()===bankName.toLowerCase());
+  const bankObj=findBank(bankName,data.banks||[]);
   const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]?parseFloat(bankObj.rates[taksit-1]):0;
   const bankCost=parseFloat((amount*bankRate/100).toFixed(2));
   const profit=parseFloat((amount*(customerRate-bankRate)/100).toFixed(2));
@@ -343,7 +395,7 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
     type:'cekim',
     amount:amount,
     installment:taksit,
-    bank:bankName,
+    bank:bankObj?bankObj.name:bankName,
     date:item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10),
     description:`WhatsApp — ${normalizePhone(item.from)}`,
     customerRate:customerRate,

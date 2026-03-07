@@ -107,9 +107,10 @@ async function apiWAQueue(token){
   if(!r.ok)throw new Error('Kuyruk alınamadı');
   return r.json();
 }
-async function apiWAAssign(token,id,customerId,username,ocr){
-  const r=await fetch(`/api/whatsapp/queue/${id}/assign`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({customerId,username,ocr})});
-  if(!r.ok){const d=await r.json();throw new Error(d.error||'Atama başarısız');}
+async function apiWAAssign(token,id,customerId,username,ocr,force){
+  const r=await fetch(`/api/whatsapp/queue/${id}/assign`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({customerId,username,ocr,force:!!force})});
+  const d=await r.json();
+  if(!r.ok){const err=new Error(d.message||d.error||'Atama başarısız');err.code=d.error;err.amount=d.amount;throw err;}
 }
 async function apiWADelete(token,id){
   const r=await fetch(`/api/whatsapp/queue/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
@@ -2245,6 +2246,7 @@ function WhatsAppQueuePage({token,allUsers}){
   const[selectedCustomer,setSelectedCustomer]=React.useState({});
   const[allCustomers,setAllCustomers]=React.useState([]);
   const[bulkLoading,setBulkLoading]=React.useState(false);
+  const[dupWarning,setDupWarning]=React.useState({});
 
   const loadQueue=async()=>{
     setLoading(true);setError('');
@@ -2274,7 +2276,7 @@ function WhatsAppQueuePage({token,allUsers}){
   const getEdit=(id,field,fallback)=>edits[id]&&edits[id][field]!==undefined?edits[id][field]:fallback;
   const setEdit=(id,field,val)=>setEdits(p=>({...p,[id]:{...p[id],[field]:val}}));
 
-  const handleAssign=async(item)=>{
+  const handleAssign=async(item,force)=>{
     const custId=selectedCustomer[item.id];
     if(!custId){setError('Müşteri seçiniz');return;}
     const cust=allCustomers.find(c=>c.id===custId);
@@ -2285,10 +2287,17 @@ function WhatsAppQueuePage({token,allUsers}){
       banka:getEdit(item.id,'banka',item.ocr?.banka)||''
     };
     try{
-      await apiWAAssign(token,item.id,custId,cust._username,ocr);
+      await apiWAAssign(token,item.id,custId,cust._username,ocr,force);
+      setDupWarning(p=>({...p,[item.id]:null}));
       setError('');
       loadQueue();
-    }catch(e){setError(e.message);}
+    }catch(e){
+      if(e.code==='mükerrer'){
+        setDupWarning(p=>({...p,[item.id]:{message:e.message,item,custId,cust,ocr}}));
+      }else{
+        setError(e.message);
+      }
+    }
   };
 
   const handleBulkAssign=async()=>{
@@ -2369,15 +2378,30 @@ function WhatsAppQueuePage({token,allUsers}){
               </select>
             </div>
           </div>
-          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-            <button onClick={()=>handleAssign(item)} disabled={!selectedCustomer[item.id]}
-              style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:!selectedCustomer[item.id]?0.4:1}}>
-              Cariye İşle
-            </button>
-            <button onClick={()=>handleDelete(item.id)}
-              style={{padding:'8px 14px',background:'rgba(239,68,68,0.15)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
-              Sil
-            </button>
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',flexDirection:'column'}}>
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+              <button onClick={()=>handleAssign(item)} disabled={!selectedCustomer[item.id]}
+                style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:!selectedCustomer[item.id]?0.4:1}}>
+                Cariye İşle
+              </button>
+              <button onClick={()=>handleDelete(item.id)}
+                style={{padding:'8px 14px',background:'rgba(239,68,68,0.15)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+                Sil
+              </button>
+            </div>
+            {dupWarning[item.id]&&(
+              <div style={{background:'rgba(234,179,8,0.15)',border:'1px solid rgba(234,179,8,0.4)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',color:'#fbbf24',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                <span>⚠️ {dupWarning[item.id].message} Yine de eklemek istiyorsanız:</span>
+                <button onClick={()=>handleAssign(item,true)}
+                  style={{padding:'6px 14px',background:'rgba(234,179,8,0.3)',color:'#fbbf24',border:'1px solid rgba(234,179,8,0.5)',borderRadius:'6px',cursor:'pointer',fontWeight:700,fontSize:'12px',whiteSpace:'nowrap'}}>
+                  Zorla Ekle
+                </button>
+                <button onClick={()=>setDupWarning(p=>({...p,[item.id]:null}))}
+                  style={{padding:'6px 10px',background:'transparent',color:'#94a3b8',border:'none',cursor:'pointer',fontSize:'12px'}}>
+                  İptal
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ))}

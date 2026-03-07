@@ -310,12 +310,13 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
   const file=getDataFile(username);
   if(!fs.existsSync(file))return res.status(404).json({error:'Kullanıcı verisi bulunamadı'});
   const data=JSON.parse(fs.readFileSync(file,'utf8'));
-  const customer=data.customers&&data.customers.find(c=>c.id===customerId);
-  if(!customer)return res.status(404).json({error:'Müşteri bulunamadı'});
+  const customerIdx=data.customers&&data.customers.findIndex(c=>c.id===customerId);
+  if(customerIdx===-1||customerIdx===undefined)return res.status(404).json({error:'Müşteri bulunamadı'});
+  const customer=data.customers[customerIdx];
   const taksit=parseInt(item.ocr&&item.ocr.taksit)||1;
   const commissionRate=customer.rates&&customer.rates[taksit]?customer.rates[taksit]:0;
-  if(!customer.entries)customer.entries=[];
-  customer.entries.push({
+  if(!data.customers[customerIdx].entries)data.customers[customerIdx].entries=[];
+  data.customers[customerIdx].entries.push({
     id:randomUUID(),
     type:'ceki',
     amount:parseFloat(item.ocr&&item.ocr.tutar)||0,

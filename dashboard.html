@@ -1924,7 +1924,8 @@ function HesabimPage({token,username,onUpdated}){
     setLoading(true);
     try{
       const r=await fetch('/api/users/me',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({newUsername:form.newUsername.trim(),currentPassword:form.currentPassword||undefined,newPassword:form.newPassword||undefined})});
-      const d=await r.json();
+      const text=await r.text();
+      let d;try{d=JSON.parse(text);}catch{setErr('Sunucu hatası: '+r.status);return;}
       if(!r.ok){setErr(d.error||'Hata');return;}
       setMsg('Bilgiler güncellendi.');
       if(d.username&&d.username!==username)onUpdated&&onUpdated(d.username);

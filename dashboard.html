@@ -2065,25 +2065,43 @@ function BankSettingsPage({banks,onUpdateBanks}){
 ════════════════════════════════════ */
 function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExport,onImport,onLogout,role,username,mobileOpen,onMobileClose,waqCount}){
   const isMobile=useIsMobile();
-  const nav=[
+  const[expanded,setExpanded]=useState({reports:false,dekont:false,hesabim:false});
+
+  const GROUPS={
+    reports:{label:'Raporlamalar',icon:<IcoPDF/>,children:[
+      {id:'reports',label:'Raporlamalar',icon:<IcoPDF/>},
+      {id:'pos',label:'POS Hesap',icon:<IcoChart/>},
+      {id:'profit',label:'Kar Analizi',icon:<IcoChart/>},
+    ]},
+    dekont:{label:'Dekont Yükle',icon:<IcoUpload/>,children:[
+      {id:'dekont',label:'Dekont Yükle',icon:<IcoUpload/>},
+      ...(role==='admin'?[{id:'waq',label:'WhatsApp',icon:<IcoUpload/>,badge:waqCount}]:[]),
+    ]},
+    hesabim:{label:'Hesabım',icon:<IcoCog/>,children:[
+      {id:'hesabim',label:'Hesabım',icon:<IcoCog/>},
+      ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>}]:[]),
+      {id:'__export',label:'Yedek Al',icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,action:onExport,color:'#22c55e'},
+      {id:'__import',label:'Geri Yükle',icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,isImport:true,color:'#f59e0b'},
+      {id:'__reset',label:'Verileri Sıfırla',icon:<IcoRefresh size={13}/>,action:onReset,color:'#ef4444'},
+    ]},
+  };
+
+  const TOP_NAV=[
     {id:'dashboard',label:'Dashboard',icon:<IcoHome/>},
     {id:'customers',label:'Müşteriler',icon:<IcoUsers/>},
-    {id:'reports',label:'Raporlamalar',icon:<IcoPDF/>},
-    {id:'pos',label:'POS Hesap',icon:<IcoChart/>,sub:true},
-    {id:'profit',label:'Kar Analizi',icon:<IcoChart/>,sub:true},
-    {id:'dekont',label:'Dekont Yükle',icon:<IcoUpload/>},
-    ...(role==='admin'?[{id:'waq',label:'WhatsApp',icon:<IcoUpload/>,sub:true}]:[]),
+    {group:'reports'},
     {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
-    {id:'hesabim',label:'Hesabım',icon:<IcoCog/>},
-    ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>,sub:true}]:[]),
-    {id:'__export',label:'Yedek Al',icon:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,sub:true,action:onExport,color:'#22c55e'},
-    {id:'__import',label:'Geri Yükle',icon:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,sub:true,isImport:true,color:'#f59e0b'},
-    {id:'__reset',label:'Verileri Sıfırla',icon:<IcoRefresh size={14}/>,sub:true,action:onReset,color:'#ef4444'},
+    {group:'dekont'},
+    {group:'hesabim'},
   ];
+
   const w=isMobile?236:(collapsed?64:236);
   const statusLabel=saveStatus==='saving'?'Kaydediliyor…':saveStatus==='saved'?'✓ Sunucuya Kaydedildi':saveStatus==='error'?'Kayıt Hatası':'Hazır';
   const statusColor=saveStatus==='saved'?'#22c55e':saveStatus==='saving'?'#f59e0b':saveStatus==='error'?'#ef4444':'#64748b';
   const navClick=function(id){setPage(id);if(isMobile&&onMobileClose)onMobileClose();};
+  const toggleGroup=function(key){setExpanded(p=>({...p,[key]:!p[key]}));};
+  const isGroupActive=(key)=>GROUPS[key].children.some(c=>c.id===page);
+
   const sidebarStyle={width:w,minWidth:w,background:'#0c1021',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',height:'100vh',flexShrink:0,transition:'width 0.2s'};
   if(isMobile){
     sidebarStyle.position='fixed';
@@ -2096,6 +2114,38 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
     sidebarStyle.position='sticky';
     sidebarStyle.top=0;
   }
+
+  const renderNavItem=(n)=>{
+    const active=page===n.id;
+    if(n.isImport){
+      return(
+        <label key={n.id} title={collapsed?n.label:''}
+          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'7px 0':'6px 14px 6px 28px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#94a3b8',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
+          <span style={{flexShrink:0}}>{n.icon}</span>
+          {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
+          <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
+        </label>
+      );
+    }
+    if(n.action){
+      return(
+        <button key={n.id} onClick={n.action} title={collapsed?n.label:''}
+          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'7px 0':'6px 14px 6px 28px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#94a3b8',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
+          <span style={{flexShrink:0}}>{n.icon}</span>
+          {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
+        </button>
+      );
+    }
+    return(
+      <button key={n.id} onClick={()=>navClick(n.id)} title={collapsed?n.label:''}
+        style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'7px 0':'6px 14px 6px 28px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':'#94a3b8',cursor:'pointer',fontWeight:active?700:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
+        <span style={{flexShrink:0}}>{n.icon}</span>
+        {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
+        {!collapsed&&n.badge>0&&<span style={{background:'#ef4444',color:'#fff',borderRadius:'10px',padding:'1px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}}>{n.badge}</span>}
+      </button>
+    );
+  };
+
   return(
     <div style={sidebarStyle}>
       <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0,cursor:'pointer'}} onClick={()=>setPage('dashboard')}>
@@ -2112,35 +2162,34 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
         </div>
       )}
       <nav style={{flex:1,padding:'12px 8px',overflowY:'auto'}}>
-        {nav.map(n=>{
-          const active=page===n.id;
-          const isSub=n.sub;
-          if(n.isImport){
+        {TOP_NAV.map((item,i)=>{
+          if(item.group){
+            const key=item.group;
+            const grp=GROUPS[key];
+            const open=expanded[key]||isGroupActive(key);
+            const groupActive=isGroupActive(key);
             return(
-              <label key={n.id} title={collapsed?n.label:''}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'8px 0':`6px 14px 6px ${isSub?'28px':'14px'}`,justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#64748b',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
-                <span style={{flexShrink:0}}>{n.icon}</span>
-                {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
-                <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
-              </label>
+              <div key={key}>
+                <button onClick={()=>collapsed?navClick(grp.children[0].id):toggleGroup(key)} title={collapsed?grp.label:''}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':'10px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:groupActive?'rgba(79,142,247,0.08)':'transparent',color:groupActive?'#4f8ef7':'#64748b',cursor:'pointer',fontWeight:groupActive?700:500,fontSize:'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
+                  <span style={{flexShrink:0}}>{grp.icon}</span>
+                  {!collapsed&&<span style={{flex:1}}>{grp.label}</span>}
+                  {!collapsed&&<span style={{fontSize:'10px',transition:'transform 0.2s',display:'inline-block',transform:open?'rotate(180deg)':'rotate(0deg)'}}>▾</span>}
+                </button>
+                {!collapsed&&open&&(
+                  <div style={{marginBottom:'4px'}}>
+                    {grp.children.map(c=>renderNavItem(c))}
+                  </div>
+                )}
+              </div>
             );
           }
-          if(n.action){
-            return(
-              <button key={n.id} onClick={n.action} title={collapsed?n.label:''}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'8px 0':`6px 14px 6px ${isSub?'28px':'14px'}`,justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#64748b',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
-                <span style={{flexShrink:0}}>{n.icon}</span>
-                {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
-              </button>
-            );
-          }
+          const active=page===item.id;
           return(
-            <button key={n.id} onClick={()=>navClick(n.id)} title={collapsed?n.label:''}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':`${isSub?'6px':'10px'} 14px ${isSub?'6px':'10px'} ${isSub?'28px':'14px'}`,justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':(isSub?'#94a3b8':'#64748b'),cursor:'pointer',fontWeight:active?700:(isSub?500:500),fontSize:isSub?'12px':'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
-              {isSub&&!collapsed&&<span style={{color:'rgba(255,255,255,0.15)',marginRight:'-4px',fontSize:'10px'}}>└</span>}
-              <span style={{flexShrink:0}}>{n.icon}</span>
-              {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
-              {!collapsed&&n.id==='waq'&&waqCount>0&&<span style={{background:'#ef4444',color:'#fff',borderRadius:'10px',padding:'1px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}}>{waqCount}</span>}
+            <button key={item.id} onClick={()=>navClick(item.id)} title={collapsed?item.label:''}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':'10px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':'#64748b',cursor:'pointer',fontWeight:active?700:500,fontSize:'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
+              <span style={{flexShrink:0}}>{item.icon}</span>
+              {!collapsed&&<span style={{flex:1}}>{item.label}</span>}
             </button>
           );
         })}

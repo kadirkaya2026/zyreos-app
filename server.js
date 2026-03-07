@@ -262,23 +262,28 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
       if(match){
         const{username,customer,data}=match;
         const taksit=parseInt(ocr.taksit)||1;
-        const commissionRate=customer.rates&&customer.rates[taksit]?customer.rates[taksit]:0;
+        const customerRate=customer.rates&&customer.rates[taksit]?parseFloat(customer.rates[taksit]):0;
+        const amount=parseFloat(ocr.tutar)||0;
+        const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
+        const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
         const newEntry={
           id:randomUUID(),
-          type:'ceki',
-          amount:parseFloat(ocr.tutar)||0,
+          type:'cekim',
+          amount:amount,
           installment:taksit,
           bank:ocr.banka||'',
           date:new Date().toISOString().slice(0,10),
           description:`WhatsApp otomatik — ${normalizePhone(from)}`,
-          commissionRate:commissionRate,
+          customerRate:customerRate,
+          customerComm:customerComm,
+          netToCustomer:netToCustomer,
           source:'whatsapp',
           createdAt:new Date().toISOString()
         };
         const idx=data.customers.findIndex(c=>c.id===customer.id);
         if(idx>=0){
-          if(!data.customers[idx].entries)data.customers[idx].entries=[];
-          data.customers[idx].entries.push(newEntry);
+          if(!data.customers[idx].cariEntries)data.customers[idx].cariEntries=[];
+          data.customers[idx].cariEntries.push(newEntry);
           fs.writeFileSync(getDataFile(username),JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
           console.log(`Cari kaydedildi — müşteri: ${customer.name}, tutar: ${ocr.tutar}`);
         }
@@ -315,17 +320,22 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
   const customer=data.customers[customerIdx];
   const ocrData=ocrOverride||item.ocr||{};
   const taksit=parseInt(ocrData.taksit)||1;
-  const commissionRate=customer.rates&&customer.rates[taksit]?customer.rates[taksit]:0;
-  if(!data.customers[customerIdx].entries)data.customers[customerIdx].entries=[];
-  data.customers[customerIdx].entries.push({
+  const customerRate=customer.rates&&customer.rates[taksit]?parseFloat(customer.rates[taksit]):0;
+  const amount=parseFloat(ocrData.tutar)||0;
+  const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
+  const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
+  if(!data.customers[customerIdx].cariEntries)data.customers[customerIdx].cariEntries=[];
+  data.customers[customerIdx].cariEntries.push({
     id:randomUUID(),
-    type:'ceki',
-    amount:parseFloat(ocrData.tutar)||0,
+    type:'cekim',
+    amount:amount,
     installment:taksit,
     bank:ocrData.banka||'',
     date:item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10),
     description:`WhatsApp — ${normalizePhone(item.from)}`,
-    commissionRate:commissionRate,
+    customerRate:customerRate,
+    customerComm:customerComm,
+    netToCustomer:netToCustomer,
     source:'whatsapp',
     createdAt:new Date().toISOString()
   });

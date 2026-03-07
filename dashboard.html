@@ -526,7 +526,13 @@ function DashboardPage({customers,onNavigateCustomer}){
 
   const PeriodCard=({label,sub,entries})=>{
     const total=sum(entries,'amount');
-    const profit=sum(entries,'profit');
+    const realProfit=entries.reduce((s,e)=>{
+      const bankCut=e.bankCost||+(e.amount*(e.bankRate||0)/100).toFixed(2);
+      const netDeposit=e.amount-bankCut;
+      const ownerShare=+(netDeposit*0.01).toFixed(2);
+      const customerComm=e.customerComm||0;
+      return s+customerComm-bankCut-ownerShare;
+    },0);
     return(
       <div style={{background:'linear-gradient(135deg,rgba(15,23,42,0.9),rgba(20,30,60,0.9))',borderRadius:'14px',border:'1px solid rgba(255,255,255,0.08)',padding:'20px 22px',display:'flex',flexDirection:'column',gap:'10px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
@@ -541,8 +547,8 @@ function DashboardPage({customers,onNavigateCustomer}){
           <div className="tabular-nums" style={{fontSize:'22px',fontWeight:800,color:'#4f8ef7',letterSpacing:'-0.5px'}}>{fmtTL(total)}</div>
         </div>
         <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:'10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div style={{fontSize:'11px',color:'#64748b'}}>Net Kar</div>
-          <div className="tabular-nums" style={{fontSize:'16px',fontWeight:800,color:profit>=0?'#22c55e':'#ef4444'}}>{fmtTL(profit)}</div>
+          <div style={{fontSize:'11px',color:'#64748b'}}>Net Kârım</div>
+          <div className="tabular-nums" style={{fontSize:'16px',fontWeight:800,color:realProfit>=0?'#a855f7':'#ef4444'}}>{fmtTL(realProfit)}</div>
         </div>
       </div>
     );
@@ -1144,17 +1150,24 @@ function POSPage({customers,banks}){
     const bankRate=bankObj?bankObj.rates[e.installment-1]:e.bankRate||0;
     const bankCut=+(e.amount*bankRate/100).toFixed(2);
     const netDeposit=+(e.amount-bankCut).toFixed(2);
-    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0};
-    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit});
+    const ownerShare=+(netDeposit*0.01).toFixed(2);
+    const customerComm=e.customerComm||0;
+    const realProfit=+(customerComm-bankCut-ownerShare).toFixed(2);
+    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0,totalOwnerShare:0,totalRealProfit:0};
+    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit,ownerShare,customerComm,realProfit});
     bankMap[e.bank].totalAmount+=e.amount;
     bankMap[e.bank].totalBankCut+=bankCut;
     bankMap[e.bank].totalNet+=netDeposit;
+    bankMap[e.bank].totalOwnerShare+=ownerShare;
+    bankMap[e.bank].totalRealProfit+=realProfit;
   });
   const bankRows=Object.values(bankMap).sort((a,b)=>b.totalNet-a.totalNet);
 
   const grandTotal=bankRows.reduce((s,r)=>s+r.totalAmount,0);
   const grandCut=bankRows.reduce((s,r)=>s+r.totalBankCut,0);
   const grandNet=bankRows.reduce((s,r)=>s+r.totalNet,0);
+  const grandOwnerShare=bankRows.reduce((s,r)=>s+r.totalOwnerShare,0);
+  const grandRealProfit=bankRows.reduce((s,r)=>s+r.totalRealProfit,0);
 
   const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
   const td={padding:'10px 14px'};
@@ -1182,6 +1195,8 @@ function POSPage({customers,banks}){
         <MetricCard label="Toplam POS Çekim" value={fmtTL(grandTotal)} color="#4f8ef7"/>
         <MetricCard label="Toplam Banka Kesintisi" value={fmtTL(grandCut)} color="#ef4444"/>
         <MetricCard label={`Yarın Yatacak (${bankRows.length} banka)`} value={fmtTL(grandNet)} color="#22c55e" large/>
+        <MetricCard label="Şirket Sahibi Payı (%1)" value={fmtTL(grandOwnerShare)} color="#f59e0b"/>
+        <MetricCard label="Net Kârım" value={fmtTL(grandRealProfit)} color="#a855f7" large/>
       </div>
 
       {dayEntries.length===0?(
@@ -1200,7 +1215,7 @@ function POSPage({customers,banks}){
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
                 <thead>
-                  <tr>{['Banka','İşlem Adedi','Toplam Çekim','Banka Kesintisi','Yarın Yatacak Tutar'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
+                  <tr>{['Banka','İşlem Adedi','Toplam Çekim','Banka Kesintisi','Yarın Yatacak','Şirket Sahibi Payı','Net Kârım'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {bankRows.map(r=>(
@@ -1212,7 +1227,12 @@ function POSPage({customers,banks}){
                         <div>{fmtTL(r.totalBankCut)}</div>
                         <div style={{fontSize:'11px',color:'#64748b'}}>%{r.totalAmount>0?+(r.totalBankCut/r.totalAmount*100).toFixed(2):0} ort.</div>
                       </td>
-                      <td className="tabular-nums" style={{...td,fontWeight:800,fontSize:'16px',color:'#22c55e'}}>{fmtTL(r.totalNet)}</td>
+                      <td className="tabular-nums" style={{...td,fontWeight:700,color:'#22c55e'}}>{fmtTL(r.totalNet)}</td>
+                      <td className="tabular-nums" style={{...td,color:'#f59e0b',fontWeight:600}}>
+                        <div>{fmtTL(r.totalOwnerShare)}</div>
+                        <div style={{fontSize:'11px',color:'#64748b'}}>%1</div>
+                      </td>
+                      <td className="tabular-nums" style={{...td,fontWeight:800,fontSize:'16px',color:'#a855f7'}}>{fmtTL(r.totalRealProfit)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1221,7 +1241,9 @@ function POSPage({customers,banks}){
                     <td colSpan={2} style={{...td,color:'#94a3b8',fontWeight:700,fontSize:'12px',textTransform:'uppercase'}}>Toplam ({dayEntries.length} işlem)</td>
                     <td className="tabular-nums" style={{...td,color:'#4f8ef7',fontWeight:800}}>{fmtTL(grandTotal)}</td>
                     <td className="tabular-nums" style={{...td,color:'#ef4444',fontWeight:800}}>{fmtTL(grandCut)}</td>
-                    <td className="tabular-nums" style={{...td,color:'#22c55e',fontWeight:800,fontSize:'16px'}}>{fmtTL(grandNet)}</td>
+                    <td className="tabular-nums" style={{...td,color:'#22c55e',fontWeight:800}}>{fmtTL(grandNet)}</td>
+                    <td className="tabular-nums" style={{...td,color:'#f59e0b',fontWeight:800}}>{fmtTL(grandOwnerShare)}</td>
+                    <td className="tabular-nums" style={{...td,color:'#a855f7',fontWeight:800,fontSize:'16px'}}>{fmtTL(grandRealProfit)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1886,7 +1908,64 @@ function DekontPage({customers,banks,onUpdateCustomers}){
   );
 }
 
-/* ── BANKA AYARLARI PAGE ── */
+/* ── HESABIM PAGE ── */
+function HesabimPage({token,username,onUpdated}){
+  const[form,setForm]=useState({newUsername:username,currentPassword:'',newPassword:'',confirmPassword:''});
+  const[msg,setMsg]=useState('');
+  const[err,setErr]=useState('');
+  const[loading,setLoading]=useState(false);
+  const inpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
+  const submit=async()=>{
+    setErr('');setMsg('');
+    if(!form.newUsername.trim()){setErr('Kullanıcı adı boş olamaz');return;}
+    if(form.newPassword&&form.newPassword.length<6){setErr('Yeni şifre en az 6 karakter olmalı');return;}
+    if(form.newPassword&&form.newPassword!==form.confirmPassword){setErr('Yeni şifreler eşleşmiyor');return;}
+    if(form.newPassword&&!form.currentPassword){setErr('Şifre değiştirmek için mevcut şifreyi gir');return;}
+    setLoading(true);
+    try{
+      const r=await fetch('/api/users/me',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({newUsername:form.newUsername.trim(),currentPassword:form.currentPassword||undefined,newPassword:form.newPassword||undefined})});
+      const d=await r.json();
+      if(!r.ok){setErr(d.error||'Hata');return;}
+      setMsg('Bilgiler güncellendi.');
+      if(d.username&&d.username!==username)onUpdated&&onUpdated(d.username);
+      setForm(p=>({...p,currentPassword:'',newPassword:'',confirmPassword:'',newUsername:d.username||p.newUsername}));
+    }catch(e){setErr(e.message);}
+    finally{setLoading(false);}
+  };
+  return(
+    <div style={{maxWidth:'480px'}}>
+      <Card style={{display:'flex',flexDirection:'column',gap:'18px'}}>
+        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Hesap Bilgileri</div>
+        {err&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{err}</div>}
+        {msg&&<div style={{color:'#22c55e',background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{msg}</div>}
+        <div>
+          <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
+          <input style={inpS} value={form.newUsername} onChange={e=>setForm(p=>({...p,newUsername:e.target.value}))}/>
+        </div>
+        <div style={{borderTop:'1px solid rgba(255,255,255,0.07)',paddingTop:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+          <div style={{color:'#64748b',fontSize:'12px',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em'}}>Şifre Değiştir</div>
+          <div>
+            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Mevcut Şifre</label>
+            <input style={inpS} type="password" value={form.currentPassword} onChange={e=>setForm(p=>({...p,currentPassword:e.target.value}))} placeholder="Değiştirmek istiyorsanız girin"/>
+          </div>
+          <div>
+            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Yeni Şifre</label>
+            <input style={inpS} type="password" value={form.newPassword} onChange={e=>setForm(p=>({...p,newPassword:e.target.value}))} placeholder="Min 6 karakter"/>
+          </div>
+          <div>
+            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Yeni Şifre (Tekrar)</label>
+            <input style={inpS} type="password" value={form.confirmPassword} onChange={e=>setForm(p=>({...p,confirmPassword:e.target.value}))} placeholder="Yeni şifreyi tekrar girin"/>
+          </div>
+        </div>
+        <button onClick={submit} disabled={loading} style={{padding:'12px',borderRadius:'10px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',fontWeight:700,fontSize:'14px',cursor:'pointer',opacity:loading?0.7:1}}>
+          {loading?'Kaydediliyor…':'Kaydet'}
+        </button>
+      </Card>
+    </div>
+  );
+}
+
+/* ── BANKA AYARLARI ── */
 function BankSettingsPage({banks,onUpdateBanks}){
   const[open,setOpen]=useState(null);
   const[compareInst,setCompareInst]=useState(1);
@@ -1994,6 +2073,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
     {id:'profit',label:'Kar Analizi',icon:<IcoChart/>},
     {id:'dekont',label:'Dekont Yükle',icon:<IcoUpload/>},
     {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
+    {id:'hesabim',label:'Hesabım',icon:<IcoCog/>},
     ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>},{id:'waq',label:'WA Kuyruk',icon:<IcoUpload/>}]:[]),
   ];
   const w=isMobile?236:(collapsed?64:236);
@@ -2084,6 +2164,10 @@ function AdminUsersPage({token}){
   const[error,setError]=useState('');
   const[actionLoading,setActionLoading]=useState('');
   const[showPwd,setShowPwd]=useState({});
+  const[editModal,setEditModal]=useState(null);
+  const[addModal,setAddModal]=useState(false);
+  const[form,setForm]=useState({});
+  const[formErr,setFormErr]=useState('');
 
   const load=async()=>{
     setLoading(true);setError('');
@@ -2100,22 +2184,88 @@ function AdminUsersPage({token}){
     finally{setActionLoading('');}
   };
 
+  const openEdit=(u)=>{setForm({username:u.username,password:''});setFormErr('');setEditModal(u.username);};
+  const openAdd=()=>{setForm({username:'',password:'',role:'user'});setFormErr('');setAddModal(true);};
+
+  const submitEdit=async()=>{
+    setFormErr('');
+    if(!form.username.trim()){setFormErr('Kullanıcı adı boş olamaz');return;}
+    if(form.password&&form.password.length<6){setFormErr('Şifre en az 6 karakter olmalı');return;}
+    try{
+      const r=await fetch(`/api/admin/users/${editModal}`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({newUsername:form.username.trim(),newPassword:form.password||undefined})});
+      const d=await r.json();
+      if(!r.ok){setFormErr(d.error||'Hata');return;}
+      setEditModal(null);await load();
+    }catch(e){setFormErr(e.message);}
+  };
+
+  const submitAdd=async()=>{
+    setFormErr('');
+    if(!form.username.trim()||!form.password){setFormErr('Kullanıcı adı ve şifre gerekli');return;}
+    if(form.password.length<6){setFormErr('Şifre en az 6 karakter olmalı');return;}
+    try{
+      const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({username:form.username.trim(),password:form.password,role:form.role||'user'})});
+      const d=await r.json();
+      if(!r.ok){setFormErr(d.error||'Hata');return;}
+      setAddModal(false);await load();
+    }catch(e){setFormErr(e.message);}
+  };
+
   const statusBadge=(s)=>{
     const cfg={pending:{color:'#f59e0b',bg:'rgba(245,158,11,0.1)',label:'Bekliyor'},approved:{color:'#22c55e',bg:'rgba(34,197,94,0.1)',label:'Onaylı'},rejected:{color:'#ef4444',bg:'rgba(239,68,68,0.1)',label:'Reddedildi'}};
     const c=cfg[s]||{color:'#64748b',bg:'rgba(100,116,139,0.1)',label:s};
     return<span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:c.bg,color:c.color,border:`1px solid ${c.color}44`}}>{c.label}</span>;
   };
 
-  const pending=users.filter(u=>u.status==='pending');
-  const others=users.filter(u=>u.status!=='pending');
-
+  const inpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
   const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
   const td={padding:'10px 14px',fontSize:'13px'};
+  const overlayS={position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'};
+  const modalS={background:'#1e2433',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'400px',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',gap:'16px'};
+
+  const Modal=({title,onClose,onSubmit,submitLabel})=>(
+    <div style={overlayS} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={modalS}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0'}}>{title}</span>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'20px',lineHeight:1}}>×</button>
+        </div>
+        {formErr&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{formErr}</div>}
+        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          <div>
+            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
+            <input style={inpS} value={form.username||''} onChange={e=>setForm(p=>({...p,username:e.target.value}))} placeholder="kullaniciadi"/>
+          </div>
+          <div>
+            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>
+              {editModal?'Yeni Şifre (boş bırakırsan değişmez)':'Şifre'}
+            </label>
+            <input style={inpS} type="password" value={form.password||''} onChange={e=>setForm(p=>({...p,password:e.target.value}))} placeholder={editModal?'Değiştirmek için gir…':'Min 6 karakter'}/>
+          </div>
+          {addModal&&(
+            <div>
+              <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Rol</label>
+              <select style={inpS} value={form.role||'user'} onChange={e=>setForm(p=>({...p,role:e.target.value}))}>
+                <option value="user">Kullanıcı</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          )}
+        </div>
+        <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
+          <button onClick={onSubmit} style={{padding:'10px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',cursor:'pointer',fontWeight:700}}>{submitLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const pending=users.filter(u=>u.status==='pending');
 
   if(loading)return(
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',flexDirection:'column',gap:'12px'}}>
       <div style={{width:'28px',height:'28px',borderRadius:'50%',border:'3px solid #4f8ef7',borderTopColor:'transparent',animation:'spin 0.8s linear infinite'}}/>
-      <div style={{color:'#64748b',fontSize:'13px'}}>Kullanıcılar yükleniyor…</div>
+      <div style={{color:'#64748b',fontSize:'13px'}}>Yükleniyor…</div>
     </div>
   );
 
@@ -2128,7 +2278,7 @@ function AdminUsersPage({token}){
         <Card style={{padding:0,overflow:'hidden',border:'1px solid rgba(245,158,11,0.25)'}}>
           <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',gap:'10px'}}>
             <div style={{width:'8px',height:'8px',borderRadius:'50%',background:'#f59e0b',animation:'pulse 1.5s infinite'}}/>
-            <span style={{fontWeight:700,fontSize:'14px',color:'#f59e0b'}}>Onay Bekleyen Kullanıcılar ({pending.length})</span>
+            <span style={{fontWeight:700,fontSize:'14px',color:'#f59e0b'}}>Onay Bekleyen ({pending.length})</span>
           </div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse'}}>
@@ -2136,19 +2286,11 @@ function AdminUsersPage({token}){
               <tbody>
                 {pending.map(u=>(
                   <tr key={u.username} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <td style={{...td,fontWeight:700,color:'#e2e8f0'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                        <div style={{width:'28px',height:'28px',borderRadius:'8px',background:'rgba(79,142,247,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'12px',color:'#4f8ef7',flexShrink:0}}>{u.username[0].toUpperCase()}</div>
-                        {u.username}
-                      </div>
-                    </td>
+                    <td style={{...td,fontWeight:700,color:'#e2e8f0'}}>{u.username}</td>
                     <td style={td}>
                       <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                        <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',letterSpacing:'0.05em',color:'#e2e8f0'}}>
-                          {showPwd[u.username]?u.passwordPlain:'••••••••'}
-                        </code>
-                        <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))}
-                          style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px',padding:'2px 6px'}}>
+                        <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',color:'#e2e8f0'}}>{showPwd[u.username]?u.passwordPlain:'••••••••'}</code>
+                        <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px'}}>
                           {showPwd[u.username]?'Gizle':'Göster'}
                         </button>
                       </div>
@@ -2156,16 +2298,8 @@ function AdminUsersPage({token}){
                     <td style={{...td,color:'#64748b'}}>{u.createdAt?new Date(u.createdAt).toLocaleString('tr-TR'):'—'}</td>
                     <td style={td}>
                       <div style={{display:'flex',gap:'6px'}}>
-                        <button disabled={actionLoading===u.username+'_approve'}
-                          onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')}
-                          style={{padding:'6px 14px',borderRadius:'6px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px',opacity:actionLoading===u.username+'_approve'?0.6:1}}>
-                          ✓ Onayla
-                        </button>
-                        <button disabled={actionLoading===u.username+'_reject'}
-                          onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')}
-                          style={{padding:'6px 14px',borderRadius:'6px',border:'none',background:'rgba(239,68,68,0.15)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'12px',border:'1px solid rgba(239,68,68,0.3)',opacity:actionLoading===u.username+'_reject'?0.6:1}}>
-                          ✗ Reddet
-                        </button>
+                        <button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'6px 14px',borderRadius:'6px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px'}}>✓ Onayla</button>
+                        <button disabled={actionLoading===u.username+'_reject'} onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')} style={{padding:'6px 14px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'12px'}}>✗ Reddet</button>
                       </div>
                     </td>
                   </tr>
@@ -2178,11 +2312,16 @@ function AdminUsersPage({token}){
 
       {/* Tüm Kullanıcılar */}
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'10px'}}>
           <span style={{fontWeight:700,fontSize:'14px'}}>Tüm Kullanıcılar ({users.length})</span>
-          <button onClick={load} style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(79,142,247,0.1)',border:'1px solid rgba(79,142,247,0.2)',borderRadius:'8px',padding:'6px 12px',color:'#4f8ef7',cursor:'pointer',fontSize:'12px',fontWeight:600}}>
-            <IcoRefresh size={12}/> Yenile
-          </button>
+          <div style={{display:'flex',gap:'8px'}}>
+            <button onClick={load} style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(79,142,247,0.1)',border:'1px solid rgba(79,142,247,0.2)',borderRadius:'8px',padding:'6px 12px',color:'#4f8ef7',cursor:'pointer',fontSize:'12px',fontWeight:600}}>
+              <IcoRefresh size={12}/> Yenile
+            </button>
+            <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'6px',background:'linear-gradient(135deg,#22c55e,#16a34a)',border:'none',borderRadius:'8px',padding:'6px 14px',color:'#fff',cursor:'pointer',fontSize:'12px',fontWeight:700}}>
+              + Yeni Kullanıcı
+            </button>
+          </div>
         </div>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse'}}>
@@ -2197,17 +2336,12 @@ function AdminUsersPage({token}){
                     </div>
                   </td>
                   <td style={td}>
-                    {u.username==='admin'?<span style={{color:'#64748b',fontSize:'12px'}}>—</span>:(
-                      <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                        <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',color:'#e2e8f0'}}>
-                          {showPwd[u.username]?u.passwordPlain:'••••••••'}
-                        </code>
-                        <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))}
-                          style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px',padding:'2px 6px'}}>
-                          {showPwd[u.username]?'Gizle':'Göster'}
-                        </button>
-                      </div>
-                    )}
+                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',color:'#e2e8f0'}}>{showPwd[u.username]?u.passwordPlain:'••••••••'}</code>
+                      <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px'}}>
+                        {showPwd[u.username]?'Gizle':'Göster'}
+                      </button>
+                    </div>
                   </td>
                   <td style={td}>
                     <span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:u.role==='admin'?'rgba(168,85,247,0.1)':'rgba(79,142,247,0.1)',color:u.role==='admin'?'#a855f7':'#4f8ef7',border:`1px solid ${u.role==='admin'?'#a855f744':'#4f8ef744'}`}}>
@@ -2217,14 +2351,13 @@ function AdminUsersPage({token}){
                   <td style={td}>{statusBadge(u.status)}</td>
                   <td style={{...td,color:'#64748b'}}>{u.createdAt?new Date(u.createdAt).toLocaleString('tr-TR'):'—'}</td>
                   <td style={td}>
-                    {u.username==='admin'?<span style={{color:'#475569',fontSize:'12px'}}>—</span>:(
-                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                        {u.status==='pending'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.15)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
-                        {u.status==='pending'&&<button disabled={actionLoading===u.username+'_reject'} onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(239,68,68,0.3)'}}>Reddet</button>}
-                        {u.status==='rejected'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.1)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
-                        <button disabled={actionLoading===u.username+'_del'} onClick={()=>{if(window.confirm(`"${u.username}" kullanıcısını silmek istediğinizden emin misiniz?`))action(()=>apiDeleteUser(token,u.username),u.username+'_del');}} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.08)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Sil</button>
-                      </div>
-                    )}
+                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                      {u.status==='pending'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.15)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
+                      {u.status==='pending'&&<button disabled={actionLoading===u.username+'_reject'} onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Reddet</button>}
+                      {u.status==='rejected'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.1)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
+                      <button onClick={()=>openEdit(u)} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(79,142,247,0.3)',background:'rgba(79,142,247,0.08)',color:'#4f8ef7',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Düzenle</button>
+                      {u.username!=='admin'&&<button disabled={actionLoading===u.username+'_del'} onClick={()=>{if(window.confirm(`"${u.username}" silinsin mi?`))action(()=>apiDeleteUser(token,u.username),u.username+'_del');}} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.08)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Sil</button>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2232,6 +2365,9 @@ function AdminUsersPage({token}){
           </table>
         </div>
       </Card>
+
+      {editModal&&<Modal title={`Düzenle — ${editModal}`} onClose={()=>setEditModal(null)} onSubmit={submitEdit} submitLabel="Kaydet"/>}
+      {addModal&&<Modal title="Yeni Kullanıcı Ekle" onClose={()=>setAddModal(false)} onSubmit={submitAdd} submitLabel="Ekle"/>}
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
     </div>
   );
@@ -2239,6 +2375,7 @@ function AdminUsersPage({token}){
 
 /* ── WHATSAPP QUEUE PAGE ── */
 function WhatsAppQueuePage({token,allUsers,onReload}){
+  const today=new Date().toISOString().slice(0,10);
   const[queue,setQueue]=React.useState([]);
   const[loading,setLoading]=React.useState(true);
   const[error,setError]=React.useState('');
@@ -2247,11 +2384,19 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
   const[allCustomers,setAllCustomers]=React.useState([]);
   const[bulkLoading,setBulkLoading]=React.useState(false);
   const[dupWarning,setDupWarning]=React.useState({});
+  const[startDate,setStartDate]=React.useState(today);
+  const[endDate,setEndDate]=React.useState(today);
+  const[statusFilter,setStatusFilter]=React.useState('all');
 
-  const loadQueue=async()=>{
+  const loadQueue=async(s,e)=>{
     setLoading(true);setError('');
-    try{setQueue(await apiWAQueue(token));}
-    catch(e){setError(e.message);}
+    try{
+      const sd=s!==undefined?s:startDate;
+      const ed=e!==undefined?e:endDate;
+      const r=await fetch(`/api/whatsapp/queue?startDate=${sd}&endDate=${ed}`,{headers:{Authorization:'Bearer '+token}});
+      if(!r.ok)throw new Error('Kuyruk yüklenemedi');
+      setQueue(await r.json());
+    }catch(e){setError(e.message);}
     finally{setLoading(false);}
   };
 
@@ -2265,9 +2410,8 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
         try{
           const r=await fetch(`/api/admin/user-data/${u.username}`,{headers:{Authorization:'Bearer '+token}});
           if(r.ok){const d=await r.json();(d.customers||[]).forEach(c=>list.push({...c,_username:u.username}));}
-        }catch(e){console.error('Müşteri yüklenemedi:',u.username,e);}
+        }catch(e){}
       }
-      console.log('Yüklenen müşteriler:',list.length,list.map(c=>c.name+'('+c._username+')'));
       setAllCustomers(list);
     };
     loadAll();
@@ -2294,7 +2438,7 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
       if(onReload)onReload();
     }catch(e){
       if(e.code==='mükerrer'){
-        setDupWarning(p=>({...p,[item.id]:{message:e.message,item,custId,cust,ocr}}));
+        setDupWarning(p=>({...p,[item.id]:{message:e.message}}));
       }else{
         setError(e.message);
       }
@@ -2302,24 +2446,21 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
   };
 
   const handleBulkAssign=async()=>{
-    const assignable=queue.filter(item=>selectedCustomer[item.id]);
-    if(!assignable.length){setError('Önce her dekont için müşteri seçin');return;}
+    const assignable=queue.filter(item=>item.status!=='assigned'&&selectedCustomer[item.id]);
+    if(!assignable.length){setError('Önce işlenmemiş dekontlar için müşteri seçin');return;}
     setBulkLoading(true);setError('');
     let ok=0,fail=0;
     for(const item of assignable){
       const custId=selectedCustomer[item.id];
       const cust=allCustomers.find(c=>c.id===custId);
       if(!cust){fail++;continue;}
-      const ocr={
-        tutar:getEdit(item.id,'tutar',item.ocr?.tutar),
-        taksit:getEdit(item.id,'taksit',item.ocr?.taksit),
-        banka:getEdit(item.id,'banka',item.ocr?.banka)
-      };
+      const ocr={tutar:getEdit(item.id,'tutar',item.ocr?.tutar),taksit:getEdit(item.id,'taksit',item.ocr?.taksit),banka:getEdit(item.id,'banka',item.ocr?.banka)};
       try{await apiWAAssign(token,item.id,custId,cust._username,ocr);ok++;}
       catch(e){fail++;}
     }
     setBulkLoading(false);
     loadQueue();
+    if(onReload)onReload();
     if(fail)setError(`${ok} kayıt işlendi, ${fail} kayıt başarısız.`);
   };
 
@@ -2329,89 +2470,143 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
     catch(e){setError(e.message);}
   };
 
+  const filtered=queue.filter(item=>{
+    if(statusFilter==='pending')return item.status!=='assigned';
+    if(statusFilter==='assigned')return item.status==='assigned';
+    return true;
+  });
+
+  const pendingCount=queue.filter(i=>i.status!=='assigned').length;
+  const assignedCount=queue.filter(i=>i.status==='assigned').length;
+
   const inp={background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'#e2e8f0',padding:'6px 8px',fontSize:'13px',width:'100%'};
-  const card={background:'#131929',borderRadius:'12px',padding:'20px',marginBottom:'16px',border:'1px solid rgba(255,255,255,0.07)'};
-  const label={fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'};
+  const dateInp={background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',padding:'8px 12px',fontSize:'13px',outline:'none'};
+  const fBtn=(val,lbl,cnt,col)=>(
+    <button onClick={()=>setStatusFilter(val)} style={{padding:'7px 14px',borderRadius:'8px',border:statusFilter===val?`1px solid ${col}44`:'1px solid transparent',cursor:'pointer',fontWeight:600,fontSize:'12px',background:statusFilter===val?col+'22':'rgba(255,255,255,0.04)',color:statusFilter===val?col:'#64748b',transition:'all .15s'}}>
+      {lbl}{cnt!=null?` (${cnt})`:''}
+    </button>
+  );
 
   return(
-    <div style={{padding:'24px',maxWidth:'960px',margin:'0 auto'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'12px'}}>
-        <h2 style={{fontWeight:700,fontSize:'20px',color:'#e2e8f0',margin:0}}>WhatsApp Kuyruk</h2>
-        {queue.length>0&&(
-          <button onClick={handleBulkAssign} disabled={bulkLoading}
-            style={{padding:'10px 20px',background:'#4f8ef7',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:700,fontSize:'13px',opacity:bulkLoading?0.6:1}}>
+    <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+      <Card style={{padding:'16px 20px'}}>
+        <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div>
+            <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'5px'}}>BAŞLANGIÇ</div>
+            <input type="date" style={dateInp} value={startDate} onChange={e=>setStartDate(e.target.value)}/>
+          </div>
+          <div>
+            <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'5px'}}>BİTİŞ</div>
+            <input type="date" style={dateInp} value={endDate} onChange={e=>setEndDate(e.target.value)}/>
+          </div>
+          <button onClick={()=>loadQueue(startDate,endDate)} style={{padding:'8px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',fontWeight:700,fontSize:'13px',cursor:'pointer'}}>
+            Filtrele
+          </button>
+          <button onClick={()=>{setStartDate(today);setEndDate(today);loadQueue(today,today);}} style={{padding:'8px 14px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',fontWeight:600,fontSize:'12px',cursor:'pointer'}}>
+            Bugün
+          </button>
+          <div style={{marginLeft:'auto',display:'flex',gap:'6px',flexWrap:'wrap'}}>
+            {fBtn('all','Tümü',queue.length,'#94a3b8')}
+            {fBtn('pending','Bekliyor',pendingCount,'#f59e0b')}
+            {fBtn('assigned','İşlendi',assignedCount,'#22c55e')}
+          </div>
+        </div>
+      </Card>
+
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
+        <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+          <span style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0'}}>WhatsApp Kuyruk</span>
+          {pendingCount>0&&<span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(245,158,11,0.1)',color:'#f59e0b',border:'1px solid rgba(245,158,11,0.3)'}}>{pendingCount} bekliyor</span>}
+          {assignedCount>0&&<span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(34,197,94,0.1)',color:'#22c55e',border:'1px solid rgba(34,197,94,0.3)'}}>{assignedCount} işlendi</span>}
+        </div>
+        {pendingCount>0&&(
+          <button onClick={handleBulkAssign} disabled={bulkLoading} style={{padding:'9px 18px',background:'#4f8ef7',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:700,fontSize:'13px',opacity:bulkLoading?0.6:1}}>
             {bulkLoading?'İşleniyor...':'Tümünü Carilere İşle'}
           </button>
         )}
       </div>
-      {error&&<div style={{background:'rgba(239,68,68,0.1)',border:'1px solid #ef4444',borderRadius:'8px',padding:'12px',color:'#ef4444',marginBottom:'16px',fontSize:'13px'}}>{error}</div>}
+
+      {error&&<div style={{background:'rgba(239,68,68,0.1)',border:'1px solid #ef4444',borderRadius:'8px',padding:'12px',color:'#ef4444',fontSize:'13px'}}>{error}</div>}
       {loading&&<div style={{color:'#64748b',textAlign:'center',padding:'40px'}}>Yükleniyor...</div>}
-      {!loading&&queue.length===0&&<div style={{color:'#64748b',textAlign:'center',padding:'40px',background:'#131929',borderRadius:'12px'}}>Bekleyen dekont yok</div>}
-      {queue.map(item=>(
-        <div key={item.id} style={card}>
-          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px',fontSize:'12px',color:'#64748b'}}>
-            <span>📱 {item.from}</span>
-            <span>🕐 {item.receivedAt?new Date(item.receivedAt).toLocaleString('tr-TR'):'-'}</span>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'14px'}}>
-            <div>
-              <div style={label}>Tutar (₺)</div>
-              <input style={inp} type="number" value={getEdit(item.id,'tutar',item.ocr?.tutar||'')}
-                onChange={e=>setEdit(item.id,'tutar',e.target.value)} placeholder="Tutar"/>
+      {!loading&&filtered.length===0&&<Card><div style={{color:'#64748b',textAlign:'center',padding:'30px',fontSize:'14px'}}>Bu tarih aralığında kayıt bulunamadı</div></Card>}
+
+      {filtered.map(item=>{
+        const isAssigned=item.status==='assigned';
+        return(
+          <div key={item.id} style={{background:'#131929',borderRadius:'12px',padding:'18px 20px',border:isAssigned?'1px solid rgba(34,197,94,0.2)':'1px solid rgba(255,255,255,0.07)'}}>
+            <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'12px',alignItems:'center'}}>
+              <span style={{fontSize:'12px',color:'#64748b'}}>📱 {item.from}</span>
+              <span style={{fontSize:'12px',color:'#64748b'}}>🕐 {item.receivedAt?new Date(item.receivedAt).toLocaleString('tr-TR'):'-'}</span>
+              {isAssigned
+                ?<span style={{marginLeft:'auto',padding:'4px 12px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(34,197,94,0.12)',color:'#22c55e',border:'1px solid rgba(34,197,94,0.3)'}}>✓ İşlendi — {item.assignedAt?new Date(item.assignedAt).toLocaleString('tr-TR'):''}</span>
+                :<span style={{marginLeft:'auto',padding:'4px 12px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(245,158,11,0.1)',color:'#f59e0b',border:'1px solid rgba(245,158,11,0.3)'}}>⏳ Bekliyor</span>
+              }
             </div>
-            <div>
-              <div style={label}>Taksit</div>
-              <input style={inp} type="number" min="1" max="12" value={getEdit(item.id,'taksit',item.ocr?.taksit||'')}
-                onChange={e=>setEdit(item.id,'taksit',e.target.value)} placeholder="Taksit"/>
-            </div>
-            <div>
-              <div style={label}>Banka</div>
-              <select style={inp} value={getEdit(item.id,'banka',item.ocr?.banka||'')} onChange={e=>setEdit(item.id,'banka',e.target.value)}>
-                <option value=''>Seç</option>
-                {['Akbank','QNB','Garanti','Kuveyt','Ziraat','Halk','İş Bankası','Vakıf','YKB'].map(b=><option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
-            <div style={{gridColumn:'span 2'}}>
-              <div style={label}>Müşteri</div>
-              <select style={inp} value={selectedCustomer[item.id]||''} onChange={e=>setSelectedCustomer(p=>({...p,[item.id]:e.target.value}))}>
-                <option value=''>Müşteri seç</option>
-                {allCustomers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',flexDirection:'column'}}>
-            <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-              <button onClick={()=>handleAssign(item)} disabled={!selectedCustomer[item.id]}
-                style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:!selectedCustomer[item.id]?0.4:1}}>
-                Cariye İşle
-              </button>
-              <button onClick={()=>handleDelete(item.id)}
-                style={{padding:'8px 14px',background:'rgba(239,68,68,0.15)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
-                Sil
-              </button>
-            </div>
-            {dupWarning[item.id]&&(
-              <div style={{background:'rgba(234,179,8,0.15)',border:'1px solid rgba(234,179,8,0.4)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',color:'#fbbf24',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                <span>⚠️ {dupWarning[item.id].message} Yine de eklemek istiyorsanız:</span>
-                <button onClick={()=>handleAssign(item,true)}
-                  style={{padding:'6px 14px',background:'rgba(234,179,8,0.3)',color:'#fbbf24',border:'1px solid rgba(234,179,8,0.5)',borderRadius:'6px',cursor:'pointer',fontWeight:700,fontSize:'12px',whiteSpace:'nowrap'}}>
-                  Zorla Ekle
-                </button>
-                <button onClick={()=>setDupWarning(p=>({...p,[item.id]:null}))}
-                  style={{padding:'6px 10px',background:'transparent',color:'#94a3b8',border:'none',cursor:'pointer',fontSize:'12px'}}>
-                  İptal
-                </button>
+
+            {isAssigned&&item.assignedTo&&(
+              <div style={{background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.15)',borderRadius:'8px',padding:'10px 14px',marginBottom:'12px',fontSize:'13px',display:'flex',gap:'16px',flexWrap:'wrap'}}>
+                <span style={{color:'#94a3b8'}}>Müşteri: <b style={{color:'#e2e8f0'}}>{item.assignedTo.customerName||item.assignedTo.customerId}</b></span>
+                <span style={{color:'#94a3b8'}}>Tutar: <b style={{color:'#e2e8f0'}}>₺{Number(item.assignedTo.amount||0).toLocaleString('tr-TR')}</b></span>
+                <span style={{color:'#94a3b8'}}>Banka: <b style={{color:'#e2e8f0'}}>{item.assignedTo.bank||'—'}</b></span>
+                <span style={{color:'#94a3b8'}}>Taksit: <b style={{color:'#e2e8f0'}}>{item.assignedTo.taksit||1}</b></span>
               </div>
             )}
+
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'10px',marginBottom:'12px'}}>
+              {[['tutar','Tutar (₺)','number'],['taksit','Taksit','number']].map(([field,lbl,type])=>(
+                <div key={field}>
+                  <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{lbl}</div>
+                  <input style={{...inp,opacity:isAssigned?0.5:1}} disabled={isAssigned} type={type} value={getEdit(item.id,field,item.ocr?.[field]||'')} onChange={e=>setEdit(item.id,field,e.target.value)}/>
+                </div>
+              ))}
+              <div>
+                <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Banka</div>
+                <select style={{...inp,opacity:isAssigned?0.5:1}} disabled={isAssigned} value={getEdit(item.id,'banka',item.ocr?.banka||'')} onChange={e=>setEdit(item.id,'banka',e.target.value)}>
+                  <option value=''>Seç</option>
+                  {['Akbank','QNB','Garanti','Kuveyt','Ziraat','Halk','İş Bankası','Vakıf','YKB'].map(b=><option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              {!isAssigned&&(
+                <div style={{gridColumn:'span 2'}}>
+                  <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Müşteri</div>
+                  <select style={inp} value={selectedCustomer[item.id]||''} onChange={e=>setSelectedCustomer(p=>({...p,[item.id]:e.target.value}))}>
+                    <option value=''>Müşteri seç</option>
+                    {allCustomers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div style={{display:'flex',gap:'8px',flexDirection:'column'}}>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                {!isAssigned&&(
+                  <button onClick={()=>handleAssign(item)} disabled={!selectedCustomer[item.id]}
+                    style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:!selectedCustomer[item.id]?0.4:1}}>
+                    Cariye İşle
+                  </button>
+                )}
+                <button onClick={()=>handleDelete(item.id)}
+                  style={{padding:'8px 14px',background:'rgba(239,68,68,0.1)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+                  Sil
+                </button>
+              </div>
+              {dupWarning[item.id]&&(
+                <div style={{background:'rgba(234,179,8,0.15)',border:'1px solid rgba(234,179,8,0.4)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',color:'#fbbf24',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                  <span>⚠️ {dupWarning[item.id].message} Yine de eklemek istiyorsanız:</span>
+                  <button onClick={()=>handleAssign(item,true)} style={{padding:'6px 14px',background:'rgba(234,179,8,0.3)',color:'#fbbf24',border:'1px solid rgba(234,179,8,0.5)',borderRadius:'6px',cursor:'pointer',fontWeight:700,fontSize:'12px',whiteSpace:'nowrap'}}>Zorla Ekle</button>
+                  <button onClick={()=>setDupWarning(p=>({...p,[item.id]:null}))} style={{padding:'6px 10px',background:'transparent',color:'#94a3b8',border:'none',cursor:'pointer',fontSize:'12px'}}>İptal</button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 /* ── TOPBAR ── */
-const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
+const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
 function Topbar({page,saved,onMenuToggle}){
   const isMobile=useIsMobile();
   return(
@@ -2588,6 +2783,7 @@ function App(){
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}
+          {activePage==='hesabim'&&<HesabimPage token={auth.token} username={auth.username} onUpdated={(newUsername)=>setAuth(p=>({...p,username:newUsername}))}/>}
           {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} onReload={()=>apiFetchData(auth.token).then(d=>{if(d.customers)setCustomers(d.customers);if(d.banks)setBanks(d.banks);})}/>}
           {activePage==='waq'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>

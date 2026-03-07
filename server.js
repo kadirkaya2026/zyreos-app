@@ -245,19 +245,66 @@ app.delete('/api/admin/users/:username',auth,adminOnly,(req,res)=>{
   res.json({ok:true});
 });
 
-// ── Şifre değiştir
-app.post('/api/change-password',auth,(req,res)=>{
-  const{currentPassword,newPassword}=req.body||{};
-  if(!currentPassword||!newPassword||newPassword.length<6)
-    return res.status(400).json({error:'Geçersiz şifre bilgisi (min 6 karakter)'});
+// ── Admin: yeni kullanıcı ekle
+app.post('/api/admin/users',auth,adminOnly,(req,res)=>{
+  const{username,password,role='user'}=req.body||{};
+  if(!username||!password||password.length<6)
+    return res.status(400).json({error:'Kullanıcı adı ve en az 6 karakterli şifre gerekli'});
   const users=readUsers();
-  const user=users.find(u=>u.username===req.user.username);
-  if(!user||!bcrypt.compareSync(currentPassword,user.password))
-    return res.status(401).json({error:'Mevcut şifre hatalı'});
-  user.password=bcrypt.hashSync(newPassword,10);
-  user.passwordPlain=newPassword;
-  writeUsers(users);res.json({ok:true});
+  if(users.find(u=>u.username===username))
+    return res.status(400).json({error:'Bu kullanıcı adı zaten alınmış'});
+  users.push({username,password:bcrypt.hashSync(password,10),passwordPlain:password,role,status:'approved',createdAt:new Date().toISOString()});
+  writeUsers(users);
+  res.json({ok:true});
 });
+
+// ── Admin: kullanıcı adı/şifre güncelle
+app.put('/api/admin/users/:username',auth,adminOnly,(req,res)=>{
+  const{newUsername,newPassword}=req.body||{};
+  const users=readUsers();
+  const idx=users.findIndex(u=>u.username===req.params.username);
+  if(idx===-1)return res.status(404).json({error:'Kullanıcı bulunamadı'});
+  if(newUsername&&newUsername!==req.params.username){
+    if(users.find(u=>u.username===newUsername))
+      return res.status(400).json({error:'Bu kullanıcı adı zaten alınmış'});
+    const oldFile=getDataFile(req.params.username);
+    const newFile=getDataFile(newUsername);
+    if(fs.existsSync(oldFile))fs.renameSync(oldFile,newFile);
+    users[idx].username=newUsername;
+  }
+  if(newPassword&&newPassword.length>=6){
+    users[idx].password=bcrypt.hashSync(newPassword,10);
+    users[idx].passwordPlain=newPassword;
+  }
+  writeUsers(users);
+  res.json({ok:true});
+});
+
+// ── Kullanıcı: kendi adını/şifresini güncelle
+app.put('/api/users/me',auth,(req,res)=>{
+  const{newUsername,currentPassword,newPassword}=req.body||{};
+  const users=readUsers();
+  const idx=users.findIndex(u=>u.username===req.user.username);
+  if(idx===-1)return res.status(404).json({error:'Kullanıcı bulunamadı'});
+  if(currentPassword&&!bcrypt.compareSync(currentPassword,users[idx].password))
+    return res.status(401).json({error:'Mevcut şifre hatalı'});
+  if(newUsername&&newUsername!==req.user.username){
+    if(users.find(u=>u.username===newUsername))
+      return res.status(400).json({error:'Bu kullanıcı adı zaten alınmış'});
+    const oldFile=getDataFile(req.user.username);
+    const newFile=getDataFile(newUsername);
+    if(fs.existsSync(oldFile))fs.renameSync(oldFile,newFile);
+    users[idx].username=newUsername;
+  }
+  if(newPassword&&newPassword.length>=6){
+    if(!currentPassword)return res.status(400).json({error:'Şifre değiştirmek için mevcut şifre gerekli'});
+    users[idx].password=bcrypt.hashSync(newPassword,10);
+    users[idx].passwordPlain=newPassword;
+  }
+  writeUsers(users);
+  res.json({ok:true,username:users[idx].username});
+});
+
 
 // ── WhatsApp: webhook doğrulama (GET)
 app.get('/api/whatsapp/webhook',(req,res)=>{
@@ -353,7 +400,11 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
 
 // ── WhatsApp: kuyruk listesi
 app.get('/api/whatsapp/queue',auth,adminOnly,(req,res)=>{
-  res.json(readQueue());
+  let q=readQueue();
+  const{startDate,endDate}=req.query;
+  if(startDate)q=q.filter(i=>i.receivedAt&&i.receivedAt.slice(0,10)>=startDate);
+  if(endDate)q=q.filter(i=>i.receivedAt&&i.receivedAt.slice(0,10)<=endDate);
+  res.json(q);
 });
 
 // ── WhatsApp: kuyruktan müşteriye ata
@@ -409,8 +460,8 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
     createdAt:new Date().toISOString()
   });
   fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
-  const newQueue=queue.filter(q=>q.id!==req.params.id);
-  writeQueue(newQueue);
+  const updatedQueue=queue.map(q=>q.id===req.params.id?{...q,status:'assigned',assignedAt:new Date().toISOString(),assignedTo:{customerId,username,customerName:customer.name,amount,bank:bankObj?bankObj.name:bankName,taksit}}:q);
+  writeQueue(updatedQueue);
   res.json({ok:true});
 });
 

@@ -74,13 +74,26 @@ function findCustomerByPhone(phone){
 
 async function ocrDekont(mediaId){
   if(!openai)throw new Error('OpenAI API key tanımlı değil');
-  const metaRes=await axios.get(`https://graph.facebook.com/v19.0/${mediaId}`,{
-    params:{phone_number_id:WA_PHONE_ID},
-    headers:{Authorization:`Bearer ${WA_TOKEN}`}
-  });
+  console.log(`[OCR] 1. Adım: Media URL alınıyor, mediaId=${mediaId}, tokenLen=${WA_TOKEN?WA_TOKEN.length:0}`);
+  let metaRes;
+  try{
+    metaRes=await axios.get(`https://graph.facebook.com/v19.0/${mediaId}`,{
+      headers:{Authorization:`Bearer ${WA_TOKEN}`}
+    });
+  }catch(e){
+    const detail=e.response?JSON.stringify(e.response.data):e.message;
+    throw new Error(`Media URL adımı başarısız (${e.response?.status}): ${detail}`);
+  }
   const imageUrl=metaRes.data.url;
+  console.log(`[OCR] 2. Adım: Görsel indiriliyor, url=${imageUrl?imageUrl.slice(0,60):'YOK'}`);
   if(!imageUrl)throw new Error('Görsel URL alınamadı');
-  const imgRes=await axios.get(imageUrl,{responseType:'arraybuffer',headers:{Authorization:`Bearer ${WA_TOKEN}`},params:{access_token:WA_TOKEN}});
+  let imgRes;
+  try{
+    imgRes=await axios.get(imageUrl,{responseType:'arraybuffer',headers:{Authorization:`Bearer ${WA_TOKEN}`}});
+  }catch(e){
+    const detail=e.response?JSON.stringify(e.response.data):e.message;
+    throw new Error(`Görsel indirme adımı başarısız (${e.response?.status}): ${detail}`);
+  }
   const base64=Buffer.from(imgRes.data).toString('base64');
   const mimeType=imgRes.headers['content-type']||'image/jpeg';
   const response=await openai.chat.completions.create({

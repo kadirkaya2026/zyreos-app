@@ -380,8 +380,6 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
           fs.writeFileSync(getDataFile(username),JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
           console.log(`Cari kaydedildi — müşteri: ${customer.name}, tutar: ${ocr.tutar}`);
         }
-        const msg=`✅ Dekontunuz alındı!\n\nTutar: ${ocr.tutar?'₺'+Number(ocr.tutar).toLocaleString('tr-TR'):'—'}\nTaksit: ${taksit===1?'Peşin':taksit+' Taksit'}\nBanka: ${ocr.banka||'—'}\n\nHesabınıza işlendi.`;
-        sendWhatsAppReply(from,msg).catch(()=>{});
       }else{
         const queue=readQueue();
         const now=new Date().toISOString();
@@ -392,7 +390,6 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
           writeQueue(queue);
           console.log(`Eşleşme yok — kuyruga eklendi: ${from}`);
         }
-        sendWhatsAppReply(from,'Dekontunuz alındı, kısa sürede incelenecektir.').catch(()=>{});
       }
     })().catch(e=>console.error('Webhook işleme hatası:',e.message));
   }catch(e){console.error('Webhook hatası:',e.message);}

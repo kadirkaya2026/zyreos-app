@@ -302,7 +302,7 @@ app.get('/api/whatsapp/queue',auth,adminOnly,(req,res)=>{
 
 // ── WhatsApp: kuyruktan müşteriye ata
 app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
-  const{customerId,username}=req.body||{};
+  const{customerId,username,ocr:ocrOverride}=req.body||{};
   if(!customerId||!username)return res.status(400).json({error:'customerId ve username gerekli'});
   const queue=readQueue();
   const item=queue.find(q=>q.id===req.params.id);
@@ -313,15 +313,16 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
   const customerIdx=data.customers&&data.customers.findIndex(c=>c.id===customerId);
   if(customerIdx===-1||customerIdx===undefined)return res.status(404).json({error:'Müşteri bulunamadı'});
   const customer=data.customers[customerIdx];
-  const taksit=parseInt(item.ocr&&item.ocr.taksit)||1;
+  const ocrData=ocrOverride||item.ocr||{};
+  const taksit=parseInt(ocrData.taksit)||1;
   const commissionRate=customer.rates&&customer.rates[taksit]?customer.rates[taksit]:0;
   if(!data.customers[customerIdx].entries)data.customers[customerIdx].entries=[];
   data.customers[customerIdx].entries.push({
     id:randomUUID(),
     type:'ceki',
-    amount:parseFloat(item.ocr&&item.ocr.tutar)||0,
+    amount:parseFloat(ocrData.tutar)||0,
     installment:taksit,
-    bank:(item.ocr&&item.ocr.banka)||'',
+    bank:ocrData.banka||'',
     date:item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10),
     description:`WhatsApp — ${normalizePhone(item.from)}`,
     commissionRate:commissionRate,

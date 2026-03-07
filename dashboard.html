@@ -107,8 +107,8 @@ async function apiWAQueue(token){
   if(!r.ok)throw new Error('Kuyruk alınamadı');
   return r.json();
 }
-async function apiWAAssign(token,id,customerId,username){
-  const r=await fetch(`/api/whatsapp/queue/${id}/assign`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({customerId,username})});
+async function apiWAAssign(token,id,customerId,username,ocr){
+  const r=await fetch(`/api/whatsapp/queue/${id}/assign`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({customerId,username,ocr})});
   if(!r.ok){const d=await r.json();throw new Error(d.error||'Atama başarısız');}
 }
 async function apiWADelete(token,id){
@@ -2237,14 +2237,14 @@ function AdminUsersPage({token}){
 }
 
 /* ── WHATSAPP QUEUE PAGE ── */
-function WhatsAppQueuePage({token,allUsers,customers}){
+function WhatsAppQueuePage({token,allUsers}){
   const[queue,setQueue]=React.useState([]);
   const[loading,setLoading]=React.useState(true);
   const[error,setError]=React.useState('');
-  const[assignState,setAssignState]=React.useState({});
-  const[selectedUser,setSelectedUser]=React.useState('');
+  const[edits,setEdits]=React.useState({});
   const[selectedCustomer,setSelectedCustomer]=React.useState({});
-  const[userCustomers,setUserCustomers]=React.useState({});
+  const[allCustomers,setAllCustomers]=React.useState([]);
+  const[bulkLoading,setBulkLoading]=React.useState(false);
 
   const loadQueue=async()=>{
     setLoading(true);setError('');
@@ -2253,16 +2253,64 @@ function WhatsAppQueuePage({token,allUsers,customers}){
     finally{setLoading(false);}
   };
 
-  React.useEffect(()=>{loadQueue();},[]);
+  React.useEffect(()=>{
+    loadQueue();
+    const loadAll=async()=>{
+      const list=[];
+      for(const u of allUsers){
+        try{
+          const r=await fetch(`/api/admin/user-data/${u.username}`,{headers:{Authorization:'Bearer '+token}});
+          if(r.ok){const d=await r.json();(d.customers||[]).forEach(c=>list.push({...c,_username:u.username}));}
+        }catch(e){}
+      }
+      setAllCustomers(list);
+    };
+    if(allUsers.length)loadAll();
+  },[allUsers.length]);
+
+  const getEdit=(id,field,fallback)=>edits[id]&&edits[id][field]!==undefined?edits[id][field]:fallback;
+  const setEdit=(id,field,val)=>setEdits(p=>({...p,[id]:{...p[id],[field]:val}}));
 
   const handleAssign=async(item)=>{
     const custId=selectedCustomer[item.id];
-    const uname=assignState[item.id]?.username||selectedUser;
-    if(!custId||!uname)return;
+    if(!custId){setError('Müşteri seçiniz');return;}
+    const cust=allCustomers.find(c=>c.id===custId);
+    if(!cust){setError('Müşteri bulunamadı');return;}
+    const payload={
+      ...item,
+      ocr:{
+        tutar:getEdit(item.id,'tutar',item.ocr?.tutar),
+        taksit:getEdit(item.id,'taksit',item.ocr?.taksit),
+        banka:getEdit(item.id,'banka',item.ocr?.banka)
+      }
+    };
     try{
-      await apiWAAssign(token,item.id,custId,uname);
+      await apiWAAssign(token,item.id,custId,cust._username,payload.ocr);
+      setError('');
       loadQueue();
     }catch(e){setError(e.message);}
+  };
+
+  const handleBulkAssign=async()=>{
+    const assignable=queue.filter(item=>selectedCustomer[item.id]);
+    if(!assignable.length){setError('Önce her dekont için müşteri seçin');return;}
+    setBulkLoading(true);setError('');
+    let ok=0,fail=0;
+    for(const item of assignable){
+      const custId=selectedCustomer[item.id];
+      const cust=allCustomers.find(c=>c.id===custId);
+      if(!cust){fail++;continue;}
+      const ocr={
+        tutar:getEdit(item.id,'tutar',item.ocr?.tutar),
+        taksit:getEdit(item.id,'taksit',item.ocr?.taksit),
+        banka:getEdit(item.id,'banka',item.ocr?.banka)
+      };
+      try{await apiWAAssign(token,item.id,custId,cust._username,ocr);ok++;}
+      catch(e){fail++;}
+    }
+    setBulkLoading(false);
+    loadQueue();
+    if(fail)setError(`${ok} kayıt işlendi, ${fail} kayıt başarısız.`);
   };
 
   const handleDelete=async(id)=>{
@@ -2271,54 +2319,60 @@ function WhatsAppQueuePage({token,allUsers,customers}){
     catch(e){setError(e.message);}
   };
 
-  const loadUserCustomers=async(username)=>{
-    if(userCustomers[username])return;
-    try{
-      const r=await fetch(`/api/admin/user-data/${username}`,{headers:{Authorization:'Bearer '+token}});
-      if(r.ok){const d=await r.json();setUserCustomers(p=>({...p,[username]:d.customers||[]}));}
-    }catch(e){}
-  };
-
+  const inp={background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'#e2e8f0',padding:'6px 8px',fontSize:'13px',width:'100%'};
   const card={background:'#131929',borderRadius:'12px',padding:'20px',marginBottom:'16px',border:'1px solid rgba(255,255,255,0.07)'};
   const label={fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'};
-  const val={fontSize:'14px',color:'#e2e8f0',fontWeight:600};
 
   return(
-    <div style={{padding:'24px',maxWidth:'900px',margin:'0 auto'}}>
-      <h2 style={{fontWeight:700,fontSize:'20px',color:'#e2e8f0',marginBottom:'20px'}}>WhatsApp Kuyruk</h2>
+    <div style={{padding:'24px',maxWidth:'960px',margin:'0 auto'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'12px'}}>
+        <h2 style={{fontWeight:700,fontSize:'20px',color:'#e2e8f0',margin:0}}>WhatsApp Kuyruk</h2>
+        {queue.length>0&&(
+          <button onClick={handleBulkAssign} disabled={bulkLoading}
+            style={{padding:'10px 20px',background:'#4f8ef7',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:700,fontSize:'13px',opacity:bulkLoading?0.6:1}}>
+            {bulkLoading?'İşleniyor...':'Tümünü Carilere İşle'}
+          </button>
+        )}
+      </div>
       {error&&<div style={{background:'rgba(239,68,68,0.1)',border:'1px solid #ef4444',borderRadius:'8px',padding:'12px',color:'#ef4444',marginBottom:'16px',fontSize:'13px'}}>{error}</div>}
       {loading&&<div style={{color:'#64748b',textAlign:'center',padding:'40px'}}>Yükleniyor...</div>}
       {!loading&&queue.length===0&&<div style={{color:'#64748b',textAlign:'center',padding:'40px',background:'#131929',borderRadius:'12px'}}>Bekleyen dekont yok</div>}
       {queue.map(item=>(
         <div key={item.id} style={card}>
-          <div style={{display:'flex',gap:'16px',flexWrap:'wrap',marginBottom:'16px'}}>
-            <div><div style={label}>Gönderen</div><div style={val}>{item.from}</div></div>
-            <div><div style={label}>Tarih</div><div style={val}>{item.receivedAt?new Date(item.receivedAt).toLocaleString('tr-TR'):'-'}</div></div>
-            <div><div style={label}>Tutar</div><div style={{...val,color:'#4f8ef7'}}>₺{item.ocr?.tutar?Number(item.ocr.tutar).toLocaleString('tr-TR'):'-'}</div></div>
-            <div><div style={label}>Taksit</div><div style={val}>{item.ocr?.taksit&&item.ocr.taksit>1?item.ocr.taksit+' Taksit':'Peşin'}</div></div>
-            <div><div style={label}>Banka</div><div style={val}>{item.ocr?.banka||'-'}</div></div>
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px',fontSize:'12px',color:'#64748b'}}>
+            <span>📱 {item.from}</span>
+            <span>🕐 {item.receivedAt?new Date(item.receivedAt).toLocaleString('tr-TR'):'-'}</span>
           </div>
-          {item.imageUrl&&<div style={{marginBottom:'12px'}}><a href={item.imageUrl} target="_blank" rel="noreferrer" style={{fontSize:'12px',color:'#4f8ef7',textDecoration:'none'}}>Dekontu Görüntüle →</a></div>}
-          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'14px'}}>
             <div>
-              <div style={label}>Kullanıcı</div>
-              <select value={assignState[item.id]?.username||''} onChange={e=>{const u=e.target.value;setAssignState(p=>({...p,[item.id]:{...p[item.id],username:u}}));if(u)loadUserCustomers(u);}}
-                style={{background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',padding:'8px 10px',fontSize:'13px',minWidth:'140px'}}>
-                <option value=''>Kullanıcı seç</option>
-                {allUsers.map(u=><option key={u.username} value={u.username}>{u.username}</option>)}
-              </select>
+              <div style={label}>Tutar (₺)</div>
+              <input style={inp} type="number" value={getEdit(item.id,'tutar',item.ocr?.tutar||'')}
+                onChange={e=>setEdit(item.id,'tutar',e.target.value)} placeholder="Tutar"/>
             </div>
             <div>
+              <div style={label}>Taksit</div>
+              <input style={inp} type="number" min="1" max="12" value={getEdit(item.id,'taksit',item.ocr?.taksit||'')}
+                onChange={e=>setEdit(item.id,'taksit',e.target.value)} placeholder="Taksit"/>
+            </div>
+            <div>
+              <div style={label}>Banka</div>
+              <select style={inp} value={getEdit(item.id,'banka',item.ocr?.banka||'')} onChange={e=>setEdit(item.id,'banka',e.target.value)}>
+                <option value=''>Seç</option>
+                {['Akbank','QNB','Garanti','Kuveyt','Ziraat','Halk','İş Bankası','Vakıf','YKB'].map(b=><option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div style={{gridColumn:'span 2'}}>
               <div style={label}>Müşteri</div>
-              <select value={selectedCustomer[item.id]||''} onChange={e=>setSelectedCustomer(p=>({...p,[item.id]:e.target.value}))}
-                style={{background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',padding:'8px 10px',fontSize:'13px',minWidth:'180px'}}>
+              <select style={inp} value={selectedCustomer[item.id]||''} onChange={e=>setSelectedCustomer(p=>({...p,[item.id]:e.target.value}))}>
                 <option value=''>Müşteri seç</option>
-                {(userCustomers[assignState[item.id]?.username||'']||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                {allCustomers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-            <button onClick={()=>handleAssign(item)} disabled={!assignState[item.id]?.username||!selectedCustomer[item.id]}
-              style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:(!assignState[item.id]?.username||!selectedCustomer[item.id])?0.4:1}}>
-              Müşteriye Ata
+          </div>
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+            <button onClick={()=>handleAssign(item)} disabled={!selectedCustomer[item.id]}
+              style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:!selectedCustomer[item.id]?0.4:1}}>
+              Cariye İşle
             </button>
             <button onClick={()=>handleDelete(item.id)}
               style={{padding:'8px 14px',background:'rgba(239,68,68,0.15)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>

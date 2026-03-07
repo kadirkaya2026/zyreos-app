@@ -299,7 +299,7 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
       if(match){
         const{username,customer,data}=match;
         const taksit=parseInt(ocr.taksit)||1;
-        const customerRate=customer.rates&&customer.rates[taksit]?parseFloat(customer.rates[taksit]):0;
+        const customerRate=customer.installmentRates&&customer.installmentRates[taksit-1]!=null?parseFloat(customer.installmentRates[taksit-1]):(customer.commissionRate?parseFloat(customer.commissionRate):0);
         const amount=parseFloat(ocr.tutar)||0;
         const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
         const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
@@ -381,7 +381,7 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
     });
     if(existing)return res.status(400).json({error:'mükerrer',message:`Bu tutar (₺${amount.toLocaleString('tr-TR')}) son 30 dakika içinde zaten işlendi.`,amount});
   }
-  const customerRate=customer.rates&&customer.rates[taksit]?parseFloat(customer.rates[taksit]):0;
+  const customerRate=customer.installmentRates&&customer.installmentRates[taksit-1]!=null?parseFloat(customer.installmentRates[taksit-1]):(customer.commissionRate?parseFloat(customer.commissionRate):0);
   const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
   const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
   const bankName=ocrData.banka||'';

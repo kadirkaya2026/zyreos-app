@@ -72,8 +72,14 @@ function findCustomerByPhone(phone){
   return null;
 }
 
-async function ocrDekont(imageUrl){
+async function ocrDekont(mediaId){
   if(!openai)throw new Error('OpenAI API key tanımlı değil');
+  const metaRes=await axios.get(`https://graph.facebook.com/v19.0/${mediaId}`,{
+    params:{phone_number_id:WA_PHONE_ID},
+    headers:{Authorization:`Bearer ${WA_TOKEN}`}
+  });
+  const imageUrl=metaRes.data.url;
+  if(!imageUrl)throw new Error('Görsel URL alınamadı');
   const imgRes=await axios.get(imageUrl,{responseType:'arraybuffer',headers:{Authorization:`Bearer ${WA_TOKEN}`}});
   const base64=Buffer.from(imgRes.data).toString('base64');
   const mimeType=imgRes.headers['content-type']||'image/jpeg';
@@ -233,14 +239,12 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
     const imageId=message.image&&message.image.id;
     if(!imageId)return;
     console.log(`Dekont işleniyor — gönderen: ${from}, görsel ID: ${imageId}`);
-    // Görsel URL'sini al
-    axios.get(`https://graph.facebook.com/v19.0/${imageId}`,{
-      headers:{Authorization:`Bearer ${WA_TOKEN}`}
-    }).then(async urlRes=>{
-      const imageUrl=urlRes.data.url;
+    (async()=>{
       let ocr={tutar:null,taksit:null,banka:null};
-      try{ocr=await ocrDekont(imageUrl);}
-      catch(e){console.error('OCR hatası:',e.message);}
+      try{
+        ocr=await ocrDekont(imageId);
+        console.log(`OCR sonucu:`,JSON.stringify(ocr));
+      }catch(e){console.error('OCR hatası:',e.message);}
       const match=findCustomerByPhone(from);
       if(match){
         const{username,customer,data}=match;
@@ -269,12 +273,12 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
         sendWhatsAppReply(from,msg).catch(()=>{});
       }else{
         const queue=readQueue();
-        queue.push({id:randomUUID(),from,imageUrl,ocr,receivedAt:new Date().toISOString(),status:'pending'});
+        queue.push({id:randomUUID(),from,imageUrl:'',ocr,receivedAt:new Date().toISOString(),status:'pending'});
         writeQueue(queue);
         console.log(`Eşleşme yok — kuyruga eklendi: ${from}`);
         sendWhatsAppReply(from,'Dekontunuz alındı, kısa sürede incelenecektir.').catch(()=>{});
       }
-    }).catch(e=>console.error('Görsel indirme hatası:',e.message));
+    })().catch(e=>console.error('Webhook işleme hatası:',e.message));
   }catch(e){console.error('Webhook hatası:',e.message);}
 });
 

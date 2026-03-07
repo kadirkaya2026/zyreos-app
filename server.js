@@ -343,53 +343,14 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
         ocr=await ocrDekont(imageId);
         console.log(`OCR sonucu:`,JSON.stringify(ocr));
       }catch(e){console.error('OCR hatası:',e.message);}
-      const match=findCustomerByPhone(from);
-      if(match){
-        const{username,customer,data}=match;
-        const taksit=parseInt(ocr.taksit)||1;
-        const customerRate=customer.installmentRates&&customer.installmentRates[taksit-1]!=null?parseFloat(customer.installmentRates[taksit-1]):(customer.commissionRate?parseFloat(customer.commissionRate):0);
-        const amount=parseFloat(ocr.tutar)||0;
-        const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
-        const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
-        const bankName=ocr.banka||'';
-        const bankObj=findBank(bankName,data.banks||[]);
-        const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]?parseFloat(bankObj.rates[taksit-1]):0;
-        const bankCost=parseFloat((amount*bankRate/100).toFixed(2));
-        const profit=parseFloat((amount*(customerRate-bankRate)/100).toFixed(2));
-        const newEntry={
-          id:randomUUID(),
-          type:'cekim',
-          amount:amount,
-          installment:taksit,
-          bank:bankName,
-          date:new Date().toISOString().slice(0,10),
-          description:`WhatsApp otomatik — ${normalizePhone(from)}`,
-          customerRate:customerRate,
-          customerComm:customerComm,
-          netToCustomer:netToCustomer,
-          bankRate:bankRate,
-          bankCost:bankCost,
-          profit:profit,
-          source:'whatsapp',
-          createdAt:new Date().toISOString()
-        };
-        const idx=data.customers.findIndex(c=>c.id===customer.id);
-        if(idx>=0){
-          if(!data.customers[idx].cariEntries)data.customers[idx].cariEntries=[];
-          data.customers[idx].cariEntries.push(newEntry);
-          fs.writeFileSync(getDataFile(username),JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
-          console.log(`Cari kaydedildi — müşteri: ${customer.name}, tutar: ${ocr.tutar}`);
-        }
+      const queue=readQueue();
+      const now=new Date().toISOString();
+      if(isDuplicate(queue,from,ocr.tutar,now)){
+        console.log(`Mükerrer dekont atlandı — gönderen: ${from}, tutar: ${ocr.tutar}`);
       }else{
-        const queue=readQueue();
-        const now=new Date().toISOString();
-        if(isDuplicate(queue,from,ocr.tutar,now)){
-          console.log(`Mükerrer dekont atlandı — gönderen: ${from}, tutar: ${ocr.tutar}`);
-        }else{
-          queue.push({id:randomUUID(),from,imageUrl:'',ocr,receivedAt:now,status:'pending'});
-          writeQueue(queue);
-          console.log(`Eşleşme yok — kuyruga eklendi: ${from}`);
-        }
+        queue.push({id:randomUUID(),from,imageUrl:'',ocr,receivedAt:now,status:'pending'});
+        writeQueue(queue);
+        console.log(`Kuyruğa eklendi — gönderen: ${from}, tutar: ${ocr.tutar}`);
       }
     })().catch(e=>console.error('Webhook işleme hatası:',e.message));
   }catch(e){console.error('Webhook hatası:',e.message);}

@@ -2656,7 +2656,7 @@ function useHashRouter(){
 function App(){
   const[auth,setAuth]=useState(()=>getAuth());
   const[authScreen,setAuthScreen]=useState('login');
-  const[customers,setCustomers]=useState(INIT_CUSTOMERS);
+  const[customers,setCustomers]=useState([]);
   const[banks,setBanks]=useState(INIT_BANKS);
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
   const[mobileSidebarOpen,setMobileSidebarOpen]=useState(false);

@@ -438,7 +438,42 @@ app.patch('/api/whatsapp/queue/:id/unassign',auth,adminOnly,(req,res)=>{
   res.json({ok:true});
 });
 
-// ── Ana sayfa
+// ── WhatsApp: işlenmiş kaydı güncelle
+app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
+  const{username,ocr:ocrNew}=req.body||{};
+  if(!username||!ocrNew)return res.status(400).json({error:'username ve ocr gerekli'});
+  const queue=readQueue();
+  const item=queue.find(q=>q.id===req.params.id);
+  if(!item||item.status!=='assigned')return res.status(404).json({error:'İşlenmiş kayıt bulunamadı'});
+  const file=getDataFile(username);
+  if(!fs.existsSync(file))return res.status(404).json({error:'Kullanıcı verisi bulunamadı'});
+  const data=JSON.parse(fs.readFileSync(file,'utf8'));
+  const customerId=item.assignedTo&&item.assignedTo.customerId;
+  const customerIdx=data.customers&&data.customers.findIndex(c=>c.id===customerId);
+  if(customerIdx===-1||customerIdx===undefined)return res.status(404).json({error:'Müşteri bulunamadı'});
+  const customer=data.customers[customerIdx];
+  const entryIdx=(customer.cariEntries||[]).findIndex(e=>e.queueId===req.params.id);
+  if(entryIdx===-1)return res.status(404).json({error:'Cari kayıt bulunamadı'});
+  const taksit=parseInt(ocrNew.taksit)||1;
+  const amount=parseFloat(ocrNew.tutar)||0;
+  const customerRate=customer.installmentRates&&customer.installmentRates[taksit-1]!=null?parseFloat(customer.installmentRates[taksit-1]):(customer.commissionRate?parseFloat(customer.commissionRate):0);
+  const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
+  const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
+  const bankName=ocrNew.banka||'';
+  const bankObj=findBank(bankName,data.banks||[]);
+  const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]?parseFloat(bankObj.rates[taksit-1]):0;
+  const bankCost=parseFloat((amount*bankRate/100).toFixed(2));
+  const profit=parseFloat((amount*(customerRate-bankRate)/100).toFixed(2));
+  data.customers[customerIdx].cariEntries[entryIdx]={
+    ...data.customers[customerIdx].cariEntries[entryIdx],
+    amount,installment:taksit,bank:bankObj?bankObj.name:bankName,
+    customerRate,customerComm,netToCustomer,bankRate,bankCost,profit
+  };
+  fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
+  const updatedQueue=queue.map(q=>q.id===req.params.id?{...q,ocr:ocrNew,assignedTo:{...q.assignedTo,amount,bank:bankObj?bankObj.name:bankName,taksit}}:q);
+  writeQueue(updatedQueue);
+  res.json({ok:true});
+});
 app.get('/favicon.png',(req,res)=>res.sendFile(path.join(__dirname,'favicon.png')));
 app.get('/manifest.json',(req,res)=>res.sendFile(path.join(__dirname,'manifest.json')));
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));

@@ -119,6 +119,11 @@ async function apiWAAssign(token,id,customerId,username,ocr,force){
   const d=await r.json();
   if(!r.ok){const err=new Error(d.message||d.error||'Atama başarısız');err.code=d.error;err.amount=d.amount;throw err;}
 }
+async function apiWAUpdate(token,id,username,ocr){
+  const r=await fetch(`/api/whatsapp/queue/${id}/update`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({username,ocr})});
+  const d=await r.json();
+  if(!r.ok)throw new Error(d.error||'Güncelleme başarısız');
+}
 async function apiWADelete(token,id){
   const r=await fetch(`/api/whatsapp/queue/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
   if(!r.ok){const d=await r.json();throw new Error(d.error||'Silme başarısız');}
@@ -2567,6 +2572,22 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
     }
   };
 
+  const handleUpdate=async(item)=>{
+    const username=item.assignedTo?.username;
+    if(!username){setError('Kullanıcı bilgisi bulunamadı');return;}
+    const ocr={
+      tutar:Number(getEdit(item.id,'tutar',item.ocr?.tutar))||0,
+      taksit:parseInt(getEdit(item.id,'taksit',item.ocr?.taksit))||1,
+      banka:getEdit(item.id,'banka',item.ocr?.banka)||''
+    };
+    try{
+      await apiWAUpdate(token,item.id,username,ocr);
+      setError('');
+      loadQueue();
+      if(onReload)onReload();
+    }catch(e){setError(e.message);}
+  };
+
   const handleBulkAssign=async()=>{
     const assignable=queue.filter(item=>item.status!=='assigned'&&selectedCustomer[item.id]);
     if(!assignable.length){setError('Önce işlenmemiş dekontlar için müşteri seçin');return;}
@@ -2678,12 +2699,12 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
               {[['tutar','Tutar (₺)','number'],['taksit','Taksit','number']].map(([field,lbl,type])=>(
                 <div key={field}>
                   <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{lbl}</div>
-                  <input style={{...inp,opacity:isAssigned?0.5:1}} disabled={isAssigned} type={type} value={getEdit(item.id,field,item.ocr?.[field]||'')} onChange={e=>setEdit(item.id,field,e.target.value)}/>
+                  <input style={inp} type={type} value={getEdit(item.id,field,item.ocr?.[field]||'')} onChange={e=>setEdit(item.id,field,e.target.value)}/>
                 </div>
               ))}
               <div>
                 <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Banka</div>
-                <select style={{...inp,opacity:isAssigned?0.5:1}} disabled={isAssigned} value={getEdit(item.id,'banka',item.ocr?.banka||'')} onChange={e=>setEdit(item.id,'banka',e.target.value)}>
+                <select style={inp} value={getEdit(item.id,'banka',item.ocr?.banka||'')} onChange={e=>setEdit(item.id,'banka',e.target.value)}>
                   <option value=''>Seç</option>
                   {['Akbank','QNB','Garanti','Kuveyt','Ziraat','Halk','İş Bankası','Vakıf','YKB'].map(b=><option key={b} value={b}>{b}</option>)}
                 </select>
@@ -2705,6 +2726,12 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
                   <button onClick={()=>handleAssign(item)} disabled={!selectedCustomer[item.id]}
                     style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:!selectedCustomer[item.id]?0.4:1}}>
                     Cariye İşle
+                  </button>
+                )}
+                {isAssigned&&(
+                  <button onClick={()=>handleUpdate(item)}
+                    style={{padding:'8px 16px',background:'#4f8ef7',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+                    Güncelle
                   </button>
                 )}
                 <button onClick={()=>handleDelete(item.id)}

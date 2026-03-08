@@ -23,7 +23,8 @@ if(!fs.existsSync(DATA_DIR))fs.mkdirSync(DATA_DIR,{recursive:true});
 
 const BANK_ALIASES={
   'akbank':'Akbank','axess':'Akbank','ak bank':'Akbank',
-  'garanti':'Garanti','bonus':'Garanti','garanti bbva':'Garanti','diğer banka':'Garanti','diger banka':'Garanti','diğer':'Garanti',
+  'garanti':'Garanti','bonus':'Garanti','garanti bbva':'Garanti',
+  'diğer banka':'Diğer Banka','diger banka':'Diğer Banka','diğer':'Diğer Banka','diger':'Diğer Banka',
   'halk':'Halk','halkbank':'Halk','halk bank':'Halk','paraf':'Halk',
   'ziraat':'Ziraat','ziraat bankası':'Ziraat','ziraatbank':'Ziraat','bankkart':'Ziraat',
   'qnb':'QNB','finansbank':'QNB','qnb finansbank':'QNB','cardfinans':'QNB','card finans':'QNB','enpara':'QNB',
@@ -58,6 +59,18 @@ function isDuplicate(queue,from,tutar,receivedAt){
   });
 }
 function getDataFile(username){return path.join(DATA_DIR,`data_${username}.json`);}
+
+function ensureDigerBanka(data,file){
+  if(!data.banks||!Array.isArray(data.banks))return data;
+  if(data.banks.find(b=>b.name==='Diğer Banka'))return data;
+  const garanti=data.banks.find(b=>b.name==='Garanti');
+  const defaultRates=garanti?[...garanti.rates]:Array(12).fill(0);
+  const defaultFee=garanti?garanti.fee:0;
+  const newBank={id:'diger-banka',name:'Diğer Banka',color:'#94a3b8',rates:defaultRates,fee:defaultFee};
+  const updated={...data,banks:[...data.banks,newBank]};
+  if(file)try{fs.writeFileSync(file,JSON.stringify({...updated,savedAt:new Date().toISOString()},null,2));}catch(e){}
+  return updated;
+}
 function readUsers(){try{return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'));}catch(e){return[];}}
 function writeUsers(u){fs.writeFileSync(USERS_FILE,JSON.stringify(u,null,2));}
 function readQueue(){try{return JSON.parse(fs.readFileSync(WA_QUEUE_FILE,'utf8'));}catch(e){return[];}}
@@ -197,7 +210,8 @@ app.get('/api/data',auth,(req,res)=>{
   const file=getDataFile(req.user.username);
   try{
     if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
-    res.json(JSON.parse(fs.readFileSync(file,'utf8')));
+    const data=ensureDigerBanka(JSON.parse(fs.readFileSync(file,'utf8')),file);
+    res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });
 
@@ -219,7 +233,8 @@ app.get('/api/admin/user-data/:username',auth,adminOnly,(req,res)=>{
   const file=getDataFile(req.params.username);
   try{
     if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
-    res.json(JSON.parse(fs.readFileSync(file,'utf8')));
+    const data=ensureDigerBanka(JSON.parse(fs.readFileSync(file,'utf8')),file);
+    res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });
 app.post('/api/admin/users/:username/approve',auth,adminOnly,(req,res)=>{

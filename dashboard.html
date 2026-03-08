@@ -184,8 +184,8 @@ const INIT_CUSTOMERS=[
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function fmt(n){return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n??0);}
 function fmtTL(n){return '₺'+fmt(n);}
-function calcBalance(entries){
-  return(entries||[]).reduce((s,e)=>e.type==='cekim'?s+e.netToCustomer:s-e.amount,0);
+function calcBalance(entries,openingBalance=0){
+  return openingBalance+(entries||[]).reduce((s,e)=>e.type==='cekim'?s+e.netToCustomer:s-e.amount,0);
 }
 function calcCekim(amount,installment,customerRate,bank){
   const bankRate=bank.rates[installment-1];
@@ -577,7 +577,7 @@ function DashboardPage({customers,onNavigateCustomer}){
           <div style={{fontWeight:700,marginBottom:'16px',fontSize:'14px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Müşteri Bakiye Özeti</div>
           <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
             {customers.map(c=>{
-              const bak=calcBalance(c.cariEntries||[]);
+              const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
               const isBorc=bak>0;
               return(
                 <div key={c.id} onClick={()=>onNavigateCustomer(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderRadius:'10px',background:'#131929',cursor:'pointer',border:'1px solid transparent',transition:'border-color 0.15s'}} className="hover:border-blue-500/30">
@@ -624,8 +624,8 @@ function DashboardPage({customers,onNavigateCustomer}){
 
 /* ── CUSTOMER FORM MODAL ── */
 function CustomerFormModal({open,onClose,onSave,initial}){
-  const blank={name:'',phone:'',installmentRates:Array(12).fill(3.5),notes:''};
-  const toForm=c=>({name:c.name||'',phone:c.phone||'',installmentRates:c.installmentRates||Array(12).fill(3.5),notes:c.notes||''});
+  const blank={name:'',phone:'',openingBalance:0,installmentRates:Array(12).fill(3.5),notes:''};
+  const toForm=c=>({name:c.name||'',phone:c.phone||'',openingBalance:c.openingBalance||0,installmentRates:c.installmentRates||Array(12).fill(3.5),notes:c.notes||''});
   const[form,setForm]=useState(initial?toForm(initial):blank);
   useEffect(()=>{if(open)setForm(initial?toForm(initial):blank);},[open]);
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -636,6 +636,7 @@ function CustomerFormModal({open,onClose,onSave,initial}){
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 16px'}}>
         <Field label="Ad Soyad" required style={{gridColumn:'1/-1'}}><Input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Ad Soyad"/></Field>
         <Field label="Telefon"><Input value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="0532 xxx xx xx"/></Field>
+        <Field label="Açılış Bakiyesi (₺)"><input type="number" step="0.01" value={form.openingBalance||0} onChange={e=>set('openingBalance',parseFloat(e.target.value)||0)} style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'9px 12px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/></Field>
       </div>
       <div style={{marginTop:'16px',background:'rgba(15,23,42,0.6)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.08)',padding:'14px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
@@ -791,7 +792,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const totalCekim=cekimler.reduce((s,e)=>s+e.amount,0);
   const totalKom=cekimler.reduce((s,e)=>s+(e.customerComm||0),0);
   const totalOdedi=odemeler.reduce((s,e)=>s+e.amount,0);
-  const bakiye=calcBalance(entries);
+  const bakiye=calcBalance(entries,customer.openingBalance||0);
   const handleAddEntry=entry=>{
     onUpdateCustomer({...customer,cariEntries:[...entries,entry]});
   };
@@ -1006,7 +1007,7 @@ function CustomersPage({customers,banks,onUpdateCustomers}){
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:'16px'}}>
         {customers.map(c=>{
-          const bak=calcBalance(c.cariEntries||[]);
+          const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
           const cekim=(c.cariEntries||[]).filter(e=>e.type==='cekim').length;
           const isBorc=bak>0;
           return(
@@ -1336,7 +1337,7 @@ function ReportsPage({customers}){
   const totalCekim=filteredEntries.filter(e=>e.type==='cekim').reduce((s,e)=>s+e.amount,0);
   const totalKom=filteredEntries.filter(e=>e.type==='cekim').reduce((s,e)=>s+(e.customerComm||0),0);
   const totalOdenen=filteredEntries.filter(e=>e.type==='nakit_odeme').reduce((s,e)=>s+e.amount,0);
-  const bakiye=calcBalance(filteredEntries);
+  const bakiye=calcBalance(filteredEntries,selCustomer?.openingBalance||0);
 
   const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
   const td={padding:'10px 14px'};
@@ -2992,7 +2993,7 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:'16px'}}>
         {customers.map(c=>{
-          const bak=calcBalance(c.cariEntries||[]);
+          const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
           const cekim=(c.cariEntries||[]).filter(e=>e.type==='cekim').length;
           const isBorc=bak>0;
           return(

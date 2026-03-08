@@ -23,7 +23,7 @@ if(!fs.existsSync(DATA_DIR))fs.mkdirSync(DATA_DIR,{recursive:true});
 
 const BANK_ALIASES={
   'akbank':'Akbank','axess':'Akbank','ak bank':'Akbank',
-  'garanti':'Garanti','bonus':'Garanti','garanti bbva':'Garanti',
+  'garanti':'Garanti','bonus':'Garanti','garanti bbva':'Garanti','diğer banka':'Garanti','diger banka':'Garanti','diğer':'Garanti',
   'halk':'Halk','halkbank':'Halk','halk bank':'Halk','paraf':'Halk',
   'ziraat':'Ziraat','ziraat bankası':'Ziraat','ziraatbank':'Ziraat','bankkart':'Ziraat',
   'qnb':'QNB','finansbank':'QNB','qnb finansbank':'QNB','cardfinans':'QNB','card finans':'QNB','enpara':'QNB',
@@ -138,7 +138,7 @@ async function ocrDekont(mediaId){
     messages:[{
       role:'user',
       content:[
-        {type:'text',text:'Bu banka dekontundan şu bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma: {"tutar": <sadece sayı, kuruş yok>, "taksit": <sadece sayı, peşin ise 1>, "banka": "<banka adı>"}. Banka adı SADECE şunlardan biri olmalı (parantezdeki kart/takma adlara dikkat et): Akbank (Axess), QNB (CardFinans, Finansbank, Enpara), Garanti (Bonus), Halk (Paraf), Ziraat (Ziraat Bankası, Bankkart), Kuveyt (Kuveyt Türk), YKB (WorldCard, Yapı Kredi), İş Bankası (Maximum, Maxipuan), Vakıf (Vakıfbank). Emin değilsen boş bırak.'},
+        {type:'text',text:'Bu banka dekontundan şu bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma: {"tutar": <sadece sayı, kuruş yok>, "taksit": <sadece sayı, peşin ise 1>, "banka": "<banka adı>"}. Banka adı SADECE şunlardan biri olmalı (parantezdeki kart/takma adlara dikkat et): Akbank (Axess), QNB (CardFinans, Finansbank, Enpara), Garanti (Bonus, Diğer Banka), Halk (Paraf), Ziraat (Ziraat Bankası, Bankkart), Kuveyt (Kuveyt Türk), YKB (WorldCard, Yapı Kredi), İş Bankası (Maximum, Maxipuan), Vakıf (Vakıfbank). "Diğer Banka" veya tanımlanamayan banka görürsen Garanti yaz. Emin değilsen boş bırak.'},
         {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}}
       ]
     }],

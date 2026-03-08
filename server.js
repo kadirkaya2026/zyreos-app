@@ -345,13 +345,9 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
       }catch(e){console.error('OCR hatası:',e.message);}
       const queue=readQueue();
       const now=new Date().toISOString();
-      if(isDuplicate(queue,from,ocr.tutar,now)){
-        console.log(`Mükerrer dekont atlandı — gönderen: ${from}, tutar: ${ocr.tutar}`);
-      }else{
-        queue.push({id:randomUUID(),from,imageUrl:'',ocr,receivedAt:now,status:'pending'});
-        writeQueue(queue);
-        console.log(`Kuyruğa eklendi — gönderen: ${from}, tutar: ${ocr.tutar}`);
-      }
+      queue.push({id:randomUUID(),from,imageUrl:'',ocr,receivedAt:now,status:'pending'});
+      writeQueue(queue);
+      console.log(`Kuyruğa eklendi — gönderen: ${from}, tutar: ${ocr.tutar}`);
     })().catch(e=>console.error('Webhook işleme hatası:',e.message));
   }catch(e){console.error('Webhook hatası:',e.message);}
 });

@@ -154,11 +154,21 @@ async function ocrDekont(mediaId){
         {type:'text',text:`Bu POS/banka dekontundan aşağıdaki bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma:
 {"tutar": <sadece tam sayı, kuruş/virgül yok>, "taksit": <sadece sayı, peşin/tek çekim ise 1>, "banka": "<banka adı>"}
 
-TUTAR: "İşlem Tutarı", "Tutar", "Amount" gibi alanların karşısındaki rakamı al. Taksit başına düşen tutarı değil, TOPLAM işlem tutarını al. Nokta/virgül ayraçlarını yok say, sadece tam sayı döndür. Örnek: "15.000,00 TL" → 15000
+TUTAR: "İşlem Tutarı", "Tutar", "Amount", "İşlem Tutan" gibi alanların karşısındaki rakamı al. Taksit başına düşen tutarı değil, TOPLAM işlem tutarını al. Nokta/virgül ayraçlarını yok say, sadece tam sayı döndür. Örnek: "15.000,00 TL" → 15000, "20.000,00 TRY" → 20000
 
-TAKSİT: "Taksit" alanındaki sayıyı al. "Tek Çekim", "Peşin", "Tek Taksit" ise 1 yaz.
+TAKSİT: "Taksit", "Ödeme Planı", "Taksit Sayısı" alanındaki sayıyı al. "Tek Çekim", "Peşin", "Tek Taksit" ise 1 yaz. "Maximum 4 Taksit" gibi ifadelerde sadece sayıyı al → 4.
 
-BANKA: SADECE şu isimlerden birini yaz: Akbank (Axess), QNB (CardFinans, Finansbank, Enpara), Garanti (Bonus, Diğer Banka), Halk (Paraf), Ziraat (Ziraat Bankası, Bankkart), Kuveyt (Kuveyt Türk), YKB (WorldCard, Yapı Kredi), İş Bankası (Maximum, Maxipuan), Vakıf (Vakıfbank). Tanımlanamazsa Garanti yaz.`},
+BANKA: SADECE şu isimlerden birini yaz (parantezdeki kelimeler o bankaya ait ipuçlarıdır):
+- Akbank (Axess)
+- QNB (CardFinans, Finansbank, Enpara)
+- Garanti (Bonus, Diğer Banka)
+- Halk (Paraf)
+- Ziraat (Ziraat Bankası, Bankkart)
+- Kuveyt (Kuveyt Türk)
+- YKB (WorldCard, Yapı Kredi)
+- İş Bankası (Maximum, Maxipuan)
+- Vakıf (Vakıfbank)
+Bankayı tespit edemiyorsan Garanti yaz.`},
         {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}}
       ]
     }],

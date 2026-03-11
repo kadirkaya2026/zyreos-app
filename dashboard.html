@@ -423,7 +423,7 @@ function exportPDF(customer,opts){
   const totalOdenen=entries.filter(e=>e.type==='nakit_odeme').reduce((s,e)=>s+e.amount,0);
   const bakiye=calcBalance(entries);
   const periodLabel=dateFrom||dateTo?`${dateFrom||'Başlangıç'} — ${dateTo||'Bugün'}`:'Tüm İşlemler';
-  let running=0;
+  let running=customer.openingBalance||0;
   const rows=entries.map(e=>{
     if(e.type==='cekim'){running+=e.netToCustomer;}else{running-=e.amount;}
     const rColor=running>=0?'#c53030':'#276749';
@@ -809,7 +809,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
     }
   };
   // running balance rows
-  let running=0;
+  let running=customer.openingBalance||0;
   const rows=entries.map(e=>{
     if(e.type==='cekim')running=+(running+e.netToCustomer).toFixed(2);
     else running=+(running-e.amount).toFixed(2);
@@ -1417,7 +1417,7 @@ function ReportsPage({customers}){
                     <tr>{['Tarih','Açıklama','Çekim Tutarı','Müşteri Kom.','Müşteriye Nakit','Ödenen Nakit','Bakiye'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {(()=>{let running=0;return filteredEntries.map(e=>{
+                    {(()=>{let running=selCustomer?.openingBalance||0;return filteredEntries.map(e=>{
                       if(e.type==='cekim')running+=e.netToCustomer;else running-=e.amount;
                       return(
                         <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>

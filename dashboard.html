@@ -933,10 +933,22 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
         </Card>
       )}
       {/* EKSTRE */}
-      {tab==='ekstre'&&(
+      {tab==='ekstre'&&(()=>{
+        const [exFrom,setExFrom]=React.useState('');
+        const [exTo,setExTo]=React.useState('');
+        const inS2={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
+        return(
         <div>
-          <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'16px'}}>
-            <button onClick={()=>exportPDF(customer)} style={{display:'flex',alignItems:'center',gap:'8px',background:'#ef4444',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPDF size={16}/>PDF İndir / Yazdır</button>
+          <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px',flexWrap:'wrap'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+              <span style={{color:'#64748b',fontSize:'13px'}}>Başlangıç:</span>
+              <input type="date" value={exFrom} onChange={e=>setExFrom(e.target.value)} style={inS2}/>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+              <span style={{color:'#64748b',fontSize:'13px'}}>Bitiş:</span>
+              <input type="date" value={exTo} onChange={e=>setExTo(e.target.value)} style={inS2}/>
+            </div>
+            <button onClick={()=>exportPDF(customer,{dateFrom:exFrom,dateTo:exTo})} style={{display:'flex',alignItems:'center',gap:'8px',background:'#ef4444',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',marginLeft:'auto'}}><IcoPDF size={16}/>Ekstre İndir (PDF)</button>
           </div>
           <Card style={{padding:0,overflow:'hidden'}}>
             <div style={{overflowX:'auto'}}>
@@ -970,7 +982,8 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
             </div>
           </Card>
         </div>
-      )}
+        );
+      })()}
       <AddEntryModal open={addOpen} onClose={()=>setAddOpen(false)} onSave={handleAddEntry} customer={customer} banks={banks}/>
       <CustomerFormModal open={editOpen} onClose={()=>setEditOpen(false)} initial={customer}
         onSave={updated=>onUpdateCustomer({
@@ -1181,9 +1194,9 @@ function POSPage({customers,banks}){
   dayEntries.forEach(e=>{
     const bankObj=banks.find(b=>b.name===e.bank);
     const taksit=parseInt(e.installment)||1;
-    const bankRate=e.bankRate!=null?e.bankRate:(bankObj&&bankObj.rates?bankObj.rates[taksit-1]:0)||0;
-    const bankCut=e.bankCost!=null?e.bankCost:+(e.amount*bankRate/100).toFixed(2);
-    const netDeposit=+(e.amount-bankCut).toFixed(2);
+    const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]!=null?parseFloat(bankObj.rates[taksit-1]):0;
+    const bankCut=parseFloat((e.amount*bankRate/100).toFixed(2));
+    const netDeposit=parseFloat((e.amount-bankCut).toFixed(2));
     const ownerShare=+(netDeposit*0.01).toFixed(2);
     const customerComm=e.customerComm||0;
     const realProfit=+(customerComm-bankCut-ownerShare).toFixed(2);
@@ -2556,7 +2569,8 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
     const ocr={
       tutar:Number(getEdit(item.id,'tutar',item.ocr?.tutar))||0,
       taksit:parseInt(getEdit(item.id,'taksit',item.ocr?.taksit))||1,
-      banka:getEdit(item.id,'banka',item.ocr?.banka)||''
+      banka:getEdit(item.id,'banka',item.ocr?.banka)||'',
+      tarih:getEdit(item.id,'tarih',item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10))
     };
     try{
       await apiWAAssign(token,item.id,custId,cust._username,ocr,force);
@@ -2579,7 +2593,8 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
     const ocr={
       tutar:Number(getEdit(item.id,'tutar',item.ocr?.tutar))||0,
       taksit:parseInt(getEdit(item.id,'taksit',item.ocr?.taksit))||1,
-      banka:getEdit(item.id,'banka',item.ocr?.banka)||''
+      banka:getEdit(item.id,'banka',item.ocr?.banka)||'',
+      tarih:getEdit(item.id,'tarih',item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10))
     };
     try{
       await apiWAUpdate(token,item.id,username,ocr);
@@ -2707,8 +2722,12 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
                 <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Banka</div>
                 <select style={inp} value={getEdit(item.id,'banka',item.ocr?.banka||'')} onChange={e=>setEdit(item.id,'banka',e.target.value)}>
                   <option value=''>Seç</option>
-                  {['Akbank','QNB','Garanti','Kuveyt','Ziraat','Halk','İş Bankası','Vakıf','YKB'].map(b=><option key={b} value={b}>{b}</option>)}
+                  {['Akbank','QNB','Garanti','Diğer Banka','Kuveyt','Ziraat','Halk','İş Bankası','Vakıf','YKB'].map(b=><option key={b} value={b}>{b}</option>)}
                 </select>
+              </div>
+              <div>
+                <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Kayıt Tarihi</div>
+                <input style={inp} type="date" value={getEdit(item.id,'tarih',item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10))} onChange={e=>setEdit(item.id,'tarih',e.target.value)}/>
               </div>
               {!isAssigned&&(
                 <div style={{gridColumn:'span 2'}}>

@@ -417,7 +417,7 @@ app.post('/api/whatsapp/queue/:id/assign',auth,adminOnly,(req,res)=>{
     amount:amount,
     installment:taksit,
     bank:bankObj?bankObj.name:bankName,
-    date:item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10),
+    date:ocrData.tarih||(item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10)),
     description:`WhatsApp — ${normalizePhone(item.from)}`,
     customerRate:customerRate,
     customerComm:customerComm,
@@ -516,7 +516,8 @@ app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
   data.customers[customerIdx].cariEntries[entryIdx]={
     ...data.customers[customerIdx].cariEntries[entryIdx],
     amount,installment:taksit,bank:bankObj?bankObj.name:bankName,
-    customerRate,customerComm,netToCustomer,bankRate,bankCost,profit
+    customerRate,customerComm,netToCustomer,bankRate,bankCost,profit,
+    ...(ocrNew.tarih?{date:ocrNew.tarih}:{})
   };
   fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
   const updatedQueue=queue.map(q=>q.id===req.params.id?{...q,ocr:ocrNew,assignedTo:{...q.assignedTo,amount,bank:bankObj?bankObj.name:bankName,taksit}}:q);
@@ -549,14 +550,12 @@ app.listen(PORT,()=>{
           const rawRate=bankObj.rates[taksit-1];
           if(rawRate==null||rawRate===undefined)return;
           const correctRate=parseFloat(rawRate)||0;
-          const correctCost=+(e.amount*correctRate/100).toFixed(2);
-          const correctProfit=+((e.customerComm||0)-correctCost).toFixed(2);
-          if(e.bankRate!==correctRate||e.bankCost!==correctCost){
-            e.bankRate=correctRate;
-            e.bankCost=correctCost;
-            e.profit=correctProfit;
-            changed=true;totalFixed++;
-          }
+          const correctCost=parseFloat((e.amount*correctRate/100).toFixed(2));
+          const correctProfit=parseFloat(((e.customerComm||0)-correctCost).toFixed(2));
+          e.bankRate=correctRate;
+          e.bankCost=correctCost;
+          e.profit=correctProfit;
+          changed=true;totalFixed++;
         });
       });
       if(changed)fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));

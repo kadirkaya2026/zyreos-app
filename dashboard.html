@@ -882,6 +882,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
 function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const[tab,setTab]=useState('cari');
   const[addOpen,setAddOpen]=useState(false);
+  const[editOpen,setEditOpen]=useState(false);
   const[editingEntry,setEditingEntry]=useState(null);
   const entries=customer.cariEntries||[];
   const cekimler=entries.filter(e=>e.type==='cekim');

@@ -727,14 +727,15 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
     }else{
       const valid=bulkRows.filter(r=>parseFloat(r.amount)>0);
       if(!valid.length)return alert('En az bir satıra tutar giriniz.');
-      valid.forEach(r=>{
+      const allEntries=valid.map(r=>{
         const amt=parseFloat(r.amount);
         const bank=banks.find(b=>b.name===r.bank)||banks[0];
         const inst=parseInt(r.installment)||1;
         const rate=parseFloat(r.customerRate)||(customer?.installmentRates?.[inst-1]??3.5);
         const c=calcCekim(amt,inst,rate,bank);
-        onSave({id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',amount:amt,bank:bank.name,installment:inst,customerRate:rate,...c});
+        return{id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',amount:amt,bank:bank.name,installment:inst,customerRate:rate,...c};
       });
+      onSave(allEntries);
     }
     onClose();
   };
@@ -863,7 +864,8 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const totalOdedi=odemeler.reduce((s,e)=>s+e.amount,0);
   const bakiye=calcBalance(entries,customer.openingBalance||0);
   const handleAddEntry=entry=>{
-    onUpdateCustomer({...customer,cariEntries:[...entries,entry]});
+    const newEntries=Array.isArray(entry)?entry:[entry];
+    onUpdateCustomer({...customer,cariEntries:[...entries,...newEntries]});
   };
   const handleDeleteEntry=id=>{
     const entry=entries.find(e=>e.id===id);

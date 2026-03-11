@@ -1180,8 +1180,9 @@ function POSPage({customers,banks}){
   const bankMap={};
   dayEntries.forEach(e=>{
     const bankObj=banks.find(b=>b.name===e.bank);
-    const bankRate=bankObj?bankObj.rates[e.installment-1]:e.bankRate||0;
-    const bankCut=+(e.amount*bankRate/100).toFixed(2);
+    const taksit=parseInt(e.installment)||1;
+    const bankRate=e.bankRate!=null?e.bankRate:(bankObj&&bankObj.rates?bankObj.rates[taksit-1]:0)||0;
+    const bankCut=e.bankCost!=null?e.bankCost:+(e.amount*bankRate/100).toFixed(2);
     const netDeposit=+(e.amount-bankCut).toFixed(2);
     const ownerShare=+(netDeposit*0.01).toFixed(2);
     const customerComm=e.customerComm||0;

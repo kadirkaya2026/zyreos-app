@@ -556,44 +556,8 @@ app.post('/api/whatsapp/send-statement',auth,async(req,res)=>{
     filtered.forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
     const balLabel=rb>=0?'Borç':'Alacak';
     const balAbs=Math.abs(rb);
-    let r2=openingBalance||0;
-    let rows='';
-    filtered.forEach(e=>{
-      const ic=e.type==='cekim';
-      if(ic)r2=+(r2+(e.netToCustomer||0)).toFixed(2);else r2=+(r2-(e.amount||0)).toFixed(2);
-      const tarih=fmtDate(e.date).padEnd(12);
-      const acik=(e.description||'').slice(0,20).padEnd(21);
-      const bnk=(ic?(e.bank||''):'').slice(0,12).padEnd(13);
-      const taks=(ic?String(e.installment||1):'').padEnd(5);
-      const borc=(ic?fmtNum(e.amount):'').padStart(17);
-      const odeme=(!ic?fmtNum(e.amount):'').padStart(17);
-      const bak=(fmtNum(Math.abs(r2))+(r2>=0?' Borc':' Alacak')).padStart(20);
-      rows+=tarih+acik+bnk+taks+borc+odeme+bak+'\n';
-    });
-    const sep='-'.repeat(105);
-    const hdr='Tarih       Aciklama             Banka        Taks Borc              Odeme             Bakiye';
-    const txt=[
-      'ZYREOS - Cari Ekstre',
-      'Musteri: '+(customerName||''),
-      'Tarih: '+fmtDate(date),
-      '',
-      sep,
-      hdr,
-      sep,
-      rows.trimEnd(),
-      sep,
-      'Bakiye: '+fmtNum(balAbs)+' '+(rb>=0?'Borc':'Alacak'),
-    ].join('\n');
-    const fileBuf=Buffer.from(txt,'utf-8');
-    const fd=new global.FormData();
-    fd.append('messaging_product','whatsapp');
-    fd.append('type','text/plain');
-    fd.append('file',new Blob([fileBuf],{type:'text/plain'}),'ekstre_'+date+'.txt');
-    const uploadRes=await fetch('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/media',{method:'POST',headers:{Authorization:'Bearer '+WA_TOKEN},body:fd});
-    if(!uploadRes.ok){const eu=await uploadRes.json();throw new Error(eu?.error?.message||'Media upload failed');}
-    const mediaId=(await uploadRes.json()).id;
-    const caption='Merhaba '+esc(customerName||'')+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
-    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to:FIXED_TO,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.txt',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
+    const caption='Merhaba '+(customerName||'')+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
+    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to:FIXED_TO,type:'text',text:{body:caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
     res.json({ok:true,caption});
   }catch(err){
     console.error('[send-statement]',err.response?.data||err.message||err);

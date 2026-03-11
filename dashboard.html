@@ -1200,13 +1200,15 @@ function POSPage({customers,banks}){
     const ownerShare=+(netDeposit*0.01).toFixed(2);
     const customerComm=e.customerComm||0;
     const realProfit=+(customerComm-bankCut-ownerShare).toFixed(2);
-    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0,totalOwnerShare:0,totalRealProfit:0};
-    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit,ownerShare,customerComm,realProfit});
+    const bankNotFound=!bankObj;
+    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0,totalOwnerShare:0,totalRealProfit:0,hasUnknown:false};
+    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit,ownerShare,customerComm,realProfit,bankNotFound});
     bankMap[e.bank].totalAmount+=e.amount;
     bankMap[e.bank].totalBankCut+=bankCut;
     bankMap[e.bank].totalNet+=netDeposit;
     bankMap[e.bank].totalOwnerShare+=ownerShare;
     bankMap[e.bank].totalRealProfit+=realProfit;
+    if(bankNotFound)bankMap[e.bank].hasUnknown=true;
   });
   const bankRows=Object.values(bankMap).sort((a,b)=>b.totalNet-a.totalNet);
 
@@ -1594,7 +1596,10 @@ function ProfitPage({customers}){
                     <div style={{fontWeight:600,fontSize:'13px'}}>{r.customerName}</div>
                     <div style={{color:'#64748b',fontSize:'11px'}}>{r.customerCode}</div>
                   </td>
-                  <td style={{...s,color:'#94a3b8',fontSize:'12px'}}>{r.bank}</td>
+                  <td style={{...s,color:'#94a3b8',fontSize:'12px'}}>
+                    {r.bank}
+                    {r.bankNotFound&&<span title="Banka ayarlarda bulunamadı, komisyon hesaplanamadı!" style={{marginLeft:'4px',color:'#f59e0b',fontWeight:700,cursor:'help'}}>⚠️</span>}
+                  </td>
                   <td style={{...s,textAlign:'center'}}>
                     <Badge color="#4f8ef7">{r.installment===1?'Peşin':`${r.installment} T`}</Badge>
                   </td>

@@ -1103,7 +1103,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
           if(!waPhone||waPhone.length<10)return alert('Geçerli bir telefon numarası girin (örn: 905551234567)');
           setWaSending(true);
           try{
-            const token=localStorage.getItem('zyreos_token')||'';
+            const token=(getAuth()?.token)||'';
             const r=await fetch('/api/whatsapp/send-statement',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({to:waPhone,customerName:customer.name,date:waDate,entries:customer.cariEntries||[],openingBalance:customer.openingBalance||0})});
             const d=await r.json();
             if(!r.ok)throw new Error(d.error||'Hata');

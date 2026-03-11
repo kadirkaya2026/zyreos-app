@@ -6,8 +6,6 @@ const path=require('path');
 const axios=require('axios');
 const{OpenAI}=require('openai');
 const{randomUUID}=require('crypto');
-const PDFLib=require('pdf-lib');
-const FormData=require('form-data');
 
 const app=express();
 app.use(express.json({limit:'10mb'}));
@@ -548,61 +546,72 @@ app.post('/api/whatsapp/send-statement',authMiddleware,async(req,res)=>{
   try{
     const{to,customerName,date,entries=[],openingBalance=0}=req.body;
     if(!to||!date)return res.status(400).json({error:'to ve date gerekli'});
-    if(!WA_TOKEN||!WA_PHONE_ID)return res.status(500).json({error:'WhatsApp yapılandırılmamış'});
+    if(!WA_TOKEN||!WA_PHONE_ID)return res.status(500).json({error:'WhatsApp yapilandirilmamis'});
     const fmtNum=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' TL';
     const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
     let rb=openingBalance||0;
     entries.forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
-    const balLabel=rb>=0?'Bor\u00e7':'Alacak';
+    const balLabel=rb>=0?'Borc':'Alacak';
     const balAbs=Math.abs(rb);
-    // pdf-lib ile PDF oluştur
-    const{PDFDocument,rgb,StandardFonts}=PDFLib;
-    const pdfDoc=await PDFDocument.create();
-    const fontR=await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontB=await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const W=595,M=40,rowH=16,colX=[M,105,215,315,370,440,510];
-    const cols7=(arr)=>arr.slice(0,7);
-    let page=pdfDoc.addPage([W,842]);
-    let y=800;
-    const txt=(p,s,x,yy,sz,bold,clr)=>{p.drawText(s,{x,y:yy,size:sz,font:bold?fontB:fontR,color:clr||rgb(0.88,0.91,0.95)});};
-    // Başlık
-    txt(page,'ZYREOS',W/2-30,y,18,true,rgb(0.31,0.56,0.97));y-=22;
-    txt(page,'Cari Ekstre — '+fmtDate(date),M,y,10,false,rgb(0.58,0.64,0.73));y-=14;
-    txt(page,'Musteri: '+(customerName||''),M,y,10,false,rgb(0.58,0.64,0.73));y-=20;
-    // Çizgi
-    page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.5,color:rgb(0.2,0.25,0.35)});y-=12;
-    // Başlıklar
-    const headers=['Tarih','Aciklama','Banka','Taksit','Borc','Odeme','Bakiye'];
-    headers.forEach((h,i)=>txt(page,h,colX[i],y,7.5,true,rgb(0.39,0.51,0.63)));
-    y-=12;
-    page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.5,color:rgb(0.2,0.25,0.35)});y-=3;
-    // Satırlar
+    // Minimal PDF oluştur (saf JS, bağımlılık yok)
+    const lines=[];
+    lines.push('%PDF-1.4');
+    const objs=[];
+    const addObj=(n,s)=>{objs[n]={offset:0,content:s};};
+    addObj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+    addObj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    // Sayfa içeriği
+    const title='ZYREOS - Cari Ekstre';
+    const subTitle='Musteri: '+(customerName||'')+' | Tarih: '+fmtDate(date);
+    const balLine='Bakiye: '+fmtNum(balAbs)+' '+balLabel;
+    let content='BT\n/F1 14 Tf\n50 780 Td\n('+title+') Tj\n/F1 10 Tf\n0 -20 Td\n('+subTitle+') Tj\n0 -20 Td\n';
+    const hdr='Tarih        Aciklama            Banka      Taks  Borc             Odeme            Bakiye';
+    content+='('+hdr+') Tj\n0 -5 Td\n('+('-'.repeat(100))+') Tj\n0 -5 Td\n';
     let r2=openingBalance||0;
-    for(const e of entries){
-      if(y<60){page=pdfDoc.addPage([W,842]);y=800;}
+    let yOff=0;
+    entries.forEach(e=>{
       const ic=e.type==='cekim';
       if(ic)r2=+(r2+(e.netToCustomer||0)).toFixed(2);else r2=+(r2-(e.amount||0)).toFixed(2);
-      const row=[fmtDate(e.date),(e.description||'').slice(0,18),ic?(e.bank||''):'',ic?String(e.installment||1):'',ic?fmtNum(e.amount):'',!ic?fmtNum(e.amount):'',fmtNum(Math.abs(r2))+(r2>=0?' B':' A')];
-      row.forEach((c,i)=>txt(page,c,colX[i],y,7,false));
-      y-=rowH;
+      const d2=fmtDate(e.date).padEnd(13);
+      const desc=(e.description||'').replace(/[()\\]/g,' ').slice(0,18).padEnd(20);
+      const bnk=ic?(e.bank||'').slice(0,10).padEnd(11):''.padEnd(11);
+      const taks=ic?String(e.installment||1).padEnd(6):''.padEnd(6);
+      const borc=ic?fmtNum(e.amount).padStart(16):''.padStart(16);
+      const odeme=!ic?fmtNum(e.amount).padStart(16):''.padStart(16);
+      const bak=(fmtNum(Math.abs(r2))+(r2>=0?' B':' A')).padStart(16);
+      const row=d2+desc+bnk+taks+borc+odeme+bak;
+      content+='('+row.replace(/[()\\]/g,' ')+') Tj\n0 -14 Td\n';
+      yOff+=14;
+      if(yOff>680){content+='ET\nBT\n/F1 10 Tf\n50 780 Td\n';yOff=0;}
+    });
+    content+='0 -20 Td\n('+('-'.repeat(100))+') Tj\n0 -14 Td\n/F1 11 Tf\n('+balLine+') Tj\nET';
+    addObj(4,'<< /Length '+(content.length)+' >>\nstream\n'+content+'\nendstream');
+    addObj(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >> >> >>');
+    let pdf='%PDF-1.4\n';
+    const offsets={};
+    for(let i=1;i<=4;i++){
+      offsets[i]=pdf.length;
+      pdf+=i+' 0 obj\n'+objs[i].content+'\nendobj\n';
     }
-    y-=4;
-    page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.5,color:rgb(0.2,0.25,0.35)});y-=14;
-    txt(page,'Bakiye: '+fmtNum(balAbs)+' '+balLabel,W-M-160,y,10,true,rgb(0.96,0.83,0.27));
-    const pdfBuf=Buffer.from(await pdfDoc.save());
-    // Meta'ya yükle
-    const form=new FormData();
-    form.append('messaging_product','whatsapp');
-    form.append('type','application/pdf');
-    form.append('file',pdfBuf,{filename:'ekstre_'+date+'.pdf',contentType:'application/pdf'});
-    const uploadRes=await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/media',form,{headers:{Authorization:'Bearer '+WA_TOKEN,...form.getHeaders()}});
-    const mediaId=uploadRes.data.id;
+    const xrefOffset=pdf.length;
+    pdf+='xref\n0 5\n0000000000 65535 f \n';
+    for(let i=1;i<=4;i++)pdf+=(offsets[i].toString().padStart(10,'0'))+' 00000 n \n';
+    pdf+='trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n'+xrefOffset+'\n%%EOF';
+    const pdfBuf=Buffer.from(pdf,'latin1');
+    // Node 18 built-in fetch + FormData ile yükle
+    const fd=new global.FormData();
+    fd.append('messaging_product','whatsapp');
+    fd.append('type','application/pdf');
+    fd.append('file',new Blob([pdfBuf],{type:'application/pdf'}),{filename:'ekstre_'+date+'.pdf'});
+    const uploadRes=await fetch('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/media',{method:'POST',headers:{Authorization:'Bearer '+WA_TOKEN},body:fd});
+    if(!uploadRes.ok){const e=await uploadRes.json();throw new Error(e?.error?.message||'Media upload failed');}
+    const mediaId=(await uploadRes.json()).id;
     const caption='Merhaba '+customerName+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
     await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.pdf',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
     res.json({ok:true,caption});
   }catch(err){
-    console.error('[send-statement]',err.response?.data||err.message);
-    res.status(500).json({error:err.response?.data?.error?.message||err.message});
+    console.error('[send-statement]',err.response?.data||err.message||err);
+    res.status(500).json({error:err.response?.data?.error?.message||err.message||'Hata'});
   }
 });
 

@@ -548,93 +548,45 @@ app.post('/api/whatsapp/send-statement',auth,async(req,res)=>{
     if(!date)return res.status(400).json({error:'date gerekli'});
     if(!WA_TOKEN||!WA_PHONE_ID)return res.status(500).json({error:'WhatsApp yapilandirilmamis'});
     const FIXED_TO='905016401263';
-    // Tüm non-ASCII karakterleri temizle
-    const asc=s=>(s||'').replace(/ş/g,'s').replace(/Ş/g,'S').replace(/ı/g,'i').replace(/İ/g,'I').replace(/ğ/g,'g').replace(/Ğ/g,'G').replace(/ü/g,'u').replace(/Ü/g,'U').replace(/ö/g,'o').replace(/Ö/g,'O').replace(/ç/g,'c').replace(/Ç/g,'C').replace(/[^\x00-\x7F]/g,'?');
     const fmtNum=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' TL';
     const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
+    const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const filtered=entries.filter(e=>e.date&&e.date<=date);
     let rb=openingBalance||0;
     filtered.forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
-    const balLabel=rb>=0?'Borc':'Alacak';
+    const balLabel=rb>=0?'Borç':'Alacak';
     const balAbs=Math.abs(rb);
-    const cName=asc(customerName||'');
-    const fmtDate2=d=>d?d.split('-').reverse().join('.'):'';
-    // PDF stream'ini buf ile oluştur — tüm chars ASCII garantili
-    const safePDF=s=>s.replace(/[()\\]/g,' ');
-    const PW=842,PH=595; // A4 Landscape
-    const pageStartY=560;
-    const lineH=11;
-    // multipage desteği için sayfa listesi
-    const pages=[];
-    let curLines=[];
-    // Header satırları (her sayfada tekrar)
-    const hdrLines=[
-      {txt:'ZYREOS - Cari Ekstre',sz:13,bold:true},
-      {txt:'Musteri: '+cName+'  |  Tarih: '+fmtDate2(date),sz:9},
-      {txt:'',sz:9},
-      {txt:'Tarih        Aciklama              Banka       Taks  Borc               Odeme              Bakiye',sz:7.5,mono:true},
-      {txt:'-'.repeat(100),sz:7,mono:true},
-    ];
-    const flushPage=()=>{pages.push([...hdrLines,...curLines]);curLines=[];};
     let r2=openingBalance||0;
+    let rows='';
     filtered.forEach(e=>{
       const ic=e.type==='cekim';
       if(ic)r2=+(r2+(e.netToCustomer||0)).toFixed(2);else r2=+(r2-(e.amount||0)).toFixed(2);
-      const desc=asc(e.description||'').slice(0,20).padEnd(20);
-      const bnk=asc(ic?(e.bank||''):'').slice(0,11).padEnd(12);
-      const taks=(ic?String(e.installment||1):'').padEnd(6);
-      const borc=(ic?fmtNum(e.amount):'').padStart(18);
-      const odeme=(!ic?fmtNum(e.amount):'').padStart(18);
-      const bak=(fmtNum(Math.abs(r2))+(r2>=0?' B':' A')).padStart(17);
-      const row=fmtDate(e.date).padEnd(13)+desc+bnk+taks+borc+odeme+bak;
-      curLines.push({txt:row,sz:7,mono:true});
-      if(curLines.length>=42)flushPage();
+      const rIsPos=r2>=0;
+      rows+=`<tr>
+        <td>${esc(fmtDate(e.date))}</td>
+        <td>${esc(e.description||'')}</td>
+        <td>${ic?esc(e.bank||''):''}</td>
+        <td>${ic?(e.installment||1):''}</td>
+        <td style="color:#ef4444;text-align:right">${ic?fmtNum(e.amount):''}</td>
+        <td style="color:#22c55e;text-align:right">${!ic?fmtNum(e.amount):''}</td>
+        <td style="color:${rIsPos?'#ef4444':'#22c55e'};text-align:right;font-weight:700">${fmtNum(Math.abs(r2))} <small>${rIsPos?'Borç':'Alacak'}</small></td>
+      </tr>`;
     });
-    curLines.push({txt:'-'.repeat(100),sz:7});
-    curLines.push({txt:'Bakiye: '+fmtNum(balAbs)+' '+balLabel,sz:10,bold:true});
-    flushPage();
-    // Her sayfa için PDF objesi oluştur — çok sayfalı PDF
-    const kids=[];
-    const allObjs={};
-    let objId=1;
-    const addO=(s)=>{const id=objId++;allObjs[id]=s;return id;};
-    const catId=addO(''); // catalog placeholder
-    const pagesId=addO(''); // pages placeholder
-    const fontId=addO('<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>');
-    const fontBId=addO('<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>');
-    pages.forEach(lines=>{
-      let y=pageStartY;
-      let stream='';
-      lines.forEach(l=>{
-        const sz=l.sz||9;
-        const font=l.bold?'F2':'F1';
-        stream+='BT /'+font+' '+sz+' Tf 30 '+y+' Td ('+safePDF(l.txt)+') Tj ET\n';
-        y-=(sz+3);
-      });
-      const contId=addO('<< /Length '+stream.length+' >>\nstream\n'+stream+'endstream');
-      const pageId=addO('<< /Type /Page /Parent '+pagesId+' 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Contents '+contId+' 0 R /Resources << /Font << /F1 '+fontId+' 0 R /F2 '+fontBId+' 0 R >> >> >>');
-      kids.push(pageId);
-    });
-    allObjs[catId]='<< /Type /Catalog /Pages '+pagesId+' 0 R >>';
-    allObjs[pagesId]='<< /Type /Pages /Kids ['+kids.map(k=>k+' 0 R').join(' ')+'] /Count '+kids.length+' >>';
-    let pdf='%PDF-1.4\n';
-    const offsets={};
-    const maxId=objId-1;
-    for(let i=1;i<=maxId;i++){offsets[i]=pdf.length;pdf+=i+' 0 obj\n'+allObjs[i]+'\nendobj\n';}
-    const xrefOffset=pdf.length;
-    pdf+='xref\n0 '+(maxId+1)+'\n0000000000 65535 f \n';
-    for(let i=1;i<=maxId;i++)pdf+=(offsets[i].toString().padStart(10,'0'))+' 00000 n \n';
-    pdf+='trailer\n<< /Size '+(maxId+1)+' /Root '+catId+' 0 R >>\nstartxref\n'+xrefOffset+'\n%%EOF';
-    const pdfBuf=Buffer.from(pdf,'latin1');
+    const html=`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ekstre ${fmtDate(date)}</title>
+<style>body{font-family:Arial,sans-serif;background:#0a0d14;color:#e2e8f0;margin:0;padding:16px}h1{color:#4f8ef7;font-size:22px;margin:0 0 4px}h2{color:#94a3b8;font-size:13px;font-weight:400;margin:0 0 20px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#1a2035;padding:8px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid rgba(255,255,255,.1)}td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.05)}.footer{margin-top:20px;padding:14px;background:#1a2035;border-radius:8px;font-size:15px;font-weight:700}.footer span{color:${rb>=0?'#ef4444':'#22c55e'}}</style></head>
+<body><h1>ZYREOS — Cari Ekstre</h1><h2>${esc(customerName||'')} | ${fmtDate(date)} tarihi itibarıyla</h2>
+<table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Banka</th><th>Taksit</th><th>Borç</th><th>Ödeme</th><th>Bakiye</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="footer">Bakiye: <span>${fmtNum(balAbs)} ${balLabel}</span></div></body></html>`;
+    const htmlBuf=Buffer.from(html,'utf-8');
     const fd=new global.FormData();
     fd.append('messaging_product','whatsapp');
-    fd.append('type','application/pdf');
-    fd.append('file',new Blob([pdfBuf],{type:'application/pdf'}),{filename:'ekstre_'+date+'.pdf'});
+    fd.append('type','text/html');
+    fd.append('file',new Blob([htmlBuf],{type:'text/html'}),'ekstre_'+date+'.html');
     const uploadRes=await fetch('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/media',{method:'POST',headers:{Authorization:'Bearer '+WA_TOKEN},body:fd});
     if(!uploadRes.ok){const eu=await uploadRes.json();throw new Error(eu?.error?.message||'Media upload failed');}
     const mediaId=(await uploadRes.json()).id;
-    const caption='Merhaba '+cName+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
-    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to:FIXED_TO,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.pdf',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
+    const caption='Merhaba '+esc(customerName||'')+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
+    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to:FIXED_TO,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.html',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
     res.json({ok:true,caption});
   }catch(err){
     console.error('[send-statement]',err.response?.data||err.message||err);

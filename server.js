@@ -453,6 +453,41 @@ app.patch('/api/whatsapp/queue/:id/unassign',auth,adminOnly,(req,res)=>{
   res.json({ok:true});
 });
 
+// ── Migration: eski kayıtlarda bankRate/bankCost düzelt
+app.post('/api/admin/migrate/fix-bank-rates',auth,adminOnly,(req,res)=>{
+  const users=readUsers();
+  let totalFixed=0;
+  users.forEach(u=>{
+    const file=getDataFile(u.username);
+    if(!fs.existsSync(file))return;
+    try{
+      const data=JSON.parse(fs.readFileSync(file,'utf8'));
+      if(!data.customers||!data.banks)return;
+      let changed=false;
+      data.customers.forEach(c=>{
+        (c.cariEntries||[]).forEach(e=>{
+          if(e.type!=='cekim')return;
+          const taksit=parseInt(e.installment)||1;
+          const bankObj=data.banks.find(b=>b.name===e.bank);
+          if(!bankObj||!bankObj.rates)return;
+          const correctRate=bankObj.rates[taksit-1]||0;
+          const correctCost=+(e.amount*correctRate/100).toFixed(2);
+          const correctProfit=+((e.customerComm||0)-correctCost).toFixed(2);
+          if(e.bankRate!==correctRate||e.bankCost!==correctCost){
+            e.bankRate=correctRate;
+            e.bankCost=correctCost;
+            e.profit=correctProfit;
+            changed=true;
+            totalFixed++;
+          }
+        });
+      });
+      if(changed)fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
+    }catch(err){console.error('Migration hatası:',u.username,err.message);}
+  });
+  res.json({ok:true,fixed:totalFixed});
+});
+
 // ── WhatsApp: işlenmiş kaydı güncelle
 app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
   const{username,ocr:ocrNew}=req.body||{};
@@ -494,5 +529,36 @@ app.get('/manifest.json',(req,res)=>res.sendFile(path.join(__dirname,'manifest.j
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));
 
 const PORT=process.env.PORT||3000;
-app.listen(PORT,()=>console.log(`ZYREOS http://localhost:${PORT} adresinde çalışıyor`));
+app.listen(PORT,()=>{
+  console.log(`ZYREOS http://localhost:${PORT} adresinde çalışıyor`);
+  // Eski kayıtlardaki bankRate/bankCost değerlerini düzelt
+  try{
+    const users=readUsers();
+    let totalFixed=0;
+    users.forEach(u=>{
+      const file=getDataFile(u.username);
+      if(!fs.existsSync(file))return;
+      const data=JSON.parse(fs.readFileSync(file,'utf8'));
+      if(!data.customers||!data.banks)return;
+      let changed=false;
+      data.customers.forEach(c=>{
+        (c.cariEntries||[]).forEach(e=>{
+          if(e.type!=='cekim')return;
+          const taksit=parseInt(e.installment)||1;
+          const bankObj=data.banks.find(b=>b.name===e.bank);
+          if(!bankObj||!bankObj.rates)return;
+          const correctRate=bankObj.rates[taksit-1]||0;
+          const correctCost=+(e.amount*correctRate/100).toFixed(2);
+          const correctProfit=+((e.customerComm||0)-correctCost).toFixed(2);
+          if(e.bankRate!==correctRate||e.bankCost!==correctCost){
+            e.bankRate=correctRate;e.bankCost=correctCost;e.profit=correctProfit;
+            changed=true;totalFixed++;
+          }
+        });
+      });
+      if(changed)fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
+    });
+    if(totalFixed>0)console.log(`[Migration] ${totalFixed} kayıt düzeltildi`);
+  }catch(err){console.error('[Migration] Hata:',err.message);}
+});
 

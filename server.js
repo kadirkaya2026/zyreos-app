@@ -544,61 +544,60 @@ app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
 // ── WhatsApp Ekstre Gönder
 app.post('/api/whatsapp/send-statement',auth,async(req,res)=>{
   try{
-    const{to,customerName,date,entries=[],openingBalance=0}=req.body;
-    if(!to||!date)return res.status(400).json({error:'to ve date gerekli'});
+    const{customerName,date,entries=[],openingBalance=0}=req.body;
+    if(!date)return res.status(400).json({error:'date gerekli'});
     if(!WA_TOKEN||!WA_PHONE_ID)return res.status(500).json({error:'WhatsApp yapilandirilmamis'});
+    const FIXED_TO='905016401263';
+    // Türkçe karakter dönüşümü
+    const tr=s=>(s||'').replace(/ş/g,'s').replace(/Ş/g,'S').replace(/ı/g,'i').replace(/İ/g,'I').replace(/ğ/g,'g').replace(/Ğ/g,'G').replace(/ü/g,'u').replace(/Ü/g,'U').replace(/ö/g,'o').replace(/Ö/g,'O').replace(/ç/g,'c').replace(/Ç/g,'C');
     const fmtNum=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' TL';
     const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
+    // Seçilen tarihe kadar olan kayıtları filtrele (date dahil)
+    const filtered=entries.filter(e=>e.date&&e.date<=date);
     let rb=openingBalance||0;
-    entries.forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
+    filtered.forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
     const balLabel=rb>=0?'Borc':'Alacak';
     const balAbs=Math.abs(rb);
-    // Minimal PDF oluştur (saf JS, bağımlılık yok)
-    const lines=[];
-    lines.push('%PDF-1.4');
-    const objs=[];
-    const addObj=(n,s)=>{objs[n]={offset:0,content:s};};
+    // PDF oluştur
+    const addObj=(n,s)=>{objs[n]={content:s};};
+    const objs={};
     addObj(1,'<< /Type /Catalog /Pages 2 0 R >>');
     addObj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-    // Sayfa içeriği
+    const cName=tr(customerName||'');
     const title='ZYREOS - Cari Ekstre';
-    const subTitle='Musteri: '+(customerName||'')+' | Tarih: '+fmtDate(date);
+    const subTitle='Musteri: '+cName+'  |  Tarih: '+fmtDate(date);
     const balLine='Bakiye: '+fmtNum(balAbs)+' '+balLabel;
-    let content='BT\n/F1 14 Tf\n50 780 Td\n('+title+') Tj\n/F1 10 Tf\n0 -20 Td\n('+subTitle+') Tj\n0 -20 Td\n';
-    const hdr='Tarih        Aciklama            Banka      Taks  Borc             Odeme            Bakiye';
-    content+='('+hdr+') Tj\n0 -5 Td\n('+('-'.repeat(100))+') Tj\n0 -5 Td\n';
+    // Sütun genişlikleri: Tarih(12) Aciklama(22) Banka(12) Taks(5) Borc(18) Odeme(18) Bakiye(18)
+    const hdr='Tarih         Aciklama               Banka        Taks  Borc                Odeme               Bakiye';
+    const sep='-'.repeat(hdr.length);
+    let content='BT\n/F1 13 Tf\n40 800 Td\n('+title+') Tj\n/F1 9 Tf\n0 -18 Td\n('+subTitle+') Tj\n/F1 8 Tf\n0 -14 Td\n('+hdr+') Tj\n0 -4 Td\n('+sep+') Tj\n0 -12 Td\n';
     let r2=openingBalance||0;
     let yOff=0;
-    entries.forEach(e=>{
+    filtered.forEach(e=>{
       const ic=e.type==='cekim';
       if(ic)r2=+(r2+(e.netToCustomer||0)).toFixed(2);else r2=+(r2-(e.amount||0)).toFixed(2);
-      const d2=fmtDate(e.date).padEnd(13);
-      const desc=(e.description||'').replace(/[()\\]/g,' ').slice(0,18).padEnd(20);
-      const bnk=ic?(e.bank||'').slice(0,10).padEnd(11):''.padEnd(11);
-      const taks=ic?String(e.installment||1).padEnd(6):''.padEnd(6);
-      const borc=ic?fmtNum(e.amount).padStart(16):''.padStart(16);
-      const odeme=!ic?fmtNum(e.amount).padStart(16):''.padStart(16);
-      const bak=(fmtNum(Math.abs(r2))+(r2>=0?' B':' A')).padStart(16);
-      const row=d2+desc+bnk+taks+borc+odeme+bak;
-      content+='('+row.replace(/[()\\]/g,' ')+') Tj\n0 -14 Td\n';
-      yOff+=14;
-      if(yOff>680){content+='ET\nBT\n/F1 10 Tf\n50 780 Td\n';yOff=0;}
+      const desc=tr(e.description||'').replace(/[()\\]/g,' ').slice(0,22).padEnd(22);
+      const bnk=tr(ic?(e.bank||''):'').slice(0,12).padEnd(13);
+      const taks=(ic?String(e.installment||1):'').padEnd(6);
+      const borc=(ic?fmtNum(e.amount):'').padStart(19);
+      const odeme=(!ic?fmtNum(e.amount):'').padStart(19);
+      const bak=(fmtNum(Math.abs(r2))+(r2>=0?' B':' A')).padStart(18);
+      const row=fmtDate(e.date).padEnd(14)+desc+bnk+taks+borc+odeme+bak;
+      content+='('+row.replace(/[()\\]/g,' ')+') Tj\n0 -11 Td\n';
+      yOff+=11;
+      if(yOff>720){content+='ET\nBT\n/F1 8 Tf\n40 800 Td\n';yOff=0;}
     });
-    content+='0 -20 Td\n('+('-'.repeat(100))+') Tj\n0 -14 Td\n/F1 11 Tf\n('+balLine+') Tj\nET';
+    content+='0 -8 Td\n('+sep+') Tj\n0 -13 Td\n/F1 10 Tf\n('+balLine+') Tj\nET';
     addObj(4,'<< /Length '+(content.length)+' >>\nstream\n'+content+'\nendstream');
-    addObj(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >> >> >>');
+    addObj(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >> >> >>');
     let pdf='%PDF-1.4\n';
     const offsets={};
-    for(let i=1;i<=4;i++){
-      offsets[i]=pdf.length;
-      pdf+=i+' 0 obj\n'+objs[i].content+'\nendobj\n';
-    }
+    for(let i=1;i<=4;i++){offsets[i]=pdf.length;pdf+=i+' 0 obj\n'+objs[i].content+'\nendobj\n';}
     const xrefOffset=pdf.length;
     pdf+='xref\n0 5\n0000000000 65535 f \n';
     for(let i=1;i<=4;i++)pdf+=(offsets[i].toString().padStart(10,'0'))+' 00000 n \n';
     pdf+='trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n'+xrefOffset+'\n%%EOF';
     const pdfBuf=Buffer.from(pdf,'latin1');
-    // Node 18 built-in fetch + FormData ile yükle
     const fd=new global.FormData();
     fd.append('messaging_product','whatsapp');
     fd.append('type','application/pdf');
@@ -606,8 +605,8 @@ app.post('/api/whatsapp/send-statement',auth,async(req,res)=>{
     const uploadRes=await fetch('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/media',{method:'POST',headers:{Authorization:'Bearer '+WA_TOKEN},body:fd});
     if(!uploadRes.ok){const e=await uploadRes.json();throw new Error(e?.error?.message||'Media upload failed');}
     const mediaId=(await uploadRes.json()).id;
-    const caption='Merhaba '+customerName+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
-    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.pdf',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
+    const caption='Merhaba '+cName+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
+    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to:FIXED_TO,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.pdf',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
     res.json({ok:true,caption});
   }catch(err){
     console.error('[send-statement]',err.response?.data||err.message||err);

@@ -689,12 +689,15 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
   const today=todayStr();
   const[form,setForm]=useState({date:today,description:'Kart Çekimi',amount:'',bank:'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
   const[nakit,setNakit]=useState({date:today,description:'Nakit Ödeme',amount:''});
+  const newBulkRow=()=>({id:uid(),date:today,amount:'',bank:banks[0]?.name||'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
+  const[bulkRows,setBulkRows]=useState([newBulkRow()]);
   useEffect(()=>{
     if(open){
       setType('cekim');
       const defRate=customer?.installmentRates?.[0]??customer?.commissionRate??3.5;
       setForm({date:today,description:'Kart Çekimi',amount:'',bank:banks[0]?.name||'',installment:1,customerRate:defRate});
       setNakit({date:today,description:'Nakit Ödeme',amount:''});
+      setBulkRows([newBulkRow()]);
     }
   },[open,customer]);
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -717,12 +720,29 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
       if(!selBank)return alert('Banka seçiniz.');
       const c=calcCekim(amt,form.installment,form.customerRate,selBank);
       onSave({id:uid(),date:form.date,type:'cekim',description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,...c});
-    }else{
+    }else if(type==='nakit_odeme'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
       onSave({id:uid(),date:nakit.date,type:'nakit_odeme',description:nakit.description||'Nakit Ödeme',amount:amt});
+    }else{
+      const valid=bulkRows.filter(r=>parseFloat(r.amount)>0);
+      if(!valid.length)return alert('En az bir satıra tutar giriniz.');
+      valid.forEach(r=>{
+        const amt=parseFloat(r.amount);
+        const bank=banks.find(b=>b.name===r.bank)||banks[0];
+        const inst=parseInt(r.installment)||1;
+        const rate=parseFloat(r.customerRate)||(customer?.installmentRates?.[inst-1]??3.5);
+        const c=calcCekim(amt,inst,rate,bank);
+        onSave({id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',amount:amt,bank:bank.name,installment:inst,customerRate:rate,...c});
+      });
     }
     onClose();
+  };
+  const setBulkRow=(id,k,v)=>setBulkRows(p=>p.map(r=>r.id===id?{...r,[k]:v}:r));
+  const setBulkInstallment=(id,val)=>{
+    const inst=parseInt(val)||1;
+    const autoRate=customer?.installmentRates?.[inst-1]??customer?.commissionRate??3.5;
+    setBulkRows(p=>p.map(r=>r.id===id?{...r,installment:inst,customerRate:autoRate}:r));
   };
   const previewRow=(lbl,val,color='#e2e8f0')=>(
     <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
@@ -730,10 +750,11 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
       <span className="tabular-nums" style={{color,fontWeight:700,fontSize:'13px'}}>{val}</span>
     </div>
   );
+  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'6px 8px',color:'#e2e8f0',fontSize:'12px',width:'100%',boxSizing:'border-box'};
   return(
-    <Modal open={open} onClose={onClose} title="Yeni Kayıt Ekle" width={520}>
+    <Modal open={open} onClose={onClose} title="Yeni Kayıt Ekle" width={type==='bulk'?820:520}>
       <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
-        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e']].map(([v,l,c])=>(
+        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],['bulk','Toplu Giriş','#f59e0b']].map(([v,l,c])=>(
           <button key={v} onClick={()=>setType(v)}
             style={{flex:1,padding:'10px',borderRadius:'8px',border:`2px solid ${type===v?c:'rgba(255,255,255,0.1)'}`,background:type===v?c+'22':'transparent',color:type===v?c:'#94a3b8',cursor:'pointer',fontWeight:700,fontSize:'13px',transition:'all 0.15s'}}>{l}</button>
         ))}
@@ -770,17 +791,60 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
             </div>
           )}
         </div>
-      ):(
+      ):type==='nakit_odeme'?(
         <div>
           <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
           <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))}/></Field>
           <Field label="Ödeme Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="5000"/></Field>
         </div>
+      ):(
+        <div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
+              <thead>
+                <tr style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+                  {['Tarih','Tutar (₺)','Banka','Taksit','Müş. Oranı %',''].map(h=>(
+                    <th key={h} style={{padding:'6px 8px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bulkRows.map((r,i)=>(
+                  <tr key={r.id} style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                    <td style={{padding:'4px 4px'}}><input type="date" value={r.date} onChange={e=>setBulkRow(r.id,'date',e.target.value)} style={inS}/></td>
+                    <td style={{padding:'4px 4px'}}><input type="number" min="0" step="0.01" value={r.amount} onChange={e=>setBulkRow(r.id,'amount',e.target.value)} placeholder="10000" style={{...inS,width:'100px'}}/></td>
+                    <td style={{padding:'4px 4px'}}>
+                      <select value={r.bank} onChange={e=>setBulkRow(r.id,'bank',e.target.value)} style={inS}>
+                        {banks.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
+                      </select>
+                    </td>
+                    <td style={{padding:'4px 4px'}}>
+                      <select value={r.installment} onChange={e=>setBulkInstallment(r.id,e.target.value)} style={{...inS,width:'90px'}}>
+                        {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i===0?'Peşin':`${i+1} Taksit`}</option>)}
+                      </select>
+                    </td>
+                    <td style={{padding:'4px 4px'}}><input type="number" step="0.1" min="0" max="100" value={r.customerRate} onChange={e=>setBulkRow(r.id,'customerRate',e.target.value)} style={{...inS,width:'70px',color:'#f59e0b'}}/></td>
+                    <td style={{padding:'4px 4px'}}>
+                      <button onClick={()=>setBulkRows(p=>p.filter(x=>x.id!==r.id))} style={{background:'#ef444422',border:'1px solid #ef444444',borderRadius:'4px',color:'#ef4444',padding:'4px 8px',cursor:'pointer',fontSize:'12px'}}>✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={()=>setBulkRows(p=>[...p,newBulkRow()])}
+            style={{marginTop:'10px',padding:'7px 16px',background:'rgba(79,142,247,0.15)',border:'1px dashed #4f8ef7',borderRadius:'8px',color:'#4f8ef7',cursor:'pointer',fontWeight:600,fontSize:'13px',width:'100%'}}>
+            + Satır Ekle
+          </button>
+          <div style={{marginTop:'8px',color:'#64748b',fontSize:'11px'}}>
+            Toplam {bulkRows.filter(r=>parseFloat(r.amount)>0).length} satır / {fmtTL(bulkRows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0))} TL
+          </div>
+        </div>
       )}
       <div style={{display:'flex',gap:'12px',justifyContent:'flex-end',marginTop:'16px'}}>
         <button onClick={onClose} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
         <button onClick={handleSave}
-          style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>Kaydet</button>
+          style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>{type==='bulk'?`Tümünü Kaydet (${bulkRows.filter(r=>parseFloat(r.amount)>0).length})`:'Kaydet'}</button>
       </div>
     </Modal>
   );

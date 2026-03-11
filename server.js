@@ -542,7 +542,7 @@ app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
   res.json({ok:true});
 });
 // ── WhatsApp Ekstre Gönder
-app.post('/api/whatsapp/send-statement',authMiddleware,async(req,res)=>{
+app.post('/api/whatsapp/send-statement',auth,async(req,res)=>{
   try{
     const{to,customerName,date,entries=[],openingBalance=0}=req.body;
     if(!to||!date)return res.status(400).json({error:'to ve date gerekli'});

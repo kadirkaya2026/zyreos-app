@@ -421,7 +421,7 @@ function exportPDF(customer,opts){
   const totalCekim=entries.filter(e=>e.type==='cekim').reduce((s,e)=>s+e.amount,0);
   const totalKomisyon=entries.filter(e=>e.type==='cekim').reduce((s,e)=>s+(e.customerComm||0),0);
   const totalOdenen=entries.filter(e=>e.type==='nakit_odeme').reduce((s,e)=>s+e.amount,0);
-  const bakiye=calcBalance(entries);
+  const bakiye=calcBalance(entries,customer.openingBalance||0);
   const periodLabel=dateFrom||dateTo?`${dateFrom||'Başlangıç'} — ${dateTo||'Bugün'}`:'Tüm İşlemler';
   let running=customer.openingBalance||0;
   const rows=entries.map(e=>{

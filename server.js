@@ -470,15 +470,14 @@ app.post('/api/admin/migrate/fix-bank-rates',auth,adminOnly,(req,res)=>{
           const taksit=parseInt(e.installment)||1;
           const bankObj=data.banks.find(b=>b.name===e.bank);
           if(!bankObj||!bankObj.rates)return;
-          const correctRate=bankObj.rates[taksit-1]||0;
+          const rawRate=bankObj.rates[taksit-1];
+          if(rawRate==null||rawRate===undefined)return;
+          const correctRate=parseFloat(rawRate)||0;
           const correctCost=+(e.amount*correctRate/100).toFixed(2);
           const correctProfit=+((e.customerComm||0)-correctCost).toFixed(2);
           if(e.bankRate!==correctRate||e.bankCost!==correctCost){
-            e.bankRate=correctRate;
-            e.bankCost=correctCost;
-            e.profit=correctProfit;
-            changed=true;
-            totalFixed++;
+            e.bankRate=correctRate;e.bankCost=correctCost;e.profit=correctProfit;
+            changed=true;totalFixed++;
           }
         });
       });
@@ -547,11 +546,15 @@ app.listen(PORT,()=>{
           const taksit=parseInt(e.installment)||1;
           const bankObj=data.banks.find(b=>b.name===e.bank);
           if(!bankObj||!bankObj.rates)return;
-          const correctRate=bankObj.rates[taksit-1]||0;
+          const rawRate=bankObj.rates[taksit-1];
+          if(rawRate==null||rawRate===undefined)return;
+          const correctRate=parseFloat(rawRate)||0;
           const correctCost=+(e.amount*correctRate/100).toFixed(2);
           const correctProfit=+((e.customerComm||0)-correctCost).toFixed(2);
           if(e.bankRate!==correctRate||e.bankCost!==correctCost){
-            e.bankRate=correctRate;e.bankCost=correctCost;e.profit=correctProfit;
+            e.bankRate=correctRate;
+            e.bankCost=correctCost;
+            e.profit=correctProfit;
             changed=true;totalFixed++;
           }
         });

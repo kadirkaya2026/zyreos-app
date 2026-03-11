@@ -885,8 +885,9 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const[editOpen,setEditOpen]=useState(false);
   const[editingEntry,setEditingEntry]=useState(null);
   const[waOpen,setWaOpen]=useState(false);
+  const[exFrom,setExFrom]=useState('');
+  const[exTo,setExTo]=useState('');
   const yesterday=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
-  const[waPhone,setWaPhone]=useState('');
   const[waDate,setWaDate]=useState(yesterday);
   const[waSending,setWaSending]=useState(false);
   const entries=customer.cariEntries||[];
@@ -1041,8 +1042,6 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
       )}
       {/* EKSTRE */}
       {tab==='ekstre'&&(()=>{
-        const [exFrom,setExFrom]=React.useState('');
-        const [exTo,setExTo]=React.useState('');
         const inS2={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
         return(
         <div>

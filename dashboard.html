@@ -219,6 +219,7 @@ const IcoChevronRight=({size=18})=><Icon d="M9 18l6-6-6-6" size={size}/>;
 const IcoChevronDown=({size=16})=><Icon d="M6 9l6 6 6-6" size={size}/>;
 const IcoPlus=({size=16})=><Icon d="M12 5v14M5 12h14" size={size}/>;
 const IcoTrash=({size=15})=><Icon d="M3 6h18M19 6l-1 14H6L5 6M9 6V4h6v2" size={size}/>;
+const IcoPencil=({size=15})=><Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" size={size}/>;
 const IcoEdit=({size=15})=><Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" size={size}/>;
 const IcoPDF=({size=16})=><Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" size={size}/>;
 const IcoRefresh=({size=16})=><Icon d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" size={size}/>;
@@ -684,7 +685,7 @@ function CustomerFormModal({open,onClose,onSave,initial}){
 }
 
 /* ── ADD ENTRY MODAL ── */
-function AddEntryModal({open,onClose,onSave,customer,banks}){
+function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks}){
   const[type,setType]=useState('cekim');
   const today=todayStr();
   const[form,setForm]=useState({date:today,description:'Kart Çekimi',amount:'',bank:'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
@@ -693,13 +694,24 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
   const[bulkRows,setBulkRows]=useState([newBulkRow()]);
   useEffect(()=>{
     if(open){
-      setType('cekim');
-      const defRate=customer?.installmentRates?.[0]??customer?.commissionRate??3.5;
-      setForm({date:today,description:'Kart Çekimi',amount:'',bank:banks[0]?.name||'',installment:1,customerRate:defRate});
-      setNakit({date:today,description:'Nakit Ödeme',amount:''});
-      setBulkRows([newBulkRow()]);
+      if(editingEntry){
+        if(editingEntry.type==='nakit_odeme'){
+          setType('nakit_odeme');
+          setNakit({date:editingEntry.date||today,description:editingEntry.description||'Nakit Ödeme',amount:String(editingEntry.amount||'')});
+        }else{
+          setType('cekim');
+          setForm({date:editingEntry.date||today,description:editingEntry.description||'Kart Çekimi',amount:String(editingEntry.amount||''),bank:editingEntry.bank||banks[0]?.name||'',installment:editingEntry.installment||1,customerRate:editingEntry.customerRate??customer?.commissionRate??3.5});
+        }
+        setBulkRows([newBulkRow()]);
+      }else{
+        setType('cekim');
+        const defRate=customer?.installmentRates?.[0]??customer?.commissionRate??3.5;
+        setForm({date:today,description:'Kart Çekimi',amount:'',bank:banks[0]?.name||'',installment:1,customerRate:defRate});
+        setNakit({date:today,description:'Nakit Ödeme',amount:''});
+        setBulkRows([newBulkRow()]);
+      }
     }
-  },[open,customer]);
+  },[open,customer,editingEntry]);
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
   const handleInstallmentChange=(val)=>{
     const inst=parseInt(val);
@@ -714,6 +726,21 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
     return calcCekim(amt,form.installment,form.customerRate,selBank);
   },[form.amount,form.installment,form.customerRate,selBank]);
   const handleSave=()=>{
+    if(editingEntry){
+      if(type==='cekim'){
+        const amt=parseFloat(form.amount)||0;
+        if(!amt)return alert('Tutar giriniz.');
+        if(!selBank)return alert('Banka seçiniz.');
+        const c=calcCekim(amt,form.installment,form.customerRate,selBank);
+        onUpdate({...editingEntry,date:form.date,description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,...c});
+      }else{
+        const amt=parseFloat(nakit.amount)||0;
+        if(!amt)return alert('Tutar giriniz.');
+        onUpdate({...editingEntry,date:nakit.date,description:nakit.description||'Nakit Ödeme',amount:amt});
+      }
+      onClose();
+      return;
+    }
     if(type==='cekim'){
       const amt=parseFloat(form.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
@@ -753,9 +780,9 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
   );
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'6px 8px',color:'#e2e8f0',fontSize:'12px',width:'100%',boxSizing:'border-box'};
   return(
-    <Modal open={open} onClose={onClose} title="Yeni Kayıt Ekle" width={type==='bulk'?820:520}>
+    <Modal open={open} onClose={onClose} title={editingEntry?'Kaydı Düzenle':'Yeni Kayıt Ekle'} width={type==='bulk'?820:520}>
       <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
-        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],['bulk','Toplu Giriş','#f59e0b']].map(([v,l,c])=>(
+        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],...(!editingEntry?[['bulk','Toplu Giriş','#f59e0b']]:[])].map(([v,l,c])=>(
           <button key={v} onClick={()=>setType(v)}
             style={{flex:1,padding:'10px',borderRadius:'8px',border:`2px solid ${type===v?c:'rgba(255,255,255,0.1)'}`,background:type===v?c+'22':'transparent',color:type===v?c:'#94a3b8',cursor:'pointer',fontWeight:700,fontSize:'13px',transition:'all 0.15s'}}>{l}</button>
         ))}
@@ -855,7 +882,7 @@ function AddEntryModal({open,onClose,onSave,customer,banks}){
 function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const[tab,setTab]=useState('cari');
   const[addOpen,setAddOpen]=useState(false);
-  const[editOpen,setEditOpen]=useState(false);
+  const[editingEntry,setEditingEntry]=useState(null);
   const entries=customer.cariEntries||[];
   const cekimler=entries.filter(e=>e.type==='cekim');
   const odemeler=entries.filter(e=>e.type==='nakit_odeme');
@@ -873,6 +900,10 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
     if(entry&&entry.queueId&&entry.source==='whatsapp'){
       fetch(`/api/whatsapp/queue/${entry.queueId}/unassign`,{method:'PATCH',headers:{Authorization:'Bearer '+(localStorage.getItem('zyreos_token')||'')}}).catch(()=>{});
     }
+  };
+  const handleUpdateEntry=updated=>{
+    const arr=Array.isArray(updated)?updated:[updated];
+    onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})});
   };
   // running balance rows
   let running=customer.openingBalance||0;
@@ -944,7 +975,10 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
                         <td className="tabular-nums" style={{padding:'10px 12px',color:'#22c55e',fontWeight:600}}>{!isCekim?fmtTL(e.amount):'—'}</td>
                         <td className="tabular-nums" style={{padding:'10px 12px',color:rIsPos?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(Math.abs(e.runningBal))}<span style={{fontSize:'10px',marginLeft:'4px'}}>{rIsPos?'Borç':'Alacak'}</span></td>
                         <td style={{padding:'10px 12px',textAlign:'center'}}>
-                          <button onClick={()=>{if(window.confirm('Kaydı silmek istediğinizden emin misiniz?'))handleDeleteEntry(e.id);}} style={{background:'none',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'4px 8px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center',gap:'3px',fontSize:'12px'}}><IcoTrash size={13}/>Sil</button>
+                          <div style={{display:'flex',gap:'4px',justifyContent:'center'}}>
+                            <button onClick={()=>setEditingEntry(e)} style={{background:'none',border:'1px solid rgba(79,142,247,0.3)',borderRadius:'6px',padding:'4px 8px',cursor:'pointer',color:'#4f8ef7',display:'flex',alignItems:'center',gap:'3px',fontSize:'12px'}}><IcoPencil size={13}/>Düzenle</button>
+                            <button onClick={()=>{if(window.confirm('Kaydı silmek istediğinizden emin misiniz?'))handleDeleteEntry(e.id);}} style={{background:'none',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'4px 8px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center',gap:'3px',fontSize:'12px'}}><IcoTrash size={13}/>Sil</button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1050,7 +1084,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
         </div>
         );
       })()}
-      <AddEntryModal open={addOpen} onClose={()=>setAddOpen(false)} onSave={handleAddEntry} customer={customer} banks={banks}/>
+      <AddEntryModal open={addOpen||!!editingEntry} onClose={()=>{setAddOpen(false);setEditingEntry(null);}} onSave={handleAddEntry} onUpdate={handleUpdateEntry} editingEntry={editingEntry||null} customer={customer} banks={banks}/>
       <CustomerFormModal open={editOpen} onClose={()=>setEditOpen(false)} initial={customer}
         onSave={updated=>onUpdateCustomer({
           ...updated,

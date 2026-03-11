@@ -884,6 +884,11 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const[addOpen,setAddOpen]=useState(false);
   const[editOpen,setEditOpen]=useState(false);
   const[editingEntry,setEditingEntry]=useState(null);
+  const[waOpen,setWaOpen]=useState(false);
+  const yesterday=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
+  const[waPhone,setWaPhone]=useState('');
+  const[waDate,setWaDate]=useState(yesterday);
+  const[waSending,setWaSending]=useState(false);
   const entries=customer.cariEntries||[];
   const cekimler=entries.filter(e=>e.type==='cekim');
   const odemeler=entries.filter(e=>e.type==='nakit_odeme');
@@ -949,6 +954,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
               <span style={{fontWeight:700}}>Cari Hareketler</span>
               <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={14}/>Kayıt Ekle</button>
+              <button onClick={()=>{setWaPhone('');setWaDate(yesterday);setWaOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',marginLeft:'8px'}}>📤 WA Ekstre</button>
             </div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
@@ -1086,6 +1092,51 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
         );
       })()}
       <AddEntryModal open={addOpen||!!editingEntry} onClose={()=>{setAddOpen(false);setEditingEntry(null);}} onSave={handleAddEntry} onUpdate={handleUpdateEntry} editingEntry={editingEntry||null} customer={customer} banks={banks}/>
+      {waOpen&&(()=>{
+        const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
+        let rb=customer.openingBalance||0;
+        (customer.cariEntries||[]).forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
+        const balLabel=rb>=0?'Borç':'Alacak';
+        const balAbs=Math.abs(rb);
+        const preview=`Merhaba ${customer.name}, ${fmtDate(waDate)} itibarıyla bakiyeniz: ${balAbs.toLocaleString('tr-TR',{minimumFractionDigits:2})} TL ${balLabel}.`;
+        const handleSendWa=async()=>{
+          if(!waPhone||waPhone.length<10)return alert('Geçerli bir telefon numarası girin (örn: 905551234567)');
+          setWaSending(true);
+          try{
+            const token=localStorage.getItem('zyreos_token')||'';
+            const r=await fetch('/api/whatsapp/send-statement',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({to:waPhone,customerName:customer.name,date:waDate,entries:customer.cariEntries||[],openingBalance:customer.openingBalance||0})});
+            const d=await r.json();
+            if(!r.ok)throw new Error(d.error||'Hata');
+            alert('Ekstre gönderildi!');
+            setWaOpen(false);
+          }catch(e){alert('Hata: '+e.message);}
+          finally{setWaSending(false);}
+        };
+        return(
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div style={{background:'#1a2035',borderRadius:'12px',padding:'28px',width:'420px',boxShadow:'0 8px 40px rgba(0,0,0,0.5)'}}>
+              <h3 style={{margin:'0 0 20px',fontSize:'16px',fontWeight:700}}>WA Ekstre Gönder</h3>
+              <div style={{marginBottom:'14px'}}>
+                <label style={{display:'block',fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Telefon Numarası (905xxxxxxxxx)</label>
+                <input value={waPhone} onChange={e=>setWaPhone(e.target.value)} placeholder="905551234567" style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.15)',borderRadius:'6px',padding:'8px 10px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/>
+              </div>
+              <div style={{marginBottom:'14px'}}>
+                <label style={{display:'block',fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Bakiyenin hesaplanacağı tarih</label>
+                <input type="date" value={waDate} onChange={e=>setWaDate(e.target.value)} style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.15)',borderRadius:'6px',padding:'8px 10px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/>
+              </div>
+              <div style={{background:'rgba(255,255,255,0.05)',borderRadius:'8px',padding:'12px',marginBottom:'20px',fontSize:'12px',color:'#94a3b8',lineHeight:1.5}}>
+                <strong style={{color:'#e2e8f0'}}>Gönderilecek mesaj:</strong><br/>{preview}
+              </div>
+              <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
+                <button onClick={()=>setWaOpen(false)} style={{background:'none',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+                <button onClick={handleSendWa} disabled={waSending} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',opacity:waSending?0.6:1}}>
+                  {waSending?'Gönderiliyor...':'Gönder'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <CustomerFormModal open={editOpen} onClose={()=>setEditOpen(false)} initial={customer}
         onSave={updated=>onUpdateCustomer({
           ...updated,

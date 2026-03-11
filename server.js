@@ -6,6 +6,8 @@ const path=require('path');
 const axios=require('axios');
 const{OpenAI}=require('openai');
 const{randomUUID}=require('crypto');
+const PDFDocument=require('pdfkit');
+const FormData=require('form-data');
 
 const app=express();
 app.use(express.json({limit:'10mb'}));
@@ -541,6 +543,65 @@ app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
   writeQueue(updatedQueue);
   res.json({ok:true});
 });
+// ── WhatsApp Ekstre Gönder
+app.post('/api/whatsapp/send-statement',authMiddleware,async(req,res)=>{
+  try{
+    const{to,customerName,date,entries=[],openingBalance=0}=req.body;
+    if(!to||!date)return res.status(400).json({error:'to ve date gerekli'});
+    if(!WA_TOKEN||!WA_PHONE_ID)return res.status(500).json({error:'WhatsApp yapılandırılmamış'});
+    const fmtTL=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' TL';
+    const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
+    let rb=openingBalance||0;
+    entries.forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
+    const balLabel=rb>=0?'Borç':'Alacak';
+    const balAbs=Math.abs(rb);
+    const pdfBuf=await new Promise((resolve,reject)=>{
+      const doc=new PDFDocument({margin:40,size:'A4'});
+      const chunks=[];
+      doc.on('data',c=>chunks.push(c));
+      doc.on('end',()=>resolve(Buffer.concat(chunks)));
+      doc.on('error',reject);
+      doc.fontSize(18).font('Helvetica-Bold').text('ZYREOS',{align:'center'});
+      doc.fontSize(11).font('Helvetica').text('Cari Ekstre — '+fmtDate(date),{align:'center'});
+      doc.moveDown(0.3);
+      doc.fontSize(11).text('Müşteri: '+(customerName||''),{align:'center'});
+      doc.moveDown(0.8);
+      const colX=[40,105,215,315,365,435,505];
+      const headers=['Tarih','Açıklama','Banka','Taksit','Borç','Ödeme','Bakiye'];
+      const sy=doc.y;
+      doc.fontSize(8).font('Helvetica-Bold');
+      headers.forEach((h,i)=>doc.text(h,colX[i],sy,{width:(colX[i+1]||(colX[i]+65))-colX[i]-4,lineBreak:false}));
+      doc.moveDown(0.3);doc.moveTo(40,doc.y).lineTo(570,doc.y).stroke();doc.moveDown(0.2);
+      doc.font('Helvetica').fontSize(7.5);
+      let r2=openingBalance||0;
+      entries.forEach(e=>{
+        const ic=e.type==='cekim';
+        if(ic)r2=+(r2+(e.netToCustomer||0)).toFixed(2);else r2=+(r2-(e.amount||0)).toFixed(2);
+        const ry=doc.y;
+        const cols=[fmtDate(e.date),e.description||'',ic?(e.bank||''):'',ic?(e.installment||1).toString():'',ic?fmtTL(e.amount):'',!ic?fmtTL(e.amount):'',fmtTL(Math.abs(r2))+(r2>=0?' B':' A')];
+        cols.forEach((c,i)=>doc.text(c,colX[i],ry,{width:(colX[i+1]||(colX[i]+65))-colX[i]-4,lineBreak:false}));
+        doc.moveDown(0.55);
+        if(doc.y>750){doc.addPage();doc.fontSize(7.5).font('Helvetica');}
+      });
+      doc.moveDown(0.3);doc.moveTo(40,doc.y).lineTo(570,doc.y).stroke();doc.moveDown(0.4);
+      doc.fontSize(10).font('Helvetica-Bold').text('Bakiye: '+fmtTL(balAbs)+' '+balLabel,{align:'right'});
+      doc.end();
+    });
+    const form=new FormData();
+    form.append('messaging_product','whatsapp');
+    form.append('type','application/pdf');
+    form.append('file',pdfBuf,{filename:'ekstre_'+date+'.pdf',contentType:'application/pdf'});
+    const uploadRes=await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/media',form,{headers:{Authorization:'Bearer '+WA_TOKEN,...form.getHeaders()}});
+    const mediaId=uploadRes.data.id;
+    const caption='Merhaba '+customerName+', '+fmtDate(date)+' itibarıyla bakiyeniz: '+fmtTL(balAbs)+' '+balLabel+'.';
+    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.pdf',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
+    res.json({ok:true,caption});
+  }catch(err){
+    console.error('[send-statement]',err.response?.data||err.message);
+    res.status(500).json({error:err.response?.data?.error?.message||err.message});
+  }
+});
+
 app.get('/favicon.png',(req,res)=>res.sendFile(path.join(__dirname,'favicon.png')));
 app.get('/manifest.json',(req,res)=>res.sendFile(path.join(__dirname,'manifest.json')));
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));

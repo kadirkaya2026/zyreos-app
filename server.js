@@ -561,32 +561,39 @@ app.post('/api/whatsapp/send-statement',auth,async(req,res)=>{
     filtered.forEach(e=>{
       const ic=e.type==='cekim';
       if(ic)r2=+(r2+(e.netToCustomer||0)).toFixed(2);else r2=+(r2-(e.amount||0)).toFixed(2);
-      const rIsPos=r2>=0;
-      rows+=`<tr>
-        <td>${esc(fmtDate(e.date))}</td>
-        <td>${esc(e.description||'')}</td>
-        <td>${ic?esc(e.bank||''):''}</td>
-        <td>${ic?(e.installment||1):''}</td>
-        <td style="color:#ef4444;text-align:right">${ic?fmtNum(e.amount):''}</td>
-        <td style="color:#22c55e;text-align:right">${!ic?fmtNum(e.amount):''}</td>
-        <td style="color:${rIsPos?'#ef4444':'#22c55e'};text-align:right;font-weight:700">${fmtNum(Math.abs(r2))} <small>${rIsPos?'Borç':'Alacak'}</small></td>
-      </tr>`;
+      const tarih=fmtDate(e.date).padEnd(12);
+      const acik=(e.description||'').slice(0,20).padEnd(21);
+      const bnk=(ic?(e.bank||''):'').slice(0,12).padEnd(13);
+      const taks=(ic?String(e.installment||1):'').padEnd(5);
+      const borc=(ic?fmtNum(e.amount):'').padStart(17);
+      const odeme=(!ic?fmtNum(e.amount):'').padStart(17);
+      const bak=(fmtNum(Math.abs(r2))+(r2>=0?' Borc':' Alacak')).padStart(20);
+      rows+=tarih+acik+bnk+taks+borc+odeme+bak+'\n';
     });
-    const html=`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ekstre ${fmtDate(date)}</title>
-<style>body{font-family:Arial,sans-serif;background:#0a0d14;color:#e2e8f0;margin:0;padding:16px}h1{color:#4f8ef7;font-size:22px;margin:0 0 4px}h2{color:#94a3b8;font-size:13px;font-weight:400;margin:0 0 20px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#1a2035;padding:8px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid rgba(255,255,255,.1)}td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.05)}.footer{margin-top:20px;padding:14px;background:#1a2035;border-radius:8px;font-size:15px;font-weight:700}.footer span{color:${rb>=0?'#ef4444':'#22c55e'}}</style></head>
-<body><h1>ZYREOS — Cari Ekstre</h1><h2>${esc(customerName||'')} | ${fmtDate(date)} tarihi itibarıyla</h2>
-<table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Banka</th><th>Taksit</th><th>Borç</th><th>Ödeme</th><th>Bakiye</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="footer">Bakiye: <span>${fmtNum(balAbs)} ${balLabel}</span></div></body></html>`;
-    const htmlBuf=Buffer.from(html,'utf-8');
+    const sep='-'.repeat(105);
+    const hdr='Tarih       Aciklama             Banka        Taks Borc              Odeme             Bakiye';
+    const txt=[
+      'ZYREOS - Cari Ekstre',
+      'Musteri: '+(customerName||''),
+      'Tarih: '+fmtDate(date),
+      '',
+      sep,
+      hdr,
+      sep,
+      rows.trimEnd(),
+      sep,
+      'Bakiye: '+fmtNum(balAbs)+' '+(rb>=0?'Borc':'Alacak'),
+    ].join('\n');
+    const fileBuf=Buffer.from(txt,'utf-8');
     const fd=new global.FormData();
     fd.append('messaging_product','whatsapp');
-    fd.append('type','text/html');
-    fd.append('file',new Blob([htmlBuf],{type:'text/html'}),'ekstre_'+date+'.html');
+    fd.append('type','text/plain');
+    fd.append('file',new Blob([fileBuf],{type:'text/plain'}),'ekstre_'+date+'.txt');
     const uploadRes=await fetch('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/media',{method:'POST',headers:{Authorization:'Bearer '+WA_TOKEN},body:fd});
     if(!uploadRes.ok){const eu=await uploadRes.json();throw new Error(eu?.error?.message||'Media upload failed');}
     const mediaId=(await uploadRes.json()).id;
     const caption='Merhaba '+esc(customerName||'')+', '+fmtDate(date)+' itibariyla bakiyeniz: '+fmtNum(balAbs)+' '+balLabel+'.';
-    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to:FIXED_TO,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.html',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
+    await axios.post('https://graph.facebook.com/v19.0/'+WA_PHONE_ID+'/messages',{messaging_product:'whatsapp',to:FIXED_TO,type:'document',document:{id:mediaId,filename:'ekstre_'+date+'.txt',caption}},{headers:{Authorization:'Bearer '+WA_TOKEN,'Content-Type':'application/json'}});
     res.json({ok:true,caption});
   }catch(err){
     console.error('[send-statement]',err.response?.data||err.message||err);

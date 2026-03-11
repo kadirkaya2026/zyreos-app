@@ -147,11 +147,18 @@ async function ocrDekont(mediaId){
   const base64=Buffer.from(imgRes.data).toString('base64');
   const mimeType=imgRes.headers['content-type']||'image/jpeg';
   const response=await openai.chat.completions.create({
-    model:'gpt-4o-mini',
+    model:'gpt-4o',
     messages:[{
       role:'user',
       content:[
-        {type:'text',text:'Bu banka dekontundan şu bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma: {"tutar": <sadece sayı, kuruş yok>, "taksit": <sadece sayı, peşin ise 1>, "banka": "<banka adı>"}. Banka adı SADECE şunlardan biri olmalı (parantezdeki kart/takma adlara dikkat et): Akbank (Axess), QNB (CardFinans, Finansbank, Enpara), Garanti (Bonus, Diğer Banka), Halk (Paraf), Ziraat (Ziraat Bankası, Bankkart), Kuveyt (Kuveyt Türk), YKB (WorldCard, Yapı Kredi), İş Bankası (Maximum, Maxipuan), Vakıf (Vakıfbank). "Diğer Banka" veya tanımlanamayan banka görürsen Garanti yaz. Emin değilsen boş bırak.'},
+        {type:'text',text:`Bu POS/banka dekontundan aşağıdaki bilgileri çıkar ve SADECE JSON döndür, başka hiçbir şey yazma:
+{"tutar": <sadece tam sayı, kuruş/virgül yok>, "taksit": <sadece sayı, peşin/tek çekim ise 1>, "banka": "<banka adı>"}
+
+TUTAR: "İşlem Tutarı", "Tutar", "Amount" gibi alanların karşısındaki rakamı al. Taksit başına düşen tutarı değil, TOPLAM işlem tutarını al. Nokta/virgül ayraçlarını yok say, sadece tam sayı döndür. Örnek: "15.000,00 TL" → 15000
+
+TAKSİT: "Taksit" alanındaki sayıyı al. "Tek Çekim", "Peşin", "Tek Taksit" ise 1 yaz.
+
+BANKA: SADECE şu isimlerden birini yaz: Akbank (Axess), QNB (CardFinans, Finansbank, Enpara), Garanti (Bonus, Diğer Banka), Halk (Paraf), Ziraat (Ziraat Bankası, Bankkart), Kuveyt (Kuveyt Türk), YKB (WorldCard, Yapı Kredi), İş Bankası (Maximum, Maxipuan), Vakıf (Vakıfbank). Tanımlanamazsa Garanti yaz.`},
         {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}}
       ]
     }],

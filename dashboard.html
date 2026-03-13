@@ -3118,11 +3118,17 @@ function App(){
     <div style={{display:'flex',minHeight:'100vh',background:'#0a0d14'}}>
       {isMobile&&mobileSidebarOpen&&<div onClick={()=>setMobileSidebarOpen(false)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',zIndex:199}}/>}
       <Sidebar page={activePage} setPage={p=>{
-        clearTimeout(saveTimerRef.current);
-        apiSaveData(auth.token,{customers,banks}).finally(()=>{
+        if(saveTimerRef.current){
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current=null;
+          apiSaveData(auth.token,{customers,banks}).finally(()=>{
+            navigate(p);
+            apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);});
+          });
+        }else{
           navigate(p);
           apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);});
-        });
+        }
       }} collapsed={collapsed} setCollapsed={setCollapsed}
         onReset={handleReset} saveStatus={saveStatus}
         onExport={exportBackup} onImport={importBackup} onLogout={logout}

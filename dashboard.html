@@ -899,7 +899,8 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const bakiye=calcBalance(entries,customer.openingBalance||0);
   const handleAddEntry=entry=>{
     const newEntries=Array.isArray(entry)?entry:[entry];
-    onUpdateCustomer({...customer,cariEntries:[...entries,...newEntries]});
+    const current=customer.cariEntries||[];
+    onUpdateCustomer({...customer,cariEntries:[...current,...newEntries]});
   };
   const handleDeleteEntry=id=>{
     const entry=entries.find(e=>e.id===id);
@@ -3178,7 +3179,7 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
         customer={detail}
         banks={banks}
         onBack={()=>onClearDetail()}
-        onUpdateCustomer={updated=>onUpdateCustomers(customers.map(c=>c.id===updated.id?updated:c))}
+        onUpdateCustomer={updated=>onUpdateCustomers(prev=>prev.map(c=>c.id===updated.id?updated:c))}
       />
     );
   }

@@ -225,6 +225,8 @@ const IcoPDF=({size=16})=><Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2
 const IcoRefresh=({size=16})=><Icon d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" size={size}/>;
 const IcoX=({size=16})=><Icon d="M18 6L6 18M6 6l12 12" size={size}/>;
 const IcoArrowLeft=({size=18})=><Icon d="M19 12H5M12 19l-7-7 7-7" size={size}/>;
+const IcoCash=()=><Icon d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>;
+
 const IcoInfo=({size=16})=><Icon d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8h.01M12 12v4" size={size}/>;
 
 /* ── AUTH SCREENS ── */
@@ -879,7 +881,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
 }
 
 /* ── CUSTOMER DETAIL ── */
-function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
+function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
   const[tab,setTab]=useState('cari');
   const[addOpen,setAddOpen]=useState(false);
   const[editOpen,setEditOpen]=useState(false);
@@ -900,18 +902,40 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const handleAddEntry=entry=>{
     const newEntries=Array.isArray(entry)?entry:[entry];
     const current=customer.cariEntries||[];
-    onUpdateCustomer({...customer,cariEntries:[...current,...newEntries]});
+    const kasaEntries=newEntries.map(e=>{
+      if(e.type==='cekim'){
+        const netDeposit=e.amount-(e.bankCost||0);
+        const ownerShare=+(netDeposit*0.01).toFixed(2);
+        const kasaAmount=+(netDeposit-ownerShare).toFixed(2);
+        return{id:uid(),date:e.date,type:'giris',amount:kasaAmount,description:'Cekim - '+customer.name+' ('+e.bank+' '+e.installment+'T)',refId:e.id,refCustomer:customer.name,auto:true};
+      }else if(e.type==='nakit_odeme'){
+        return{id:uid(),date:e.date,type:'cikis',amount:e.amount,description:'Odeme - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true};
+      }
+      return null;
+    }).filter(Boolean);
+    onUpdateCustomer({...customer,cariEntries:[...current,...newEntries]},kasaEntries);
   };
   const handleDeleteEntry=id=>{
     const entry=entries.find(e=>e.id===id);
-    onUpdateCustomer({...customer,cariEntries:entries.filter(e=>e.id!==id)});
+    onUpdateCustomer({...customer,cariEntries:entries.filter(e=>e.id!==id)},null,'delete',id);
     if(entry&&entry.queueId&&entry.source==='whatsapp'){
       fetch(`/api/whatsapp/queue/${entry.queueId}/unassign`,{method:'PATCH',headers:{Authorization:'Bearer '+(localStorage.getItem('zyreos_token')||'')}}).catch(()=>{});
     }
   };
   const handleUpdateEntry=updated=>{
     const arr=Array.isArray(updated)?updated:[updated];
-    onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})});
+    const kasaUpdates=arr.map(e=>{
+      if(e.type==='cekim'){
+        const netDeposit=e.amount-(e.bankCost||0);
+        const ownerShare=+(netDeposit*0.01).toFixed(2);
+        const kasaAmount=+(netDeposit-ownerShare).toFixed(2);
+        return{refId:e.id,date:e.date,type:'giris',amount:kasaAmount,description:'Cekim - '+customer.name+' ('+e.bank+' '+e.installment+'T)'};
+      }else if(e.type==='nakit_odeme'){
+        return{refId:e.id,date:e.date,type:'cikis',amount:e.amount,description:'Odeme - '+customer.name};
+      }
+      return null;
+    }).filter(Boolean);
+    onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})},null,'update',null,kasaUpdates);
   };
   // running balance rows
   let running=customer.openingBalance||0;
@@ -1144,7 +1168,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
 }
 
 /* ── CUSTOMERS PAGE ── */
-function CustomersPage({customers,banks,onUpdateCustomers}){
+function CustomersPage({customers,banks,onUpdateCustomers,onUpdateKasa}){
   const[detailId,setDetailId]=useState(null);
   const[addOpen,setAddOpen]=useState(false);
   const[deleteId,setDeleteId]=useState(null);
@@ -1155,7 +1179,14 @@ function CustomersPage({customers,banks,onUpdateCustomers}){
         customer={detail}
         banks={banks}
         onBack={()=>setDetailId(null)}
-        onUpdateCustomer={updated=>{onUpdateCustomers(customers.map(c=>c.id===updated.id?updated:c));}}
+        onUpdateCustomer={(updated,kasaEntries,action,refId,kasaUpdates)=>{
+          onUpdateCustomers(customers.map(c=>c.id===updated.id?updated:c));
+          if(!onUpdateKasa)return;
+          if(kasaEntries&&kasaEntries.length>0)onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,...kasaEntries]}));
+          if(action==='delete'&&refId)onUpdateKasa(prev=>({...prev,transactions:prev.transactions.filter(t=>t.refId!==refId)}));
+          if(action==='update'&&kasaUpdates&&kasaUpdates.length>0)onUpdateKasa(prev=>({...prev,transactions:prev.transactions.map(t=>{const u=kasaUpdates.find(k=>k.refId===t.refId);return u?{...t,...u}:t;})}));
+        }}
+        onUpdateKasa={onUpdateKasa}
       />
     );
   }
@@ -2311,6 +2342,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
   const TOP_NAV=[
     {id:'dashboard',label:'Dashboard',icon:<IcoHome/>},
     {id:'customers',label:'Müşteriler',icon:<IcoUsers/>},
+    {id:'kasa',label:'Kasa',icon:<IcoCash/>},
     {group:'reports'},
     {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
     {group:'dekont'},
@@ -3009,6 +3041,134 @@ function useHashRouter(){
   return[route,navigate];
 }
 
+/* ── KASA PAGE ── */
+function KasaPage({kasa,onUpdateKasa}){
+  const transactions=(kasa&&kasa.transactions)||[];
+  const today=new Date().toISOString().slice(0,10);
+  const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
+  const[dateFrom,setDateFrom]=useState(firstDay);
+  const[dateTo,setDateTo]=useState(today);
+  const[typeFilter,setTypeFilter]=useState('all');
+  const[addOpen,setAddOpen]=useState(false);
+  const[addForm,setAddForm]=useState({date:today,type:'giris',amount:'',description:''});
+
+  const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
+  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
+
+  const filtered=transactions.filter(t=>{
+    if(dateFrom&&t.date<dateFrom)return false;
+    if(dateTo&&t.date>dateTo)return false;
+    if(typeFilter!=='all'&&t.type!==typeFilter)return false;
+    return true;
+  }).sort((a,b)=>a.date<b.date?-1:1);
+
+  const totalGiris=filtered.filter(t=>t.type==='giris').reduce((s,t)=>s+t.amount,0);
+  const totalCikis=filtered.filter(t=>t.type==='cikis').reduce((s,t)=>s+t.amount,0);
+  const genelBakiye=transactions.reduce((s,t)=>t.type==='giris'?s+t.amount:s-t.amount,0);
+
+  let running=0;
+  const allSorted=[...transactions].sort((a,b)=>a.date<b.date?-1:1);
+  const runningMap={};
+  allSorted.forEach(t=>{running=+(running+(t.type==='giris'?t.amount:-t.amount)).toFixed(2);runningMap[t.id]=running;});
+
+  const handleAdd=()=>{
+    const amt=parseFloat(addForm.amount);
+    if(!amt||!addForm.description.trim())return;
+    const entry={id:uid(),date:addForm.date,type:addForm.type,amount:amt,description:addForm.description.trim(),auto:false};
+    onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,entry]}));
+    setAddOpen(false);
+    setAddForm({date:today,type:'giris',amount:'',description:''});
+  };
+  const handleDelete=id=>{
+    onUpdateKasa(prev=>({...prev,transactions:prev.transactions.filter(t=>t.id!==id)}));
+  };
+
+  return(
+    <div>
+      <h2 style={{fontWeight:800,fontSize:'20px',marginBottom:'20px'}}>Kasa</h2>
+      <div style={{display:'flex',gap:'16px',marginBottom:'24px',flexWrap:'wrap'}}>
+        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'180px'}}>
+          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Güncel Bakiye</div>
+          <div style={{fontSize:'26px',fontWeight:800,color:genelBakiye>=0?'#22c55e':'#ef4444'}}>{fmt(genelBakiye)} ₺</div>
+        </div>
+        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'160px'}}>
+          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Giriş</div>
+          <div style={{fontSize:'20px',fontWeight:700,color:'#22c55e'}}>{fmt(totalGiris)} ₺</div>
+        </div>
+        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'160px'}}>
+          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Çıkış</div>
+          <div style={{fontSize:'20px',fontWeight:700,color:'#ef4444'}}>{fmt(totalCikis)} ₺</div>
+        </div>
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center'}}>
+          <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Manuel Hareket Ekle</button>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:'10px',marginBottom:'16px',flexWrap:'wrap',alignItems:'center'}}>
+        <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={inS}/>
+        <span style={{color:'#64748b'}}>—</span>
+        <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={inS}/>
+        <select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)} style={inS}>
+          <option value="all">Tümü</option>
+          <option value="giris">Sadece Giriş</option>
+          <option value="cikis">Sadece Çıkış</option>
+        </select>
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+          <thead>
+            <tr style={{background:'rgba(30,39,64,.8)',color:'#94a3b8'}}>
+              {['Tarih','Açıklama','Müşteri','Giriş','Çıkış','Bakiye',''].map(h=>(
+                <th key={h} style={{padding:'10px 12px',textAlign:h==='Giriş'||h==='Çıkış'||h==='Bakiye'?'right':'left',fontWeight:600,borderBottom:'1px solid rgba(255,255,255,.08)'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(t=>(
+              <tr key={t.id} style={{borderBottom:'1px solid rgba(255,255,255,.05)',fontStyle:t.auto?'normal':'italic',color:t.auto?'#e2e8f0':'#c4b5fd'}}>
+                <td style={{padding:'9px 12px'}}>{fmtDate(t.date)}</td>
+                <td style={{padding:'9px 12px'}}>{t.description}{!t.auto&&<span style={{marginLeft:'6px',background:'rgba(139,92,246,.2)',color:'#c4b5fd',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Manuel</span>}</td>
+                <td style={{padding:'9px 12px',color:'#94a3b8'}}>{t.refCustomer||'-'}</td>
+                <td style={{padding:'9px 12px',textAlign:'right',color:'#22c55e'}}>{t.type==='giris'?fmt(t.amount)+' ₺':''}</td>
+                <td style={{padding:'9px 12px',textAlign:'right',color:'#ef4444'}}>{t.type==='cikis'?fmt(t.amount)+' ₺':''}</td>
+                <td style={{padding:'9px 12px',textAlign:'right',color:(runningMap[t.id]||0)>=0?'#22c55e':'#ef4444',fontWeight:600}}>{fmt(runningMap[t.id]||0)} ₺</td>
+                <td style={{padding:'9px 12px',textAlign:'right'}}>
+                  {!t.auto&&<button onClick={()=>handleDelete(t.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px 6px'}}><IcoTrash size={13}/></button>}
+                </td>
+              </tr>
+            ))}
+            {filtered.length===0&&(
+              <tr><td colSpan={7} style={{padding:'32px',textAlign:'center',color:'#475569'}}>Kayıt bulunamadı</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {addOpen&&(
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
+          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
+            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Manuel Hareket Ekle</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label><input type="date" value={addForm.date} onChange={e=>setAddForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tür</label>
+                <select value={addForm.type} onChange={e=>setAddForm(p=>({...p,type:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                  <option value="giris">Giriş</option>
+                  <option value="cikis">Çıkış</option>
+                </select>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tutar (₺)</label><input type="number" min="0" step="0.01" value={addForm.amount} onChange={e=>setAddForm(p=>({...p,amount:e.target.value}))} placeholder="0.00" style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Açıklama</label><input type="text" value={addForm.description} onChange={e=>setAddForm(p=>({...p,description:e.target.value}))} placeholder="Açıklama..." style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
+            </div>
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
+              <button onClick={()=>setAddOpen(false)} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={handleAdd} style={{background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Kaydet</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ════════════════════════════════════
    APP
 ════════════════════════════════════ */
@@ -3017,6 +3177,7 @@ function App(){
   const[authScreen,setAuthScreen]=useState('login');
   const[customers,setCustomers]=useState([]);
   const[banks,setBanks]=useState(INIT_BANKS);
+  const[kasa,setKasa]=useState({transactions:[]});
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
   const[mobileSidebarOpen,setMobileSidebarOpen]=useState(false);
   const isMobile=useIsMobile();
@@ -3038,6 +3199,7 @@ function App(){
       .then(data=>{
         if(data.customers&&data.customers.length>0)setCustomers(data.customers);
         if(data.banks&&data.banks.length>0)setBanks(data.banks);
+        if(data.kasa)setKasa(data.kasa);
         setInitialized(true);
       })
       .catch(e=>{
@@ -3052,7 +3214,7 @@ function App(){
     clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
-      apiSaveData(auth.token,{customers,banks})
+      apiSaveData(auth.token,{customers,banks,kasa})
         .then(()=>{
           setSaveStatus('saved');setSavedTime(timeStr());
           setTimeout(()=>{setSaveStatus('idle');setSavedTime('');},5000);
@@ -3063,7 +3225,7 @@ function App(){
         });
     },800);
     return()=>clearTimeout(saveTimerRef.current);
-  },[customers,banks,initialized]);
+  },[customers,banks,kasa,initialized]);
 
   useEffect(()=>{
     if(!auth||auth.role!=='admin')return;
@@ -3121,13 +3283,13 @@ function App(){
         if(saveTimerRef.current){
           clearTimeout(saveTimerRef.current);
           saveTimerRef.current=null;
-          apiSaveData(auth.token,{customers,banks}).finally(()=>{
+          apiSaveData(auth.token,{customers,banks,kasa}).finally(()=>{
             navigate(p);
-            apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);});
+            apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);if(data.kasa)setKasa(data.kasa);});
           });
         }else{
           navigate(p);
-          apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);});
+          apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);if(data.kasa)setKasa(data.kasa);});
         }
       }} collapsed={collapsed} setCollapsed={setCollapsed}
         onReset={handleReset} saveStatus={saveStatus}
@@ -3143,8 +3305,10 @@ function App(){
             <CustomersPageWithDetail
               customers={customers} banks={banks} onUpdateCustomers={setCustomers}
               initDetailId={detailCustomerId} onClearDetail={()=>navigate('customers')}
+              kasa={kasa} onUpdateKasa={setKasa}
             />
           )}
+          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={setKasa}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
@@ -3166,7 +3330,7 @@ function App(){
 }
 
 /* Wrapper to handle detail navigation via URL hash */
-function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId,onClearDetail}){
+function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId,onClearDetail,kasa,onUpdateKasa}){
   // ── TÜM HOOK'LAR KOŞULSUZ ÜSTTE ──
   const[addOpen,setAddOpen]=useState(false);
   const[deleteId,setDeleteId]=useState(null);
@@ -3184,6 +3348,24 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
     onUpdateCustomers([...customers,copy]);
   };
 
+  const handleUpdateCustomer=(updated,kasaEntries,action,refId,kasaUpdates)=>{
+    onUpdateCustomers(prev=>prev.map(c=>c.id===updated.id?updated:c));
+    if(!onUpdateKasa)return;
+    if(kasaEntries&&kasaEntries.length>0){
+      onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,...kasaEntries]}));
+    }
+    if(action==='delete'&&refId){
+      onUpdateKasa(prev=>({...prev,transactions:prev.transactions.filter(t=>t.refId!==refId)}));
+    }
+    if(action==='update'&&kasaUpdates&&kasaUpdates.length>0){
+      onUpdateKasa(prev=>({...prev,transactions:prev.transactions.map(t=>{
+        const u=kasaUpdates.find(k=>k.refId===t.refId);
+        if(!u)return t;
+        return{...t,date:u.date,type:u.type,amount:u.amount,description:u.description};
+      })}));
+    }
+  };
+
   // ── MÜŞTERİ DETAY GÖRÜNÜMÜ ──
   if(detailId&&detail){
     return(
@@ -3191,7 +3373,8 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
         customer={detail}
         banks={banks}
         onBack={()=>onClearDetail()}
-        onUpdateCustomer={updated=>onUpdateCustomers(prev=>prev.map(c=>c.id===updated.id?updated:c))}
+        onUpdateCustomer={handleUpdateCustomer}
+        onUpdateKasa={onUpdateKasa}
       />
     );
   }

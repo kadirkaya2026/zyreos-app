@@ -226,10 +226,8 @@ app.get('/api/data',auth,(req,res)=>{
   res.set('Cache-Control','no-store');
   const file=getDataFile(req.user.username);
   try{
-    if(!fs.existsSync(file))return res.json({customers:[],banks:[],kasa:{transactions:[]}});
-    const raw=JSON.parse(fs.readFileSync(file,'utf8'));
-    if(!raw.kasa)raw.kasa={transactions:[]};
-    const data=ensureDigerBanka(raw,file);
+    if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
+    const data=ensureDigerBanka(JSON.parse(fs.readFileSync(file,'utf8')),file);
     res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });

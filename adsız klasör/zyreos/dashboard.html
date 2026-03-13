@@ -4,13 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ZYREOS — Finansal Takip Sistemi</title>
-<link rel="icon" type="image/png" href="/favicon.png"/>
-<link rel="apple-touch-icon" href="/favicon.png"/>
-<link rel="manifest" href="/manifest.json"/>
-<meta name="theme-color" content="#4f8ef7"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="ZYREOS"/>
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -27,23 +20,12 @@
   input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{opacity:1;}
   select option{background:#1a2035;color:#e2e8f0;}
   @media print{body{background:#fff;color:#000;}}
-  @media(max-width:768px){.mobile-scroll-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}.mobile-scroll-table table{min-width:600px;}.mobile-full{width:100%!important;}.mobile-stack{flex-direction:column!important;}.mobile-p{padding:12px!important;}}
-  .sidebar-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:199;}.sidebar-overlay.open{display:block;}
-  .sidebar-drawer{transition:transform 0.25s ease;}
-  @media(max-width:768px){.sidebar-drawer{transform:translateX(-100%);position:fixed!important;z-index:200;top:0;left:0;height:100vh;}.sidebar-drawer.open{transform:translateX(0);}}
-  @media(min-width:769px){.sidebar-drawer{transform:none!important;position:sticky!important;top:0;}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useEffect,useCallback,useMemo,useRef} = React;
-
-function useIsMobile(){
-  const[m,setM]=useState(()=>window.innerWidth<=768);
-  useEffect(()=>{const fn=()=>setM(window.innerWidth<=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
-  return m;
-}
 
 /* ── STORAGE ── */
 const STORAGE_PREFIX='fintrack_v1__';
@@ -109,25 +91,6 @@ async function apiDeleteUser(token,username){
   const r=await fetch(`/api/admin/users/${username}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
   if(!r.ok){const d=await r.json();throw new Error(d.error||'İşlem başarısız');}
 }
-async function apiWAQueue(token){
-  const r=await fetch('/api/whatsapp/queue',{headers:{Authorization:'Bearer '+token}});
-  if(!r.ok)throw new Error('Kuyruk alınamadı');
-  return r.json();
-}
-async function apiWAAssign(token,id,customerId,username,ocr,force){
-  const r=await fetch(`/api/whatsapp/queue/${id}/assign`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({customerId,username,ocr,force:!!force})});
-  const d=await r.json();
-  if(!r.ok){const err=new Error(d.message||d.error||'Atama başarısız');err.code=d.error;err.amount=d.amount;throw err;}
-}
-async function apiWAUpdate(token,id,username,ocr){
-  const r=await fetch(`/api/whatsapp/queue/${id}/update`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({username,ocr})});
-  const d=await r.json();
-  if(!r.ok)throw new Error(d.error||'Güncelleme başarısız');
-}
-async function apiWADelete(token,id){
-  const r=await fetch(`/api/whatsapp/queue/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
-  if(!r.ok){const d=await r.json();throw new Error(d.error||'Silme başarısız');}
-}
 
 /* ── FILE SYSTEM HELPERS ── */
 const FS_SUPPORTED=typeof window!=='undefined'&&'showDirectoryPicker' in window;
@@ -189,8 +152,8 @@ const INIT_CUSTOMERS=[
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function fmt(n){return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n??0);}
 function fmtTL(n){return '₺'+fmt(n);}
-function calcBalance(entries,openingBalance=0){
-  return openingBalance+(entries||[]).reduce((s,e)=>e.type==='cekim'?s+e.netToCustomer:s-e.amount,0);
+function calcBalance(entries){
+  return(entries||[]).reduce((s,e)=>e.type==='cekim'?s+e.netToCustomer:s-e.amount,0);
 }
 function calcCekim(amount,installment,customerRate,bank){
   const bankRate=bank.rates[installment-1];
@@ -219,7 +182,6 @@ const IcoChevronRight=({size=18})=><Icon d="M9 18l6-6-6-6" size={size}/>;
 const IcoChevronDown=({size=16})=><Icon d="M6 9l6 6 6-6" size={size}/>;
 const IcoPlus=({size=16})=><Icon d="M12 5v14M5 12h14" size={size}/>;
 const IcoTrash=({size=15})=><Icon d="M3 6h18M19 6l-1 14H6L5 6M9 6V4h6v2" size={size}/>;
-const IcoPencil=({size=15})=><Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" size={size}/>;
 const IcoEdit=({size=15})=><Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" size={size}/>;
 const IcoPDF=({size=16})=><Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" size={size}/>;
 const IcoRefresh=({size=16})=><Icon d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" size={size}/>;
@@ -246,7 +208,7 @@ function LoginPage({onLogin,onGoRegister}){
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#0a0d14'}}>
       <div style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
         <div style={{textAlign:'center',marginBottom:'32px'}}>
-          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></div>
+          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZY<span style={{color:'#4f8ef7'}}>REOS</span></div>
           <div style={{color:'#64748b',fontSize:'13px',marginTop:'6px'}}>Finansal Takip Sistemi</div>
         </div>
         <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:'16px'}}>
@@ -297,7 +259,7 @@ function RegisterPage({onGoLogin}){
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#0a0d14'}}>
       <div style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
         <div style={{textAlign:'center',marginBottom:'32px'}}>
-          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></div>
+          <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZY<span style={{color:'#4f8ef7'}}>REOS</span></div>
           <div style={{color:'#64748b',fontSize:'13px',marginTop:'6px'}}>Yeni Hesap Oluştur</div>
         </div>
         {done?(
@@ -422,9 +384,9 @@ function exportPDF(customer,opts){
   const totalCekim=entries.filter(e=>e.type==='cekim').reduce((s,e)=>s+e.amount,0);
   const totalKomisyon=entries.filter(e=>e.type==='cekim').reduce((s,e)=>s+(e.customerComm||0),0);
   const totalOdenen=entries.filter(e=>e.type==='nakit_odeme').reduce((s,e)=>s+e.amount,0);
-  const bakiye=calcBalance(entries,customer.openingBalance||0);
+  const bakiye=calcBalance(entries);
   const periodLabel=dateFrom||dateTo?`${dateFrom||'Başlangıç'} — ${dateTo||'Bugün'}`:'Tüm İşlemler';
-  let running=customer.openingBalance||0;
+  let running=0;
   const rows=entries.map(e=>{
     if(e.type==='cekim'){running+=e.netToCustomer;}else{running-=e.amount;}
     const rColor=running>=0?'#c53030':'#276749';
@@ -539,13 +501,7 @@ function DashboardPage({customers,onNavigateCustomer}){
 
   const PeriodCard=({label,sub,entries})=>{
     const total=sum(entries,'amount');
-    const realProfit=entries.reduce((s,e)=>{
-      const bankCut=e.bankCost||+(e.amount*(e.bankRate||0)/100).toFixed(2);
-      const netDeposit=e.amount-bankCut;
-      const ownerShare=+(netDeposit*0.01).toFixed(2);
-      const customerComm=e.customerComm||0;
-      return s+customerComm-bankCut-ownerShare;
-    },0);
+    const profit=sum(entries,'profit');
     return(
       <div style={{background:'linear-gradient(135deg,rgba(15,23,42,0.9),rgba(20,30,60,0.9))',borderRadius:'14px',border:'1px solid rgba(255,255,255,0.08)',padding:'20px 22px',display:'flex',flexDirection:'column',gap:'10px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
@@ -560,8 +516,8 @@ function DashboardPage({customers,onNavigateCustomer}){
           <div className="tabular-nums" style={{fontSize:'22px',fontWeight:800,color:'#4f8ef7',letterSpacing:'-0.5px'}}>{fmtTL(total)}</div>
         </div>
         <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:'10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div style={{fontSize:'11px',color:'#64748b'}}>Net Kârım</div>
-          <div className="tabular-nums" style={{fontSize:'16px',fontWeight:800,color:realProfit>=0?'#a855f7':'#ef4444'}}>{fmtTL(realProfit)}</div>
+          <div style={{fontSize:'11px',color:'#64748b'}}>Net Kar</div>
+          <div className="tabular-nums" style={{fontSize:'16px',fontWeight:800,color:profit>=0?'#22c55e':'#ef4444'}}>{fmtTL(profit)}</div>
         </div>
       </div>
     );
@@ -583,7 +539,7 @@ function DashboardPage({customers,onNavigateCustomer}){
           <div style={{fontWeight:700,marginBottom:'16px',fontSize:'14px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Müşteri Bakiye Özeti</div>
           <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
             {customers.map(c=>{
-              const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
+              const bak=calcBalance(c.cariEntries||[]);
               const isBorc=bak>0;
               return(
                 <div key={c.id} onClick={()=>onNavigateCustomer(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderRadius:'10px',background:'#131929',cursor:'pointer',border:'1px solid transparent',transition:'border-color 0.15s'}} className="hover:border-blue-500/30">
@@ -630,8 +586,8 @@ function DashboardPage({customers,onNavigateCustomer}){
 
 /* ── CUSTOMER FORM MODAL ── */
 function CustomerFormModal({open,onClose,onSave,initial}){
-  const blank={name:'',phone:'',openingBalance:0,installmentRates:Array(12).fill(3.5),notes:''};
-  const toForm=c=>({name:c.name||'',phone:c.phone||'',openingBalance:c.openingBalance||0,installmentRates:c.installmentRates||Array(12).fill(3.5),notes:c.notes||''});
+  const blank={name:'',phone:'',installmentRates:Array(12).fill(3.5),notes:''};
+  const toForm=c=>({name:c.name||'',phone:c.phone||'',installmentRates:c.installmentRates||Array(12).fill(3.5),notes:c.notes||''});
   const[form,setForm]=useState(initial?toForm(initial):blank);
   useEffect(()=>{if(open)setForm(initial?toForm(initial):blank);},[open]);
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -642,7 +598,6 @@ function CustomerFormModal({open,onClose,onSave,initial}){
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 16px'}}>
         <Field label="Ad Soyad" required style={{gridColumn:'1/-1'}}><Input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Ad Soyad"/></Field>
         <Field label="Telefon"><Input value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="0532 xxx xx xx"/></Field>
-        <Field label="Açılış Bakiyesi (₺)"><input type="number" step="0.01" value={form.openingBalance||0} onChange={e=>set('openingBalance',parseFloat(e.target.value)||0)} style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'9px 12px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/></Field>
       </div>
       <div style={{marginTop:'16px',background:'rgba(15,23,42,0.6)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.08)',padding:'14px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
@@ -685,33 +640,19 @@ function CustomerFormModal({open,onClose,onSave,initial}){
 }
 
 /* ── ADD ENTRY MODAL ── */
-function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks}){
+function AddEntryModal({open,onClose,onSave,customer,banks}){
   const[type,setType]=useState('cekim');
   const today=todayStr();
   const[form,setForm]=useState({date:today,description:'Kart Çekimi',amount:'',bank:'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
   const[nakit,setNakit]=useState({date:today,description:'Nakit Ödeme',amount:''});
-  const newBulkRow=()=>({id:uid(),date:today,amount:'',bank:banks[0]?.name||'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
-  const[bulkRows,setBulkRows]=useState([newBulkRow()]);
   useEffect(()=>{
     if(open){
-      if(editingEntry){
-        if(editingEntry.type==='nakit_odeme'){
-          setType('nakit_odeme');
-          setNakit({date:editingEntry.date||today,description:editingEntry.description||'Nakit Ödeme',amount:String(editingEntry.amount||'')});
-        }else{
-          setType('cekim');
-          setForm({date:editingEntry.date||today,description:editingEntry.description||'Kart Çekimi',amount:String(editingEntry.amount||''),bank:editingEntry.bank||banks[0]?.name||'',installment:editingEntry.installment||1,customerRate:editingEntry.customerRate??customer?.commissionRate??3.5});
-        }
-        setBulkRows([newBulkRow()]);
-      }else{
-        setType('cekim');
-        const defRate=customer?.installmentRates?.[0]??customer?.commissionRate??3.5;
-        setForm({date:today,description:'Kart Çekimi',amount:'',bank:banks[0]?.name||'',installment:1,customerRate:defRate});
-        setNakit({date:today,description:'Nakit Ödeme',amount:''});
-        setBulkRows([newBulkRow()]);
-      }
+      setType('cekim');
+      const defRate=customer?.installmentRates?.[0]??customer?.commissionRate??3.5;
+      setForm({date:today,description:'Kart Çekimi',amount:'',bank:banks[0]?.name||'',installment:1,customerRate:defRate});
+      setNakit({date:today,description:'Nakit Ödeme',amount:''});
     }
-  },[open,customer,editingEntry]);
+  },[open,customer]);
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
   const handleInstallmentChange=(val)=>{
     const inst=parseInt(val);
@@ -726,51 +667,18 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
     return calcCekim(amt,form.installment,form.customerRate,selBank);
   },[form.amount,form.installment,form.customerRate,selBank]);
   const handleSave=()=>{
-    if(editingEntry){
-      if(type==='cekim'){
-        const amt=parseFloat(form.amount)||0;
-        if(!amt)return alert('Tutar giriniz.');
-        if(!selBank)return alert('Banka seçiniz.');
-        const c=calcCekim(amt,form.installment,form.customerRate,selBank);
-        onUpdate({...editingEntry,date:form.date,description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,...c});
-      }else{
-        const amt=parseFloat(nakit.amount)||0;
-        if(!amt)return alert('Tutar giriniz.');
-        onUpdate({...editingEntry,date:nakit.date,description:nakit.description||'Nakit Ödeme',amount:amt});
-      }
-      onClose();
-      return;
-    }
     if(type==='cekim'){
       const amt=parseFloat(form.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
       if(!selBank)return alert('Banka seçiniz.');
       const c=calcCekim(amt,form.installment,form.customerRate,selBank);
       onSave({id:uid(),date:form.date,type:'cekim',description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,...c});
-    }else if(type==='nakit_odeme'){
+    }else{
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
       onSave({id:uid(),date:nakit.date,type:'nakit_odeme',description:nakit.description||'Nakit Ödeme',amount:amt});
-    }else{
-      const valid=bulkRows.filter(r=>parseFloat(r.amount)>0);
-      if(!valid.length)return alert('En az bir satıra tutar giriniz.');
-      const allEntries=valid.map(r=>{
-        const amt=parseFloat(r.amount);
-        const bank=banks.find(b=>b.name===r.bank)||banks[0];
-        const inst=parseInt(r.installment)||1;
-        const rate=parseFloat(r.customerRate)||(customer?.installmentRates?.[inst-1]??3.5);
-        const c=calcCekim(amt,inst,rate,bank);
-        return{id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',amount:amt,bank:bank.name,installment:inst,customerRate:rate,...c};
-      });
-      onSave(allEntries);
     }
     onClose();
-  };
-  const setBulkRow=(id,k,v)=>setBulkRows(p=>p.map(r=>r.id===id?{...r,[k]:v}:r));
-  const setBulkInstallment=(id,val)=>{
-    const inst=parseInt(val)||1;
-    const autoRate=customer?.installmentRates?.[inst-1]??customer?.commissionRate??3.5;
-    setBulkRows(p=>p.map(r=>r.id===id?{...r,installment:inst,customerRate:autoRate}:r));
   };
   const previewRow=(lbl,val,color='#e2e8f0')=>(
     <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
@@ -778,11 +686,10 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       <span className="tabular-nums" style={{color,fontWeight:700,fontSize:'13px'}}>{val}</span>
     </div>
   );
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'6px 8px',color:'#e2e8f0',fontSize:'12px',width:'100%',boxSizing:'border-box'};
   return(
-    <Modal open={open} onClose={onClose} title={editingEntry?'Kaydı Düzenle':'Yeni Kayıt Ekle'} width={type==='bulk'?820:520}>
+    <Modal open={open} onClose={onClose} title="Yeni Kayıt Ekle" width={520}>
       <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
-        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],...(!editingEntry?[['bulk','Toplu Giriş','#f59e0b']]:[])].map(([v,l,c])=>(
+        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e']].map(([v,l,c])=>(
           <button key={v} onClick={()=>setType(v)}
             style={{flex:1,padding:'10px',borderRadius:'8px',border:`2px solid ${type===v?c:'rgba(255,255,255,0.1)'}`,background:type===v?c+'22':'transparent',color:type===v?c:'#94a3b8',cursor:'pointer',fontWeight:700,fontSize:'13px',transition:'all 0.15s'}}>{l}</button>
         ))}
@@ -819,60 +726,17 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
             </div>
           )}
         </div>
-      ):type==='nakit_odeme'?(
+      ):(
         <div>
           <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
           <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))}/></Field>
           <Field label="Ödeme Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="5000"/></Field>
         </div>
-      ):(
-        <div>
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
-              <thead>
-                <tr style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-                  {['Tarih','Tutar (₺)','Banka','Taksit','Müş. Oranı %',''].map(h=>(
-                    <th key={h} style={{padding:'6px 8px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {bulkRows.map((r,i)=>(
-                  <tr key={r.id} style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-                    <td style={{padding:'4px 4px'}}><input type="date" value={r.date} onChange={e=>setBulkRow(r.id,'date',e.target.value)} style={inS}/></td>
-                    <td style={{padding:'4px 4px'}}><input type="number" min="0" step="0.01" value={r.amount} onChange={e=>setBulkRow(r.id,'amount',e.target.value)} placeholder="10000" style={{...inS,width:'100px'}}/></td>
-                    <td style={{padding:'4px 4px'}}>
-                      <select value={r.bank} onChange={e=>setBulkRow(r.id,'bank',e.target.value)} style={inS}>
-                        {banks.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
-                      </select>
-                    </td>
-                    <td style={{padding:'4px 4px'}}>
-                      <select value={r.installment} onChange={e=>setBulkInstallment(r.id,e.target.value)} style={{...inS,width:'90px'}}>
-                        {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i===0?'Peşin':`${i+1} Taksit`}</option>)}
-                      </select>
-                    </td>
-                    <td style={{padding:'4px 4px'}}><input type="number" step="0.1" min="0" max="100" value={r.customerRate} onChange={e=>setBulkRow(r.id,'customerRate',e.target.value)} style={{...inS,width:'70px',color:'#f59e0b'}}/></td>
-                    <td style={{padding:'4px 4px'}}>
-                      <button onClick={()=>setBulkRows(p=>p.filter(x=>x.id!==r.id))} style={{background:'#ef444422',border:'1px solid #ef444444',borderRadius:'4px',color:'#ef4444',padding:'4px 8px',cursor:'pointer',fontSize:'12px'}}>✕</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button onClick={()=>setBulkRows(p=>[...p,newBulkRow()])}
-            style={{marginTop:'10px',padding:'7px 16px',background:'rgba(79,142,247,0.15)',border:'1px dashed #4f8ef7',borderRadius:'8px',color:'#4f8ef7',cursor:'pointer',fontWeight:600,fontSize:'13px',width:'100%'}}>
-            + Satır Ekle
-          </button>
-          <div style={{marginTop:'8px',color:'#64748b',fontSize:'11px'}}>
-            Toplam {bulkRows.filter(r=>parseFloat(r.amount)>0).length} satır / {fmtTL(bulkRows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0))} TL
-          </div>
-        </div>
       )}
       <div style={{display:'flex',gap:'12px',justifyContent:'flex-end',marginTop:'16px'}}>
         <button onClick={onClose} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
         <button onClick={handleSave}
-          style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>{type==='bulk'?`Tümünü Kaydet (${bulkRows.filter(r=>parseFloat(r.amount)>0).length})`:'Kaydet'}</button>
+          style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>Kaydet</button>
       </div>
     </Modal>
   );
@@ -883,37 +747,21 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
   const[tab,setTab]=useState('cari');
   const[addOpen,setAddOpen]=useState(false);
   const[editOpen,setEditOpen]=useState(false);
-  const[editingEntry,setEditingEntry]=useState(null);
-  const[waOpen,setWaOpen]=useState(false);
-  const[exFrom,setExFrom]=useState('');
-  const[exTo,setExTo]=useState('');
-  const yesterday=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
-  const[waDate,setWaDate]=useState(yesterday);
-  const[waSending,setWaSending]=useState(false);
   const entries=customer.cariEntries||[];
   const cekimler=entries.filter(e=>e.type==='cekim');
   const odemeler=entries.filter(e=>e.type==='nakit_odeme');
   const totalCekim=cekimler.reduce((s,e)=>s+e.amount,0);
   const totalKom=cekimler.reduce((s,e)=>s+(e.customerComm||0),0);
   const totalOdedi=odemeler.reduce((s,e)=>s+e.amount,0);
-  const bakiye=calcBalance(entries,customer.openingBalance||0);
+  const bakiye=calcBalance(entries);
   const handleAddEntry=entry=>{
-    const newEntries=Array.isArray(entry)?entry:[entry];
-    onUpdateCustomer({...customer,cariEntries:[...entries,...newEntries]});
+    onUpdateCustomer({...customer,cariEntries:[...entries,entry]});
   };
   const handleDeleteEntry=id=>{
-    const entry=entries.find(e=>e.id===id);
     onUpdateCustomer({...customer,cariEntries:entries.filter(e=>e.id!==id)});
-    if(entry&&entry.queueId&&entry.source==='whatsapp'){
-      fetch(`/api/whatsapp/queue/${entry.queueId}/unassign`,{method:'PATCH',headers:{Authorization:'Bearer '+(localStorage.getItem('zyreos_token')||'')}}).catch(()=>{});
-    }
-  };
-  const handleUpdateEntry=updated=>{
-    const arr=Array.isArray(updated)?updated:[updated];
-    onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})});
   };
   // running balance rows
-  let running=customer.openingBalance||0;
+  let running=0;
   const rows=entries.map(e=>{
     if(e.type==='cekim')running=+(running+e.netToCustomer).toFixed(2);
     else running=+(running-e.amount).toFixed(2);
@@ -955,7 +803,6 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
               <span style={{fontWeight:700}}>Cari Hareketler</span>
               <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={14}/>Kayıt Ekle</button>
-              <button onClick={()=>{setWaDate(yesterday);setWaOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',marginLeft:'8px'}}>📤 WA Ekstre</button>
             </div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
@@ -983,10 +830,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
                         <td className="tabular-nums" style={{padding:'10px 12px',color:'#22c55e',fontWeight:600}}>{!isCekim?fmtTL(e.amount):'—'}</td>
                         <td className="tabular-nums" style={{padding:'10px 12px',color:rIsPos?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(Math.abs(e.runningBal))}<span style={{fontSize:'10px',marginLeft:'4px'}}>{rIsPos?'Borç':'Alacak'}</span></td>
                         <td style={{padding:'10px 12px',textAlign:'center'}}>
-                          <div style={{display:'flex',gap:'4px',justifyContent:'center'}}>
-                            <button onClick={()=>setEditingEntry(e)} style={{background:'none',border:'1px solid rgba(79,142,247,0.3)',borderRadius:'6px',padding:'4px 8px',cursor:'pointer',color:'#4f8ef7',display:'flex',alignItems:'center',gap:'3px',fontSize:'12px'}}><IcoPencil size={13}/>Düzenle</button>
-                            <button onClick={()=>{if(window.confirm('Kaydı silmek istediğinizden emin misiniz?'))handleDeleteEntry(e.id);}} style={{background:'none',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'4px 8px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center',gap:'3px',fontSize:'12px'}}><IcoTrash size={13}/>Sil</button>
-                          </div>
+                          <button onClick={()=>{if(window.confirm('Kaydı silmek istediğinizden emin misiniz?'))handleDeleteEntry(e.id);}} style={{background:'none',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'4px 8px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center',gap:'3px',fontSize:'12px'}}><IcoTrash size={13}/>Sil</button>
                         </td>
                       </tr>
                     );
@@ -1009,7 +853,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
       {tab==='bilgi'&&(
         <Card>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-            {[['Ad Soyad',customer.name],['Müşteri Kodu',customer.code||'—'],['Telefon',customer.phone||'—'],['E-posta',customer.email||'—'],['Adres',customer.address||'—'],['Vergi No',customer.taxNo||'—']].map(([l,v])=>(
+            {[['Ad Soyad',customer.name],['Telefon',customer.phone||'—']].map(([l,v])=>(
               <div key={l}>
                 <div style={{color:'#64748b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>{l}</div>
                 <div style={{fontWeight:600}}>{v}</div>
@@ -1017,20 +861,9 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
             ))}
           </div>
           <div style={{marginTop:'20px',background:'#2d1f04',border:'1px solid #f59e0b44',borderRadius:'10px',padding:'16px'}}>
-            <div style={{color:'#f59e0b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'12px'}}>Komisyon Oranları</div>
-            {customer.installmentRates&&customer.installmentRates.some(r=>r>0)?(
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(80px,1fr))',gap:'8px'}}>
-                {customer.installmentRates.map((r,i)=>r>0?(
-                  <div key={i} style={{background:'rgba(245,158,11,0.12)',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
-                    <div style={{color:'#d97706',fontSize:'10px',fontWeight:700,marginBottom:'2px'}}>{i===0?'Peşin':`${i+1} Taksit`}</div>
-                    <div style={{color:'#f59e0b',fontSize:'16px',fontWeight:800}}>%{r}</div>
-                  </div>
-                ):null)}
-              </div>
-            ):(
-              <div className="tabular-nums" style={{fontSize:'28px',fontWeight:800,color:'#f59e0b'}}>%{customer.commissionRate}</div>
-            )}
-            <div style={{color:'#d97706',fontSize:'12px',marginTop:'8px'}}>Kart çekimlerinde uygulanan müşteri komisyon oranları</div>
+            <div style={{color:'#f59e0b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'6px'}}>Komisyon Oranı</div>
+            <div className="tabular-nums" style={{fontSize:'28px',fontWeight:800,color:'#f59e0b'}}>%{customer.commissionRate}</div>
+            <div style={{color:'#d97706',fontSize:'12px',marginTop:'4px'}}>Kart çekimlerinde uygulanan müşteri komisyon oranı</div>
           </div>
           {customer.notes&&(
             <div style={{marginTop:'16px',background:'#131929',borderRadius:'10px',padding:'14px',border:'1px solid rgba(255,255,255,0.06)'}}>
@@ -1041,20 +874,10 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
         </Card>
       )}
       {/* EKSTRE */}
-      {tab==='ekstre'&&(()=>{
-        const inS2={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
-        return(
+      {tab==='ekstre'&&(
         <div>
-          <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px',flexWrap:'wrap'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-              <span style={{color:'#64748b',fontSize:'13px'}}>Başlangıç:</span>
-              <input type="date" value={exFrom} onChange={e=>setExFrom(e.target.value)} style={inS2}/>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-              <span style={{color:'#64748b',fontSize:'13px'}}>Bitiş:</span>
-              <input type="date" value={exTo} onChange={e=>setExTo(e.target.value)} style={inS2}/>
-            </div>
-            <button onClick={()=>exportPDF(customer,{dateFrom:exFrom,dateTo:exTo})} style={{display:'flex',alignItems:'center',gap:'8px',background:'#ef4444',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',marginLeft:'auto'}}><IcoPDF size={16}/>Ekstre İndir (PDF)</button>
+          <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'16px'}}>
+            <button onClick={()=>exportPDF(customer)} style={{display:'flex',alignItems:'center',gap:'8px',background:'#ef4444',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPDF size={16}/>PDF İndir / Yazdır</button>
           </div>
           <Card style={{padding:0,overflow:'hidden'}}>
             <div style={{overflowX:'auto'}}>
@@ -1088,50 +911,8 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer}){
             </div>
           </Card>
         </div>
-        );
-      })()}
-      <AddEntryModal open={addOpen||!!editingEntry} onClose={()=>{setAddOpen(false);setEditingEntry(null);}} onSave={handleAddEntry} onUpdate={handleUpdateEntry} editingEntry={editingEntry||null} customer={customer} banks={banks}/>
-      {waOpen&&(()=>{
-        const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
-        const filteredE=(customer.cariEntries||[]).filter(e=>e.date&&e.date<=waDate);
-        let rb=customer.openingBalance||0;
-        filteredE.forEach(e=>{if(e.type==='cekim')rb=+(rb+(e.netToCustomer||0)).toFixed(2);else rb=+(rb-(e.amount||0)).toFixed(2);});
-        const balLabel=rb>=0?'Borç':'Alacak';
-        const balAbs=Math.abs(rb);
-        const preview=`Merhaba ${customer.name}, ${fmtDate(waDate)} itibarıyla bakiyeniz: ${balAbs.toLocaleString('tr-TR',{minimumFractionDigits:2})} TL ${balLabel}.`;
-        const handleSendWa=async()=>{
-          setWaSending(true);
-          try{
-            const token=(getAuth()?.token)||'';
-            const r=await fetch('/api/whatsapp/send-statement',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({customerName:customer.name,date:waDate,entries:customer.cariEntries||[],openingBalance:customer.openingBalance||0})});
-            const d=await r.json();
-            if(!r.ok)throw new Error(d.error||'Hata');
-            alert('Ekstre gönderildi!');
-            setWaOpen(false);
-          }catch(e){alert('Hata: '+e.message);}
-          finally{setWaSending(false);}
-        };
-        return(
-          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{background:'#1a2035',borderRadius:'12px',padding:'28px',width:'420px',boxShadow:'0 8px 40px rgba(0,0,0,0.5)'}}>
-              <h3 style={{margin:'0 0 20px',fontSize:'16px',fontWeight:700}}>WA Ekstre Gönder</h3>
-              <div style={{marginBottom:'14px'}}>
-                <label style={{display:'block',fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Bakiye tarihi (bu tarihe kadar olan tüm kayıtlar dahil edilir)</label>
-                <input type="date" value={waDate} onChange={e=>setWaDate(e.target.value)} style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.15)',borderRadius:'6px',padding:'8px 10px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/>
-              </div>
-              <div style={{background:'rgba(255,255,255,0.05)',borderRadius:'8px',padding:'12px',marginBottom:'20px',fontSize:'12px',color:'#94a3b8',lineHeight:1.5}}>
-                <strong style={{color:'#e2e8f0'}}>Gönderilecek mesaj:</strong><br/>{preview}
-              </div>
-              <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
-                <button onClick={()=>setWaOpen(false)} style={{background:'none',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
-                <button onClick={handleSendWa} disabled={waSending} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',opacity:waSending?0.6:1}}>
-                  {waSending?'Gönderiliyor...':'Gönder'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      )}
+      <AddEntryModal open={addOpen} onClose={()=>setAddOpen(false)} onSave={handleAddEntry} customer={customer} banks={banks}/>
       <CustomerFormModal open={editOpen} onClose={()=>setEditOpen(false)} initial={customer}
         onSave={updated=>onUpdateCustomer({
           ...updated,
@@ -1172,7 +953,7 @@ function CustomersPage({customers,banks,onUpdateCustomers}){
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:'16px'}}>
         {customers.map(c=>{
-          const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
+          const bak=calcBalance(c.cariEntries||[]);
           const cekim=(c.cariEntries||[]).filter(e=>e.type==='cekim').length;
           const isBorc=bak>0;
           return(
@@ -1184,12 +965,7 @@ function CustomersPage({customers,banks,onUpdateCustomers}){
                   </div>
                   <div style={{color:'#64748b',fontSize:'12px'}}>{c.phone}</div>
                 </div>
-                <div style={{display:'flex',gap:'6px',flexShrink:0}}>
-                  <button onClick={()=>handleCopy(c)} title="Kopyala" style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px',cursor:'pointer',color:'#4f8ef7',display:'flex',alignItems:'center'}}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  </button>
-                  <button onClick={()=>setDeleteId(c.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center'}}><IcoTrash size={13}/></button>
-                </div>
+                <button onClick={()=>setDeleteId(c.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center',flexShrink:0}}><IcoTrash size={13}/></button>
               </div>
               <div onClick={()=>setDetailId(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
@@ -1340,30 +1116,20 @@ function POSPage({customers,banks}){
   const bankMap={};
   dayEntries.forEach(e=>{
     const bankObj=banks.find(b=>b.name===e.bank);
-    const taksit=parseInt(e.installment)||1;
-    const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]!=null?parseFloat(bankObj.rates[taksit-1]):0;
-    const bankCut=parseFloat((e.amount*bankRate/100).toFixed(2));
-    const netDeposit=parseFloat((e.amount-bankCut).toFixed(2));
-    const ownerShare=+(netDeposit*0.01).toFixed(2);
-    const customerComm=e.customerComm||0;
-    const realProfit=+(customerComm-bankCut-ownerShare).toFixed(2);
-    const bankNotFound=!bankObj;
-    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0,totalOwnerShare:0,totalRealProfit:0,hasUnknown:false};
-    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit,ownerShare,customerComm,realProfit,bankNotFound});
+    const bankRate=bankObj?bankObj.rates[e.installment-1]:e.bankRate||0;
+    const bankCut=+(e.amount*bankRate/100).toFixed(2);
+    const netDeposit=+(e.amount-bankCut).toFixed(2);
+    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0};
+    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit});
     bankMap[e.bank].totalAmount+=e.amount;
     bankMap[e.bank].totalBankCut+=bankCut;
     bankMap[e.bank].totalNet+=netDeposit;
-    bankMap[e.bank].totalOwnerShare+=ownerShare;
-    bankMap[e.bank].totalRealProfit+=realProfit;
-    if(bankNotFound)bankMap[e.bank].hasUnknown=true;
   });
   const bankRows=Object.values(bankMap).sort((a,b)=>b.totalNet-a.totalNet);
 
   const grandTotal=bankRows.reduce((s,r)=>s+r.totalAmount,0);
   const grandCut=bankRows.reduce((s,r)=>s+r.totalBankCut,0);
   const grandNet=bankRows.reduce((s,r)=>s+r.totalNet,0);
-  const grandOwnerShare=bankRows.reduce((s,r)=>s+r.totalOwnerShare,0);
-  const grandRealProfit=bankRows.reduce((s,r)=>s+r.totalRealProfit,0);
 
   const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
   const td={padding:'10px 14px'};
@@ -1391,8 +1157,6 @@ function POSPage({customers,banks}){
         <MetricCard label="Toplam POS Çekim" value={fmtTL(grandTotal)} color="#4f8ef7"/>
         <MetricCard label="Toplam Banka Kesintisi" value={fmtTL(grandCut)} color="#ef4444"/>
         <MetricCard label={`Yarın Yatacak (${bankRows.length} banka)`} value={fmtTL(grandNet)} color="#22c55e" large/>
-        <MetricCard label="Şirket Sahibi Payı (%1)" value={fmtTL(grandOwnerShare)} color="#f59e0b"/>
-        <MetricCard label="Net Kârım" value={fmtTL(grandRealProfit)} color="#a855f7" large/>
       </div>
 
       {dayEntries.length===0?(
@@ -1411,7 +1175,7 @@ function POSPage({customers,banks}){
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
                 <thead>
-                  <tr>{['Banka','İşlem Adedi','Toplam Çekim','Banka Kesintisi','Yarın Yatacak','Şirket Sahibi Payı','Net Kârım'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
+                  <tr>{['Banka','İşlem Adedi','Toplam Çekim','Banka Kesintisi','Yarın Yatacak Tutar'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {bankRows.map(r=>(
@@ -1423,12 +1187,7 @@ function POSPage({customers,banks}){
                         <div>{fmtTL(r.totalBankCut)}</div>
                         <div style={{fontSize:'11px',color:'#64748b'}}>%{r.totalAmount>0?+(r.totalBankCut/r.totalAmount*100).toFixed(2):0} ort.</div>
                       </td>
-                      <td className="tabular-nums" style={{...td,fontWeight:700,color:'#22c55e'}}>{fmtTL(r.totalNet)}</td>
-                      <td className="tabular-nums" style={{...td,color:'#f59e0b',fontWeight:600}}>
-                        <div>{fmtTL(r.totalOwnerShare)}</div>
-                        <div style={{fontSize:'11px',color:'#64748b'}}>%1</div>
-                      </td>
-                      <td className="tabular-nums" style={{...td,fontWeight:800,fontSize:'16px',color:'#a855f7'}}>{fmtTL(r.totalRealProfit)}</td>
+                      <td className="tabular-nums" style={{...td,fontWeight:800,fontSize:'16px',color:'#22c55e'}}>{fmtTL(r.totalNet)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1437,9 +1196,7 @@ function POSPage({customers,banks}){
                     <td colSpan={2} style={{...td,color:'#94a3b8',fontWeight:700,fontSize:'12px',textTransform:'uppercase'}}>Toplam ({dayEntries.length} işlem)</td>
                     <td className="tabular-nums" style={{...td,color:'#4f8ef7',fontWeight:800}}>{fmtTL(grandTotal)}</td>
                     <td className="tabular-nums" style={{...td,color:'#ef4444',fontWeight:800}}>{fmtTL(grandCut)}</td>
-                    <td className="tabular-nums" style={{...td,color:'#22c55e',fontWeight:800}}>{fmtTL(grandNet)}</td>
-                    <td className="tabular-nums" style={{...td,color:'#f59e0b',fontWeight:800}}>{fmtTL(grandOwnerShare)}</td>
-                    <td className="tabular-nums" style={{...td,color:'#a855f7',fontWeight:800,fontSize:'16px'}}>{fmtTL(grandRealProfit)}</td>
+                    <td className="tabular-nums" style={{...td,color:'#22c55e',fontWeight:800,fontSize:'16px'}}>{fmtTL(grandNet)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1505,7 +1262,7 @@ function ReportsPage({customers}){
   const totalCekim=filteredEntries.filter(e=>e.type==='cekim').reduce((s,e)=>s+e.amount,0);
   const totalKom=filteredEntries.filter(e=>e.type==='cekim').reduce((s,e)=>s+(e.customerComm||0),0);
   const totalOdenen=filteredEntries.filter(e=>e.type==='nakit_odeme').reduce((s,e)=>s+e.amount,0);
-  const bakiye=calcBalance(filteredEntries,selCustomer?.openingBalance||0);
+  const bakiye=calcBalance(filteredEntries);
 
   const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
   const td={padding:'10px 14px'};
@@ -1580,7 +1337,7 @@ function ReportsPage({customers}){
                     <tr>{['Tarih','Açıklama','Çekim Tutarı','Müşteri Kom.','Müşteriye Nakit','Ödenen Nakit','Bakiye'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {(()=>{let running=selCustomer?.openingBalance||0;return filteredEntries.map(e=>{
+                    {(()=>{let running=0;return filteredEntries.map(e=>{
                       if(e.type==='cekim')running+=e.netToCustomer;else running-=e.amount;
                       return(
                         <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
@@ -1642,24 +1399,18 @@ function ProfitPage({customers}){
   const totalC=rows.reduce((s,r)=>s+r.amount,0);
   const totalKom=rows.reduce((s,r)=>s+(r.customerComm||0),0);
   const totalBank=rows.reduce((s,r)=>s+(r.bankCost||0),0);
-  const totalOwner=rows.reduce((s,r)=>s+(((r.amount-(r.bankCost||0))*0.01).toFixed(2)*1),0);
-  const totalNet=rows.reduce((s,r)=>{
-    const ownerShare=+((r.amount-(r.bankCost||0))*0.01).toFixed(2);
-    return s+(r.profit||0)-ownerShare;
-  },0);
-  const totals={totalC,totalKom,totalBank,totalOwner,totalNet};
+  const totalNet=rows.reduce((s,r)=>s+(r.profit||0),0);
+  const totals={totalC,totalKom,totalBank,totalNet};
 
   // Müşteri bazlı özet
   const custMap={};
   rows.forEach(r=>{
-    const ownerShare=+((r.amount-(r.bankCost||0))*0.01).toFixed(2);
-    const realProfit=(r.profit||0)-ownerShare;
     if(!custMap[r.customerId])custMap[r.customerId]={id:r.customerId,name:r.customerName,code:r.customerCode,cnt:0,totalC:0,kom:0,bank:0,profit:0};
     custMap[r.customerId].cnt++;
     custMap[r.customerId].totalC+=r.amount;
     custMap[r.customerId].kom+=(r.customerComm||0);
     custMap[r.customerId].bank+=(r.bankCost||0);
-    custMap[r.customerId].profit+=realProfit;
+    custMap[r.customerId].profit+=(r.profit||0);
   });
   const custStats=Object.values(custMap).map(r=>({...r,margin:r.totalC>0?+(r.profit/r.totalC*100).toFixed(2):0})).sort((a,b)=>b.profit-a.profit);
 
@@ -1743,10 +1494,7 @@ function ProfitPage({customers}){
                     <div style={{fontWeight:600,fontSize:'13px'}}>{r.customerName}</div>
                     <div style={{color:'#64748b',fontSize:'11px'}}>{r.customerCode}</div>
                   </td>
-                  <td style={{...s,color:'#94a3b8',fontSize:'12px'}}>
-                    {r.bank}
-                    {r.bankNotFound&&<span title="Banka ayarlarda bulunamadı, komisyon hesaplanamadı!" style={{marginLeft:'4px',color:'#f59e0b',fontWeight:700,cursor:'help'}}>⚠️</span>}
-                  </td>
+                  <td style={{...s,color:'#94a3b8',fontSize:'12px'}}>{r.bank}</td>
                   <td style={{...s,textAlign:'center'}}>
                     <Badge color="#4f8ef7">{r.installment===1?'Peşin':`${r.installment} T`}</Badge>
                   </td>
@@ -1759,7 +1507,7 @@ function ProfitPage({customers}){
                     <div style={{color:'#ef4444',fontWeight:600}}>{fmtTL(r.bankCost)}</div>
                     <div style={{color:'#64748b',fontSize:'11px'}}>%{r.bankRate}</div>
                   </td>
-                  <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'14px',color:((r.profit||0)-+((r.amount-(r.bankCost||0))*0.01).toFixed(2))>=0?'#22c55e':'#ef4444'}}>{fmtTL((r.profit||0)-+((r.amount-(r.bankCost||0))*0.01).toFixed(2))}</td>
+                  <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'14px',color:r.profit>=0?'#22c55e':'#ef4444'}}>{fmtTL(r.profit)}</td>
                 </tr>
               ))}
               {rows.length===0&&<tr><td colSpan={8} style={{padding:'40px',textAlign:'center',color:'#64748b'}}>Seçilen dönemde işlem bulunamadı</td></tr>}
@@ -2113,86 +1861,7 @@ function DekontPage({customers,banks,onUpdateCustomers}){
   );
 }
 
-/* ── HESABIM PAGE ── */
-function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
-  const[form,setForm]=useState({newUsername:username,currentPassword:'',newPassword:'',confirmPassword:''});
-  const[msg,setMsg]=useState('');
-  const[err,setErr]=useState('');
-  const[loading,setLoading]=useState(false);
-  const inpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
-  const submit=async()=>{
-    setErr('');setMsg('');
-    if(!form.newUsername.trim()){setErr('Kullanıcı adı boş olamaz');return;}
-    if(form.newPassword&&form.newPassword.length<6){setErr('Yeni şifre en az 6 karakter olmalı');return;}
-    if(form.newPassword&&form.newPassword!==form.confirmPassword){setErr('Yeni şifreler eşleşmiyor');return;}
-    if(form.newPassword&&!form.currentPassword){setErr('Şifre değiştirmek için mevcut şifreyi gir');return;}
-    setLoading(true);
-    try{
-      const r=await fetch('/api/users/me',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({newUsername:form.newUsername.trim(),currentPassword:form.currentPassword||undefined,newPassword:form.newPassword||undefined})});
-      const text=await r.text();
-      let d;try{d=JSON.parse(text);}catch{setErr('Sunucu hatası: '+r.status);return;}
-      if(!r.ok){setErr(d.error||'Hata');return;}
-      setMsg('Bilgiler güncellendi.');
-      if(d.username&&d.username!==username)onUpdated&&onUpdated(d.username);
-      setForm(p=>({...p,currentPassword:'',newPassword:'',confirmPassword:'',newUsername:d.username||p.newUsername}));
-    }catch(e){setErr(e.message);}
-    finally{setLoading(false);}
-  };
-  return(
-    <div style={{maxWidth:'480px'}}>
-      <Card style={{display:'flex',flexDirection:'column',gap:'18px'}}>
-        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Hesap Bilgileri</div>
-        {err&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{err}</div>}
-        {msg&&<div style={{color:'#22c55e',background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{msg}</div>}
-        <div>
-          <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
-          <input style={inpS} value={form.newUsername} onChange={e=>setForm(p=>({...p,newUsername:e.target.value}))}/>
-        </div>
-        <div style={{borderTop:'1px solid rgba(255,255,255,0.07)',paddingTop:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div style={{color:'#64748b',fontSize:'12px',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em'}}>Şifre Değiştir</div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Mevcut Şifre</label>
-            <input style={inpS} type="password" value={form.currentPassword} onChange={e=>setForm(p=>({...p,currentPassword:e.target.value}))} placeholder="Değiştirmek istiyorsanız girin"/>
-          </div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Yeni Şifre</label>
-            <input style={inpS} type="password" value={form.newPassword} onChange={e=>setForm(p=>({...p,newPassword:e.target.value}))} placeholder="Min 6 karakter"/>
-          </div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Yeni Şifre (Tekrar)</label>
-            <input style={inpS} type="password" value={form.confirmPassword} onChange={e=>setForm(p=>({...p,confirmPassword:e.target.value}))} placeholder="Yeni şifreyi tekrar girin"/>
-          </div>
-        </div>
-        <button onClick={submit} disabled={loading} style={{padding:'12px',borderRadius:'10px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',fontWeight:700,fontSize:'14px',cursor:'pointer',opacity:loading?0.7:1}}>
-          {loading?'Kaydediliyor…':'Kaydet'}
-        </button>
-      </Card>
-      <Card style={{display:'flex',flexDirection:'column',gap:'12px',marginTop:'16px'}}>
-        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Veri Yönetimi</div>
-        <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-          <button onClick={onExport} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',borderRadius:'10px',border:'1px solid rgba(34,197,94,0.25)',background:'rgba(34,197,94,0.06)',color:'#22c55e',cursor:'pointer',fontWeight:600,fontSize:'13px',textAlign:'left'}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Yedek Al
-            <span style={{color:'#64748b',fontWeight:400,fontSize:'12px',marginLeft:'auto'}}>Tüm verileri JSON olarak indir</span>
-          </button>
-          <label style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',borderRadius:'10px',border:'1px solid rgba(245,158,11,0.25)',background:'rgba(245,158,11,0.06)',color:'#f59e0b',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Geri Yükle
-            <span style={{color:'#64748b',fontWeight:400,fontSize:'12px',marginLeft:'auto'}}>JSON yedekten geri yükle</span>
-            <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport&&onImport(e.target.files[0]);e.target.value='';}}/>
-          </label>
-          <button onClick={onReset} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',borderRadius:'10px',border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.05)',color:'#ef4444',cursor:'pointer',fontWeight:600,fontSize:'13px',textAlign:'left'}}>
-            <IcoRefresh size={16}/>
-            Verileri Sıfırla
-            <span style={{color:'#64748b',fontWeight:400,fontSize:'12px',marginLeft:'auto'}}>Tüm müşteri ve kayıtları sil</span>
-          </button>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-/* ── BANKA AYARLARI ── */
+/* ── BANKA AYARLARI PAGE ── */
 function BankSettingsPage({banks,onUpdateBanks}){
   const[open,setOpen]=useState(null);
   const[compareInst,setCompareInst]=useState(1);
@@ -2290,87 +1959,24 @@ function BankSettingsPage({banks,onUpdateBanks}){
 /* ════════════════════════════════════
    SIDEBAR
 ════════════════════════════════════ */
-function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExport,onImport,onLogout,role,username,mobileOpen,onMobileClose,waqCount}){
-  const isMobile=useIsMobile();
-  const[expanded,setExpanded]=useState({reports:false,dekont:false,hesabim:false});
-
-  const GROUPS={
-    reports:{label:'Raporlamalar',icon:<IcoPDF/>,page:'reports',children:[
-      {id:'pos',label:'POS Hesap',icon:<IcoChart/>},
-      {id:'profit',label:'Kar Analizi',icon:<IcoChart/>},
-    ]},
-    dekont:{label:'Dekont Yükle',icon:<IcoUpload/>,page:'dekont',children:[
-      ...(role==='admin'?[{id:'waq',label:'WhatsApp',icon:<IcoUpload/>,badge:waqCount}]:[]),
-    ]},
-    hesabim:{label:'Hesabım',icon:<IcoCog/>,page:'hesabim',children:[
-      ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>}]:[]),
-    ]},
-  };
-
-  const TOP_NAV=[
+function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExport,onImport,onLogout,role,username}){
+  const nav=[
     {id:'dashboard',label:'Dashboard',icon:<IcoHome/>},
     {id:'customers',label:'Müşteriler',icon:<IcoUsers/>},
-    {group:'reports'},
+    {id:'reports',label:'Raporlamalar',icon:<IcoPDF/>},
+    {id:'pos',label:'POS Hesap',icon:<IcoChart/>},
+    {id:'profit',label:'Kar Analizi',icon:<IcoChart/>},
+    {id:'dekont',label:'Dekont Yükle',icon:<IcoUpload/>},
     {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
-    {group:'dekont'},
-    {group:'hesabim'},
+    ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>}]:[]),
   ];
-
-  const w=isMobile?236:(collapsed?64:236);
+  const w=collapsed?64:236;
   const statusLabel=saveStatus==='saving'?'Kaydediliyor…':saveStatus==='saved'?'✓ Sunucuya Kaydedildi':saveStatus==='error'?'Kayıt Hatası':'Hazır';
   const statusColor=saveStatus==='saved'?'#22c55e':saveStatus==='saving'?'#f59e0b':saveStatus==='error'?'#ef4444':'#64748b';
-  const navClick=function(id){setPage(id);if(isMobile&&onMobileClose)onMobileClose();};
-  const toggleGroup=function(key){setExpanded(p=>({...p,[key]:!p[key]}));};
-  const isGroupActive=(key)=>page===GROUPS[key].page||GROUPS[key].children.some(c=>c.id===page);
-
-  const sidebarStyle={width:w,minWidth:w,background:'#0c1021',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',height:'100vh',flexShrink:0,transition:'width 0.2s'};
-  if(isMobile){
-    sidebarStyle.position='fixed';
-    sidebarStyle.top=0;
-    sidebarStyle.left=0;
-    sidebarStyle.zIndex=200;
-    sidebarStyle.transform=mobileOpen?'translateX(0)':'translateX(-100%)';
-    sidebarStyle.transition='transform 0.25s ease';
-  }else{
-    sidebarStyle.position='sticky';
-    sidebarStyle.top=0;
-  }
-
-  const renderNavItem=(n)=>{
-    const active=page===n.id;
-    if(n.isImport){
-      return(
-        <label key={n.id} title={collapsed?n.label:''}
-          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'7px 0':'6px 14px 6px 28px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#94a3b8',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
-          <span style={{flexShrink:0}}>{n.icon}</span>
-          {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
-          <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
-        </label>
-      );
-    }
-    if(n.action){
-      return(
-        <button key={n.id} onClick={n.action} title={collapsed?n.label:''}
-          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'7px 0':'6px 14px 6px 28px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:n.color||'#94a3b8',cursor:'pointer',fontWeight:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
-          <span style={{flexShrink:0}}>{n.icon}</span>
-          {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
-        </button>
-      );
-    }
-    return(
-      <button key={n.id} onClick={()=>navClick(n.id)} title={collapsed?n.label:''}
-        style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'7px 0':'6px 14px 6px 28px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':'#94a3b8',cursor:'pointer',fontWeight:active?700:500,fontSize:'12px',transition:'all 0.15s',marginBottom:'1px',boxSizing:'border-box'}}>
-        <span style={{flexShrink:0}}>{n.icon}</span>
-        {!collapsed&&<span style={{flex:1}}>{n.label}</span>}
-        {!collapsed&&n.badge>0&&<span style={{background:'#ef4444',color:'#fff',borderRadius:'10px',padding:'1px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}}>{n.badge}</span>}
-      </button>
-    );
-  };
-
   return(
-    <div style={sidebarStyle}>
-      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0,cursor:'pointer'}} onClick={()=>setPage('dashboard')}>
-        {!collapsed&&<span style={{fontWeight:800,fontSize:'18px',letterSpacing:'-0.5px',color:'#e2e8f0'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></span>}
+    <div style={{width:w,minWidth:w,background:'#0c1021',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',height:'100vh',position:'sticky',top:0,flexShrink:0,transition:'width 0.2s'}}>
+      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0}}>
+        {!collapsed&&<span style={{fontWeight:800,fontSize:'18px',letterSpacing:'-0.5px',color:'#e2e8f0'}}>ZY<span style={{color:'#4f8ef7'}}>REOS</span></span>}
         {collapsed&&<div style={{width:'32px',height:'32px',borderRadius:'8px',background:'#4f8ef7',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'14px',color:'#fff'}}>Z</div>}
       </div>
       {!collapsed&&username&&(
@@ -2383,41 +1989,13 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
         </div>
       )}
       <nav style={{flex:1,padding:'12px 8px',overflowY:'auto'}}>
-        {TOP_NAV.map((item,i)=>{
-          if(item.group){
-            const key=item.group;
-            const grp=GROUPS[key];
-            const open=expanded[key]||isGroupActive(key);
-            const groupActive=isGroupActive(key);
-            return(
-              <div key={key}>
-                <div style={{display:'flex',alignItems:'center',borderRadius:'10px',background:groupActive?'rgba(79,142,247,0.08)':'transparent',marginBottom:'2px',overflow:'hidden'}}>
-                  <button onClick={()=>{navClick(grp.page);}} title={collapsed?grp.label:''}
-                    style={{flex:1,display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':'10px 14px',justifyContent:collapsed?'center':'flex-start',border:'none',background:'transparent',color:groupActive?'#4f8ef7':'#64748b',cursor:'pointer',fontWeight:groupActive?700:500,fontSize:'13px',transition:'all 0.15s',boxSizing:'border-box'}}>
-                    <span style={{flexShrink:0}}>{grp.icon}</span>
-                    {!collapsed&&<span style={{flex:1}}>{grp.label}</span>}
-                  </button>
-                  {!collapsed&&grp.children.length>0&&(
-                    <button onClick={()=>toggleGroup(key)}
-                      style={{padding:'10px 12px',border:'none',background:'transparent',color:groupActive?'#4f8ef7':'#64748b',cursor:'pointer',fontSize:'10px',transition:'transform 0.2s',display:'inline-block',transform:expanded[key]?'rotate(180deg)':'rotate(0deg)',lineHeight:1,flexShrink:0}}>
-                      ▾
-                    </button>
-                  )}
-                </div>
-                {!collapsed&&expanded[key]&&grp.children.length>0&&(
-                  <div style={{marginBottom:'4px'}}>
-                    {grp.children.map(c=>renderNavItem(c))}
-                  </div>
-                )}
-              </div>
-            );
-          }
-          const active=page===item.id;
+        {nav.map(n=>{
+          const active=page===n.id;
           return(
-            <button key={item.id} onClick={()=>navClick(item.id)} title={collapsed?item.label:''}
+            <button key={n.id} onClick={()=>setPage(n.id)} title={collapsed?n.label:''}
               style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':'10px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':'#64748b',cursor:'pointer',fontWeight:active?700:500,fontSize:'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
-              <span style={{flexShrink:0}}>{item.icon}</span>
-              {!collapsed&&<span style={{flex:1}}>{item.label}</span>}
+              <span style={{flexShrink:0}}>{n.icon}</span>
+              {!collapsed&&<span>{n.label}</span>}
             </button>
           );
         })}
@@ -2429,6 +2007,21 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
             <span style={{fontSize:'10px',color:statusColor,fontWeight:600,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{statusLabel}</span>
           </div>
         )}
+        <button onClick={onExport} title={collapsed?'Yedek Al':''}
+          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'1px solid rgba(34,197,94,0.2)',background:'rgba(34,197,94,0.06)',color:'#22c55e',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          {!collapsed&&'Yedek Al'}
+        </button>
+        <label title={collapsed?'Geri Yükle':''}
+          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'1px solid rgba(245,158,11,0.2)',background:'rgba(245,158,11,0.06)',color:'#f59e0b',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          {!collapsed&&'Geri Yükle'}
+          <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
+        </label>
+        <button onClick={onReset} title={collapsed?'Sıfırla':''}
+          style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:'transparent',color:'#ef4444',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
+          <IcoRefresh size={14}/>{!collapsed&&'Verileri Sıfırla'}
+        </button>
         <button onClick={onLogout} title={collapsed?'Çıkış':''}
           style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:collapsed?'10px 0':'9px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'1px solid rgba(100,116,139,0.2)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'12px',boxSizing:'border-box'}}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -2445,59 +2038,12 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
 }
 
 /* ── ADMIN USERS PAGE ── */
-const _adminInpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
-const _adminOverlayS={position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'};
-const _adminModalS={background:'#1e2433',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'400px',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',gap:'16px'};
-
-function AdminUserModal({title,onClose,onSubmit,submitLabel,form,setForm,formErr,editModal,addModal}){
-  return(
-    <div style={_adminOverlayS} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={_adminModalS}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0'}}>{title}</span>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'20px',lineHeight:1}}>×</button>
-        </div>
-        {formErr&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{formErr}</div>}
-        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
-            <input style={_adminInpS} value={form.username||''} onChange={e=>setForm(p=>({...p,username:e.target.value}))} placeholder="kullaniciadi"/>
-          </div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>
-              {editModal?'Yeni Şifre (boş bırakırsan değişmez)':'Şifre'}
-            </label>
-            <input style={_adminInpS} type="password" value={form.password||''} onChange={e=>setForm(p=>({...p,password:e.target.value}))} placeholder={editModal?'Değiştirmek için gir…':'Min 6 karakter'}/>
-          </div>
-          {addModal&&(
-            <div>
-              <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Rol</label>
-              <select style={_adminInpS} value={form.role||'user'} onChange={e=>setForm(p=>({...p,role:e.target.value}))}>
-                <option value="user">Kullanıcı</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          )}
-        </div>
-        <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
-          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
-          <button onClick={onSubmit} style={{padding:'10px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',cursor:'pointer',fontWeight:700}}>{submitLabel}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminUsersPage({token,onUsernameChanged,currentUsername}){
+function AdminUsersPage({token}){
   const[users,setUsers]=useState([]);
   const[loading,setLoading]=useState(true);
   const[error,setError]=useState('');
   const[actionLoading,setActionLoading]=useState('');
   const[showPwd,setShowPwd]=useState({});
-  const[editModal,setEditModal]=useState(null);
-  const[addModal,setAddModal]=useState(false);
-  const[form,setForm]=useState({});
-  const[formErr,setFormErr]=useState('');
 
   const load=async()=>{
     setLoading(true);setError('');
@@ -2514,51 +2060,22 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
     finally{setActionLoading('');}
   };
 
-  const openEdit=(u)=>{setForm({username:u.username,password:''});setFormErr('');setEditModal(u.username);};
-  const openAdd=()=>{setForm({username:'',password:'',role:'user'});setFormErr('');setAddModal(true);};
-
-  const submitEdit=async()=>{
-    setFormErr('');
-    if(!form.username.trim()){setFormErr('Kullanıcı adı boş olamaz');return;}
-    if(form.password&&form.password.length<6){setFormErr('Şifre en az 6 karakter olmalı');return;}
-    try{
-      const r=await fetch(`/api/admin/users/${editModal}`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({newUsername:form.username.trim(),newPassword:form.password||undefined})});
-      const d=await r.json();
-      if(!r.ok){setFormErr(d.error||'Hata');return;}
-      const newUn=form.username.trim();
-      setEditModal(null);await load();
-      if(onUsernameChanged&&editModal===currentUsername)onUsernameChanged(newUn);
-    }catch(e){setFormErr(e.message);}
-  };
-
-  const submitAdd=async()=>{
-    setFormErr('');
-    if(!form.username.trim()||!form.password){setFormErr('Kullanıcı adı ve şifre gerekli');return;}
-    if(form.password.length<6){setFormErr('Şifre en az 6 karakter olmalı');return;}
-    try{
-      const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({username:form.username.trim(),password:form.password,role:form.role||'user'})});
-      const d=await r.json();
-      if(!r.ok){setFormErr(d.error||'Hata');return;}
-      setAddModal(false);await load();
-    }catch(e){setFormErr(e.message);}
-  };
-
   const statusBadge=(s)=>{
     const cfg={pending:{color:'#f59e0b',bg:'rgba(245,158,11,0.1)',label:'Bekliyor'},approved:{color:'#22c55e',bg:'rgba(34,197,94,0.1)',label:'Onaylı'},rejected:{color:'#ef4444',bg:'rgba(239,68,68,0.1)',label:'Reddedildi'}};
     const c=cfg[s]||{color:'#64748b',bg:'rgba(100,116,139,0.1)',label:s};
     return<span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:c.bg,color:c.color,border:`1px solid ${c.color}44`}}>{c.label}</span>;
   };
 
-  const inpS=_adminInpS;
+  const pending=users.filter(u=>u.status==='pending');
+  const others=users.filter(u=>u.status!=='pending');
+
   const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
   const td={padding:'10px 14px',fontSize:'13px'};
-
-  const pending=users.filter(u=>u.status==='pending');
 
   if(loading)return(
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',flexDirection:'column',gap:'12px'}}>
       <div style={{width:'28px',height:'28px',borderRadius:'50%',border:'3px solid #4f8ef7',borderTopColor:'transparent',animation:'spin 0.8s linear infinite'}}/>
-      <div style={{color:'#64748b',fontSize:'13px'}}>Yükleniyor…</div>
+      <div style={{color:'#64748b',fontSize:'13px'}}>Kullanıcılar yükleniyor…</div>
     </div>
   );
 
@@ -2571,7 +2088,7 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
         <Card style={{padding:0,overflow:'hidden',border:'1px solid rgba(245,158,11,0.25)'}}>
           <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',gap:'10px'}}>
             <div style={{width:'8px',height:'8px',borderRadius:'50%',background:'#f59e0b',animation:'pulse 1.5s infinite'}}/>
-            <span style={{fontWeight:700,fontSize:'14px',color:'#f59e0b'}}>Onay Bekleyen ({pending.length})</span>
+            <span style={{fontWeight:700,fontSize:'14px',color:'#f59e0b'}}>Onay Bekleyen Kullanıcılar ({pending.length})</span>
           </div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse'}}>
@@ -2579,11 +2096,19 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
               <tbody>
                 {pending.map(u=>(
                   <tr key={u.username} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <td style={{...td,fontWeight:700,color:'#e2e8f0'}}>{u.username}</td>
+                    <td style={{...td,fontWeight:700,color:'#e2e8f0'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        <div style={{width:'28px',height:'28px',borderRadius:'8px',background:'rgba(79,142,247,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'12px',color:'#4f8ef7',flexShrink:0}}>{u.username[0].toUpperCase()}</div>
+                        {u.username}
+                      </div>
+                    </td>
                     <td style={td}>
                       <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                        <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',color:'#e2e8f0'}}>{showPwd[u.username]?u.passwordPlain:'••••••••'}</code>
-                        <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px'}}>
+                        <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',letterSpacing:'0.05em',color:'#e2e8f0'}}>
+                          {showPwd[u.username]?u.passwordPlain:'••••••••'}
+                        </code>
+                        <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))}
+                          style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px',padding:'2px 6px'}}>
                           {showPwd[u.username]?'Gizle':'Göster'}
                         </button>
                       </div>
@@ -2591,8 +2116,16 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
                     <td style={{...td,color:'#64748b'}}>{u.createdAt?new Date(u.createdAt).toLocaleString('tr-TR'):'—'}</td>
                     <td style={td}>
                       <div style={{display:'flex',gap:'6px'}}>
-                        <button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'6px 14px',borderRadius:'6px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px'}}>✓ Onayla</button>
-                        <button disabled={actionLoading===u.username+'_reject'} onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')} style={{padding:'6px 14px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'12px'}}>✗ Reddet</button>
+                        <button disabled={actionLoading===u.username+'_approve'}
+                          onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')}
+                          style={{padding:'6px 14px',borderRadius:'6px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px',opacity:actionLoading===u.username+'_approve'?0.6:1}}>
+                          ✓ Onayla
+                        </button>
+                        <button disabled={actionLoading===u.username+'_reject'}
+                          onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')}
+                          style={{padding:'6px 14px',borderRadius:'6px',border:'none',background:'rgba(239,68,68,0.15)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'12px',border:'1px solid rgba(239,68,68,0.3)',opacity:actionLoading===u.username+'_reject'?0.6:1}}>
+                          ✗ Reddet
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -2605,16 +2138,11 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
 
       {/* Tüm Kullanıcılar */}
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'10px'}}>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontWeight:700,fontSize:'14px'}}>Tüm Kullanıcılar ({users.length})</span>
-          <div style={{display:'flex',gap:'8px'}}>
-            <button onClick={load} style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(79,142,247,0.1)',border:'1px solid rgba(79,142,247,0.2)',borderRadius:'8px',padding:'6px 12px',color:'#4f8ef7',cursor:'pointer',fontSize:'12px',fontWeight:600}}>
-              <IcoRefresh size={12}/> Yenile
-            </button>
-            <button onClick={openAdd} style={{display:'flex',alignItems:'center',gap:'6px',background:'linear-gradient(135deg,#22c55e,#16a34a)',border:'none',borderRadius:'8px',padding:'6px 14px',color:'#fff',cursor:'pointer',fontSize:'12px',fontWeight:700}}>
-              + Yeni Kullanıcı
-            </button>
-          </div>
+          <button onClick={load} style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(79,142,247,0.1)',border:'1px solid rgba(79,142,247,0.2)',borderRadius:'8px',padding:'6px 12px',color:'#4f8ef7',cursor:'pointer',fontSize:'12px',fontWeight:600}}>
+            <IcoRefresh size={12}/> Yenile
+          </button>
         </div>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse'}}>
@@ -2629,12 +2157,17 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
                     </div>
                   </td>
                   <td style={td}>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                      <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',color:'#e2e8f0'}}>{showPwd[u.username]?u.passwordPlain:'••••••••'}</code>
-                      <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px'}}>
-                        {showPwd[u.username]?'Gizle':'Göster'}
-                      </button>
-                    </div>
+                    {u.username==='admin'?<span style={{color:'#64748b',fontSize:'12px'}}>—</span>:(
+                      <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        <code style={{background:'rgba(255,255,255,0.05)',padding:'3px 8px',borderRadius:'4px',fontSize:'12px',color:'#e2e8f0'}}>
+                          {showPwd[u.username]?u.passwordPlain:'••••••••'}
+                        </code>
+                        <button onClick={()=>setShowPwd(p=>({...p,[u.username]:!p[u.username]}))}
+                          style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'12px',padding:'2px 6px'}}>
+                          {showPwd[u.username]?'Gizle':'Göster'}
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td style={td}>
                     <span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:u.role==='admin'?'rgba(168,85,247,0.1)':'rgba(79,142,247,0.1)',color:u.role==='admin'?'#a855f7':'#4f8ef7',border:`1px solid ${u.role==='admin'?'#a855f744':'#4f8ef744'}`}}>
@@ -2644,13 +2177,14 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
                   <td style={td}>{statusBadge(u.status)}</td>
                   <td style={{...td,color:'#64748b'}}>{u.createdAt?new Date(u.createdAt).toLocaleString('tr-TR'):'—'}</td>
                   <td style={td}>
-                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                      {u.status==='pending'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.15)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
-                      {u.status==='pending'&&<button disabled={actionLoading===u.username+'_reject'} onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Reddet</button>}
-                      {u.status==='rejected'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.1)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
-                      <button onClick={()=>openEdit(u)} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(79,142,247,0.3)',background:'rgba(79,142,247,0.08)',color:'#4f8ef7',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Düzenle</button>
-                      {u.username!=='admin'&&<button disabled={actionLoading===u.username+'_del'} onClick={()=>{if(window.confirm(`"${u.username}" silinsin mi?`))action(()=>apiDeleteUser(token,u.username),u.username+'_del');}} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.08)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Sil</button>}
-                    </div>
+                    {u.username==='admin'?<span style={{color:'#475569',fontSize:'12px'}}>—</span>:(
+                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                        {u.status==='pending'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.15)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
+                        {u.status==='pending'&&<button disabled={actionLoading===u.username+'_reject'} onClick={()=>action(()=>apiRejectUser(token,u.username),u.username+'_reject')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(239,68,68,0.1)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(239,68,68,0.3)'}}>Reddet</button>}
+                        {u.status==='rejected'&&<button disabled={actionLoading===u.username+'_approve'} onClick={()=>action(()=>apiApproveUser(token,u.username),u.username+'_approve')} style={{padding:'5px 10px',borderRadius:'6px',border:'none',background:'rgba(34,197,94,0.1)',color:'#22c55e',cursor:'pointer',fontWeight:700,fontSize:'11px',border:'1px solid rgba(34,197,94,0.3)'}}>Onayla</button>}
+                        <button disabled={actionLoading===u.username+'_del'} onClick={()=>{if(window.confirm(`"${u.username}" kullanıcısını silmek istediğinizden emin misiniz?`))action(()=>apiDeleteUser(token,u.username),u.username+'_del');}} style={{padding:'5px 10px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.08)',color:'#ef4444',cursor:'pointer',fontWeight:700,fontSize:'11px'}}>Sil</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -2658,329 +2192,21 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
           </table>
         </div>
       </Card>
-
-      {editModal&&<AdminUserModal title={`Düzenle — ${editModal}`} onClose={()=>setEditModal(null)} onSubmit={submitEdit} submitLabel="Kaydet" form={form} setForm={setForm} formErr={formErr} editModal={editModal} addModal={false}/>}
-      {addModal&&<AdminUserModal title="Yeni Kullanıcı Ekle" onClose={()=>setAddModal(false)} onSubmit={submitAdd} submitLabel="Ekle" form={form} setForm={setForm} formErr={formErr} editModal={null} addModal={true}/>}
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
     </div>
   );
 }
 
-/* ── WHATSAPP QUEUE PAGE ── */
-function WhatsAppQueuePage({token,allUsers,onReload}){
-  const today=new Date().toISOString().slice(0,10);
-  const[queue,setQueue]=React.useState([]);
-  const[loading,setLoading]=React.useState(true);
-  const[error,setError]=React.useState('');
-  const[edits,setEdits]=React.useState({});
-  const[selectedCustomer,setSelectedCustomer]=React.useState({});
-  const[allCustomers,setAllCustomers]=React.useState([]);
-  const[bulkLoading,setBulkLoading]=React.useState(false);
-  const[dupWarning,setDupWarning]=React.useState({});
-  const[startDate,setStartDate]=React.useState(today);
-  const[endDate,setEndDate]=React.useState(today);
-  const[statusFilter,setStatusFilter]=React.useState('all');
-
-  const loadQueue=async(s,e)=>{
-    setLoading(true);setError('');
-    try{
-      const sd=s!==undefined?s:startDate;
-      const ed=e!==undefined?e:endDate;
-      const r=await fetch(`/api/whatsapp/queue?startDate=${sd}&endDate=${ed}`,{headers:{Authorization:'Bearer '+token}});
-      if(!r.ok)throw new Error('Kuyruk yüklenemedi');
-      setQueue(await r.json());
-    }catch(e){setError(e.message);}
-    finally{setLoading(false);}
-  };
-
-  React.useEffect(()=>{loadQueue();},[]);
-
-  React.useEffect(()=>{
-    if(!allUsers||allUsers.length===0)return;
-    const loadAll=async()=>{
-      const list=[];
-      for(const u of allUsers.filter(u=>u.status==='approved')){
-        try{
-          const r=await fetch(`/api/admin/user-data/${u.username}`,{headers:{Authorization:'Bearer '+token}});
-          if(r.ok){const d=await r.json();(d.customers||[]).forEach(c=>list.push({...c,_username:u.username}));}
-        }catch(e){}
-      }
-      setAllCustomers(list);
-    };
-    loadAll();
-  },[JSON.stringify(allUsers)]);
-
-  const getEdit=(id,field,fallback)=>edits[id]&&edits[id][field]!==undefined?edits[id][field]:fallback;
-  const setEdit=(id,field,val)=>setEdits(p=>({...p,[id]:{...p[id],[field]:val}}));
-
-  const handleAssign=async(item,force)=>{
-    const custId=selectedCustomer[item.id];
-    if(!custId){setError('Müşteri seçiniz');return;}
-    const cust=allCustomers.find(c=>c.id===custId);
-    if(!cust||!cust._username){setError('Müşteri bulunamadı, sayfayı yenileyip tekrar deneyin');return;}
-    const ocr={
-      tutar:Number(getEdit(item.id,'tutar',item.ocr?.tutar))||0,
-      taksit:parseInt(getEdit(item.id,'taksit',item.ocr?.taksit))||1,
-      banka:getEdit(item.id,'banka',item.ocr?.banka)||'',
-      tarih:getEdit(item.id,'tarih',item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10))
-    };
-    try{
-      await apiWAAssign(token,item.id,custId,cust._username,ocr,force);
-      setDupWarning(p=>({...p,[item.id]:null}));
-      setError('');
-      loadQueue();
-      if(onReload)onReload();
-    }catch(e){
-      if(e.code==='mükerrer'){
-        setDupWarning(p=>({...p,[item.id]:{message:e.message}}));
-      }else{
-        setError(e.message);
-      }
-    }
-  };
-
-  const handleUpdate=async(item)=>{
-    const username=item.assignedTo?.username;
-    if(!username){setError('Kullanıcı bilgisi bulunamadı');return;}
-    const ocr={
-      tutar:Number(getEdit(item.id,'tutar',item.ocr?.tutar))||0,
-      taksit:parseInt(getEdit(item.id,'taksit',item.ocr?.taksit))||1,
-      banka:getEdit(item.id,'banka',item.ocr?.banka)||'',
-      tarih:getEdit(item.id,'tarih',item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10))
-    };
-    try{
-      await apiWAUpdate(token,item.id,username,ocr);
-      setError('');
-      loadQueue();
-      if(onReload)onReload();
-    }catch(e){setError(e.message);}
-  };
-
-  const handleBulkAssign=async()=>{
-    const assignable=queue.filter(item=>item.status!=='assigned'&&selectedCustomer[item.id]);
-    if(!assignable.length){setError('Önce işlenmemiş dekontlar için müşteri seçin');return;}
-    setBulkLoading(true);setError('');
-    let ok=0,fail=0;
-    for(const item of assignable){
-      const custId=selectedCustomer[item.id];
-      const cust=allCustomers.find(c=>c.id===custId);
-      if(!cust){fail++;continue;}
-      const ocr={tutar:getEdit(item.id,'tutar',item.ocr?.tutar),taksit:getEdit(item.id,'taksit',item.ocr?.taksit),banka:getEdit(item.id,'banka',item.ocr?.banka)};
-      try{await apiWAAssign(token,item.id,custId,cust._username,ocr);ok++;}
-      catch(e){fail++;}
-    }
-    setBulkLoading(false);
-    loadQueue();
-    if(onReload)onReload();
-    if(fail)setError(`${ok} kayıt işlendi, ${fail} kayıt başarısız.`);
-  };
-
-  const handleDelete=async(id)=>{
-    if(!confirm('Bu kaydı kuyruktan silmek istediğinize emin misiniz?'))return;
-    try{await apiWADelete(token,id);loadQueue();}
-    catch(e){setError(e.message);}
-  };
-
-  const filtered=queue.filter(item=>{
-    if(statusFilter==='pending')return item.status!=='assigned';
-    if(statusFilter==='assigned')return item.status==='assigned';
-    return true;
-  }).sort((a,b)=>new Date(b.receivedAt||0)-new Date(a.receivedAt||0));
-
-  const pendingCount=queue.filter(i=>i.status!=='assigned').length;
-  const assignedCount=queue.filter(i=>i.status==='assigned').length;
-
-  const inp={background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'#e2e8f0',padding:'6px 8px',fontSize:'13px',width:'100%'};
-  const dateInp={background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',padding:'8px 12px',fontSize:'13px',outline:'none'};
-  const fBtn=(val,lbl,cnt,col)=>(
-    <button onClick={()=>setStatusFilter(val)} style={{padding:'7px 14px',borderRadius:'8px',border:statusFilter===val?`1px solid ${col}44`:'1px solid transparent',cursor:'pointer',fontWeight:600,fontSize:'12px',background:statusFilter===val?col+'22':'rgba(255,255,255,0.04)',color:statusFilter===val?col:'#64748b',transition:'all .15s'}}>
-      {lbl}{cnt!=null?` (${cnt})`:''}
-    </button>
-  );
-
-  return(
-    <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
-      <Card style={{padding:'16px 20px'}}>
-        <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div>
-            <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'5px'}}>BAŞLANGIÇ</div>
-            <input type="date" style={dateInp} value={startDate} onChange={e=>setStartDate(e.target.value)}/>
-          </div>
-          <div>
-            <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'5px'}}>BİTİŞ</div>
-            <input type="date" style={dateInp} value={endDate} onChange={e=>setEndDate(e.target.value)}/>
-          </div>
-          <button onClick={()=>loadQueue(startDate,endDate)} style={{padding:'8px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',fontWeight:700,fontSize:'13px',cursor:'pointer'}}>
-            Filtrele
-          </button>
-          <button onClick={()=>{setStartDate(today);setEndDate(today);loadQueue(today,today);}} style={{padding:'8px 14px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',fontWeight:600,fontSize:'12px',cursor:'pointer'}}>
-            Bugün
-          </button>
-          <div style={{marginLeft:'auto',display:'flex',gap:'6px',flexWrap:'wrap'}}>
-            {fBtn('all','Tümü',queue.length,'#94a3b8')}
-            {fBtn('pending','Bekliyor',pendingCount,'#f59e0b')}
-            {fBtn('assigned','İşlendi',assignedCount,'#22c55e')}
-          </div>
-        </div>
-      </Card>
-
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
-        <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-          <span style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0'}}>WhatsApp Kuyruk</span>
-          {pendingCount>0&&<span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(245,158,11,0.1)',color:'#f59e0b',border:'1px solid rgba(245,158,11,0.3)'}}>{pendingCount} bekliyor</span>}
-          {assignedCount>0&&<span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(34,197,94,0.1)',color:'#22c55e',border:'1px solid rgba(34,197,94,0.3)'}}>{assignedCount} işlendi</span>}
-        </div>
-        {pendingCount>0&&(
-          <button onClick={handleBulkAssign} disabled={bulkLoading} style={{padding:'9px 18px',background:'#4f8ef7',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:700,fontSize:'13px',opacity:bulkLoading?0.6:1}}>
-            {bulkLoading?'İşleniyor...':'Tümünü Carilere İşle'}
-          </button>
-        )}
-      </div>
-
-      {error&&<div style={{background:'rgba(239,68,68,0.1)',border:'1px solid #ef4444',borderRadius:'8px',padding:'12px',color:'#ef4444',fontSize:'13px'}}>{error}</div>}
-      {loading&&<div style={{color:'#64748b',textAlign:'center',padding:'40px'}}>Yükleniyor...</div>}
-      {!loading&&filtered.length===0&&<Card><div style={{color:'#64748b',textAlign:'center',padding:'30px',fontSize:'14px'}}>Bu tarih aralığında kayıt bulunamadı</div></Card>}
-
-      {filtered.map(item=>{
-        const isAssigned=item.status==='assigned';
-        return(
-          <div key={item.id} style={{background:'#131929',borderRadius:'12px',padding:'18px 20px',border:isAssigned?'1px solid rgba(34,197,94,0.2)':'1px solid rgba(255,255,255,0.07)'}}>
-            <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'12px',alignItems:'center'}}>
-              <span style={{fontSize:'12px',color:'#64748b'}}>📱 {item.from}</span>
-              <span style={{fontSize:'12px',color:'#64748b'}}>🕐 {item.receivedAt?new Date(item.receivedAt).toLocaleString('tr-TR'):'-'}</span>
-              {isAssigned
-                ?<span style={{marginLeft:'auto',padding:'4px 12px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(34,197,94,0.12)',color:'#22c55e',border:'1px solid rgba(34,197,94,0.3)'}}>✓ İşlendi — {item.assignedAt?new Date(item.assignedAt).toLocaleString('tr-TR'):''}</span>
-                :<span style={{marginLeft:'auto',padding:'4px 12px',borderRadius:'20px',fontSize:'11px',fontWeight:700,background:'rgba(245,158,11,0.1)',color:'#f59e0b',border:'1px solid rgba(245,158,11,0.3)'}}>⏳ Bekliyor</span>
-              }
-            </div>
-
-            {isAssigned&&item.assignedTo&&(
-              <div style={{background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.15)',borderRadius:'8px',padding:'10px 14px',marginBottom:'12px',fontSize:'13px',display:'flex',gap:'16px',flexWrap:'wrap'}}>
-                <span style={{color:'#94a3b8'}}>Müşteri: <b style={{color:'#e2e8f0'}}>{item.assignedTo.customerName||item.assignedTo.customerId}</b></span>
-                <span style={{color:'#94a3b8'}}>Tutar: <b style={{color:'#e2e8f0'}}>₺{Number(item.assignedTo.amount||0).toLocaleString('tr-TR')}</b></span>
-                <span style={{color:'#94a3b8'}}>Banka: <b style={{color:'#e2e8f0'}}>{item.assignedTo.bank||'—'}</b></span>
-                <span style={{color:'#94a3b8'}}>Taksit: <b style={{color:'#e2e8f0'}}>{item.assignedTo.taksit||1}</b></span>
-              </div>
-            )}
-
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'10px',marginBottom:'12px'}}>
-              {[['tutar','Tutar (₺)','number'],['taksit','Taksit','number']].map(([field,lbl,type])=>(
-                <div key={field}>
-                  <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{lbl}</div>
-                  <input style={inp} type={type} value={getEdit(item.id,field,item.ocr?.[field]||'')} onChange={e=>setEdit(item.id,field,e.target.value)}/>
-                </div>
-              ))}
-              <div>
-                <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Banka</div>
-                <select style={inp} value={getEdit(item.id,'banka',item.ocr?.banka||'')} onChange={e=>setEdit(item.id,'banka',e.target.value)}>
-                  <option value=''>Seç</option>
-                  {['Akbank','QNB','Garanti','Diğer Banka','Kuveyt','Ziraat','Halk','İş Bankası','Vakıf','YKB'].map(b=><option key={b} value={b}>{b}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Kayıt Tarihi</div>
-                <input style={inp} type="date" value={getEdit(item.id,'tarih',item.receivedAt?item.receivedAt.slice(0,10):new Date().toISOString().slice(0,10))} onChange={e=>setEdit(item.id,'tarih',e.target.value)}/>
-              </div>
-              {!isAssigned&&(
-                <div style={{gridColumn:'span 2'}}>
-                  <div style={{fontSize:'11px',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>Müşteri</div>
-                  <select style={inp} value={selectedCustomer[item.id]||''} onChange={e=>setSelectedCustomer(p=>({...p,[item.id]:e.target.value}))}>
-                    <option value=''>Müşteri seç</option>
-                    {allCustomers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div style={{display:'flex',gap:'8px',flexDirection:'column'}}>
-              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                {!isAssigned&&(
-                  <button onClick={()=>handleAssign(item)} disabled={!selectedCustomer[item.id]}
-                    style={{padding:'8px 16px',background:'#22c55e',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px',opacity:!selectedCustomer[item.id]?0.4:1}}>
-                    Cariye İşle
-                  </button>
-                )}
-                {isAssigned&&(
-                  <button onClick={()=>handleUpdate(item)}
-                    style={{padding:'8px 16px',background:'#4f8ef7',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
-                    Güncelle
-                  </button>
-                )}
-                <button onClick={()=>handleDelete(item.id)}
-                  style={{padding:'8px 14px',background:'rgba(239,68,68,0.1)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'8px',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
-                  Sil
-                </button>
-              </div>
-              {dupWarning[item.id]&&(
-                <div style={{background:'rgba(234,179,8,0.15)',border:'1px solid rgba(234,179,8,0.4)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',color:'#fbbf24',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                  <span>⚠️ {dupWarning[item.id].message} Yine de eklemek istiyorsanız:</span>
-                  <button onClick={()=>handleAssign(item,true)} style={{padding:'6px 14px',background:'rgba(234,179,8,0.3)',color:'#fbbf24',border:'1px solid rgba(234,179,8,0.5)',borderRadius:'6px',cursor:'pointer',fontWeight:700,fontSize:'12px',whiteSpace:'nowrap'}}>Zorla Ekle</button>
-                  <button onClick={()=>setDupWarning(p=>({...p,[item.id]:null}))} style={{padding:'6px 10px',background:'transparent',color:'#94a3b8',border:'none',cursor:'pointer',fontSize:'12px'}}>İptal</button>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /* ── TOPBAR ── */
-const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
-function Topbar({page,saved,onMenuToggle}){
-  const isMobile=useIsMobile();
-  const[installPrompt,setInstallPrompt]=React.useState(null);
-  const[isIOS,setIsIOS]=React.useState(false);
-  const[showIOSHint,setShowIOSHint]=React.useState(false);
-  React.useEffect(()=>{
-    const handler=e=>{e.preventDefault();setInstallPrompt(e);};
-    window.addEventListener('beforeinstallprompt',handler);
-    const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.navigator.standalone;
-    setIsIOS(ios);
-    return()=>window.removeEventListener('beforeinstallprompt',handler);
-  },[]);
-  const handleInstall=async()=>{
-    if(installPrompt){
-      installPrompt.prompt();
-      const{outcome}=await installPrompt.userChoice;
-      if(outcome==='accepted')setInstallPrompt(null);
-    }else if(isIOS){
-      setShowIOSHint(p=>!p);
-    }
-  };
-  const showBtn=installPrompt||(isIOS&&!window.navigator.standalone);
+const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',admin:'Kullanıcı Yönetimi'};
+function Topbar({page,saved}){
   return(
-    <div style={{position:'relative'}}>
-      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',borderBottom:'1px solid rgba(255,255,255,0.07)',background:'#0c1021',position:'sticky',top:0,zIndex:100,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-          {isMobile&&(
-            <button onClick={onMenuToggle} style={{background:'none',border:'none',color:'#94a3b8',cursor:'pointer',padding:'6px',display:'flex',alignItems:'center',borderRadius:'8px'}}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-            </button>
-          )}
-          <h1 style={{fontWeight:700,fontSize:isMobile?'14px':'16px',color:'#e2e8f0'}}>{PAGE_TITLES[page]||page}</h1>
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-          {saved&&(
-            <div style={{display:'flex',alignItems:'center',gap:'6px',color:'#22c55e',fontSize:'12px',fontWeight:600}}>
-              <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#22c55e'}}/>
-              {!isMobile&&'Kaydedildi '}{saved}
-            </div>
-          )}
-          {showBtn&&(
-            <button onClick={handleInstall} style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 12px',borderRadius:'8px',border:'1px solid rgba(79,142,247,0.4)',background:'rgba(79,142,247,0.1)',color:'#4f8ef7',cursor:'pointer',fontWeight:600,fontSize:'12px',whiteSpace:'nowrap'}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v13"/><polyline points="17 11 12 16 7 11"/><path d="M3 19h18"/></svg>
-              {!isMobile&&'Ana Ekrana Ekle'}
-            </button>
-          )}
-        </div>
-      </div>
-      {showIOSHint&&(
-        <div style={{position:'absolute',top:'60px',right:'12px',background:'#1e2433',border:'1px solid rgba(79,142,247,0.3)',borderRadius:'12px',padding:'14px 16px',zIndex:200,maxWidth:'240px',boxShadow:'0 8px 32px rgba(0,0,0,0.4)'}}>
-          <div style={{fontWeight:700,fontSize:'13px',color:'#e2e8f0',marginBottom:'8px'}}>Ana Ekrana Ekle</div>
-          <div style={{fontSize:'12px',color:'#94a3b8',lineHeight:'1.5'}}>Safari'de alttaki <strong style={{color:'#4f8ef7'}}>Paylaş</strong> butonuna bas, ardından <strong style={{color:'#4f8ef7'}}>Ana Ekrana Ekle</strong>'yi seç.</div>
-          <button onClick={()=>setShowIOSHint(false)} style={{marginTop:'10px',width:'100%',padding:'7px',borderRadius:'8px',border:'none',background:'rgba(79,142,247,0.15)',color:'#4f8ef7',cursor:'pointer',fontWeight:600,fontSize:'12px'}}>Tamam</button>
+    <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 24px',borderBottom:'1px solid rgba(255,255,255,0.07)',background:'#0c1021',position:'sticky',top:0,zIndex:100,flexShrink:0}}>
+      <h1 style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0'}}>{PAGE_TITLES[page]||page}</h1>
+      {saved&&(
+        <div style={{display:'flex',alignItems:'center',gap:'6px',color:'#22c55e',fontSize:'12px',fontWeight:600}}>
+          <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#22c55e'}}/>
+          Kaydedildi {saved}
         </div>
       )}
     </div>
@@ -3014,11 +2240,9 @@ function useHashRouter(){
 function App(){
   const[auth,setAuth]=useState(()=>getAuth());
   const[authScreen,setAuthScreen]=useState('login');
-  const[customers,setCustomers]=useState([]);
+  const[customers,setCustomers]=useState(INIT_CUSTOMERS);
   const[banks,setBanks]=useState(INIT_BANKS);
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
-  const[mobileSidebarOpen,setMobileSidebarOpen]=useState(false);
-  const isMobile=useIsMobile();
   const[initialized,setInitialized]=useState(false);
   const[saveStatus,setSaveStatus]=useState('idle');
   const[savedTime,setSavedTime]=useState('');
@@ -3026,8 +2250,6 @@ function App(){
   const{page:activePage,param:detailCustomerId}=route;
   const saveTimerRef=useRef(null);
   const initRef=useRef(false);
-  const[waqCount,setWaqCount]=useState(0);
-  const[allAdminUsers,setAllAdminUsers]=useState([]);
 
   const logout=()=>{clearAuth();setAuth(null);setAuthScreen('login');setInitialized(false);initRef.current=false;};
 
@@ -3063,19 +2285,6 @@ function App(){
     },800);
     return()=>clearTimeout(saveTimerRef.current);
   },[customers,banks,initialized]);
-
-  useEffect(()=>{
-    if(!auth||auth.role!=='admin')return;
-    const fetchWAQ=()=>apiWAQueue(auth.token).then(q=>setWaqCount(q.filter(i=>i.status==='pending').length)).catch(()=>{});
-    fetchWAQ();
-    const interval=setInterval(fetchWAQ,30000);
-    return()=>clearInterval(interval);
-  },[auth?.token,auth?.role]);
-
-  useEffect(()=>{
-    if(!auth||auth.role!=='admin')return;
-    apiAdminUsers(auth.token).then(setAllAdminUsers).catch(()=>{});
-  },[auth?.token,auth?.role]);
 
   const exportBackup=()=>{
     const blob=new Blob([JSON.stringify({customers,banks,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
@@ -3115,16 +2324,13 @@ function App(){
 
   return(
     <div style={{display:'flex',minHeight:'100vh',background:'#0a0d14'}}>
-      {isMobile&&mobileSidebarOpen&&<div onClick={()=>setMobileSidebarOpen(false)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',zIndex:199}}/>}
-      <Sidebar page={activePage} setPage={p=>{navigate(p);apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);});}} collapsed={collapsed} setCollapsed={setCollapsed}
+      <Sidebar page={activePage} setPage={p=>navigate(p)} collapsed={collapsed} setCollapsed={setCollapsed}
         onReset={handleReset} saveStatus={saveStatus}
         onExport={exportBackup} onImport={importBackup} onLogout={logout}
-        role={auth.role} username={auth.username}
-        mobileOpen={mobileSidebarOpen} onMobileClose={()=>setMobileSidebarOpen(false)}
-        waqCount={waqCount}/>
+        role={auth.role} username={auth.username}/>
       <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,overflow:'hidden'}}>
-        <Topbar page={activePage} saved={savedTime} onMenuToggle={()=>setMobileSidebarOpen(o=>!o)}/>
-        <main style={{flex:1,overflowY:'auto',padding:isMobile?'12px':'24px'}}>
+        <Topbar page={activePage} saved={savedTime}/>
+        <main style={{flex:1,overflowY:'auto',padding:'24px'}}>
           {activePage==='dashboard'&&<DashboardPage customers={customers} onNavigateCustomer={id=>navigate('customers',id)}/>}
           {activePage==='customers'&&(
             <CustomersPageWithDetail
@@ -3137,13 +2343,8 @@ function App(){
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
           {activePage==='dekont'&&<DekontPage customers={customers} banks={banks} onUpdateCustomers={setCustomers}/>}
           {activePage==='banks'&&<BankSettingsPage banks={banks} onUpdateBanks={setBanks}/>}
-          {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
+          {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
-          )}
-          {activePage==='hesabim'&&<HesabimPage token={auth.token} username={auth.username} onUpdated={(newUsername)=>setAuth(p=>({...p,username:newUsername}))} onExport={exportBackup} onImport={importBackup} onReset={handleReset}/>}
-          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} onReload={()=>apiFetchData(auth.token).then(d=>{if(d.customers)setCustomers(d.customers);if(d.banks)setBanks(d.banks);})}/>}
-          {activePage==='waq'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}
         </main>
@@ -3163,13 +2364,6 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
 
   const handleAdd=form=>onUpdateCustomers([...customers,{id:uid(),cariEntries:[],...form}]);
   const handleDelete=id=>onUpdateCustomers(customers.filter(c=>c.id!==id));
-  const handleCopy=c=>{
-    const baseName=c.name.replace(/\s*\d+$/,'').trim();
-    let suffix=2;
-    while(customers.some(x=>x.name===`${baseName} ${suffix}`))suffix++;
-    const copy={...c,id:uid(),name:`${baseName} ${suffix}`,cariEntries:[],createdAt:new Date().toISOString()};
-    onUpdateCustomers([...customers,copy]);
-  };
 
   // ── MÜŞTERİ DETAY GÖRÜNÜMÜ ──
   if(detailId&&detail){
@@ -3192,7 +2386,7 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:'16px'}}>
         {customers.map(c=>{
-          const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
+          const bak=calcBalance(c.cariEntries||[]);
           const cekim=(c.cariEntries||[]).filter(e=>e.type==='cekim').length;
           const isBorc=bak>0;
           return(
@@ -3205,12 +2399,7 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
                   </div>
                   <div style={{color:'#64748b',fontSize:'12px'}}>{c.phone}</div>
                 </div>
-                <div style={{display:'flex',gap:'6px',flexShrink:0}}>
-                  <button onClick={()=>handleCopy(c)} title="Kopyala" style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px',cursor:'pointer',color:'#4f8ef7',display:'flex',alignItems:'center'}}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  </button>
-                  <button onClick={()=>setDeleteId(c.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center'}}><IcoTrash size={13}/></button>
-                </div>
+                <button onClick={()=>setDeleteId(c.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px',cursor:'pointer',color:'#ef4444',display:'flex',alignItems:'center',flexShrink:0}}><IcoTrash size={13}/></button>
               </div>
               <div onClick={()=>window.location.assign('#customers/'+c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}}>
                 <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>

@@ -1198,10 +1198,15 @@ function CustomersPage({customers,banks,onUpdateCustomers,onUpdateKasa}){
   };
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
-        <h2 style={{fontWeight:700,fontSize:'16px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Müşteriler ({customers.length})</h2>
+      {(()=>{const toplamBakiye=customers.reduce((s,c)=>s+calcBalance(c.cariEntries||[],c.openingBalance||0),0);return(
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px',flexWrap:'wrap',gap:'10px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
+          <h2 style={{fontWeight:700,fontSize:'16px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Müşteriler ({customers.length})</h2>
+          <span style={{fontSize:'13px',color:'#64748b'}}>Toplam Bakiye: <span style={{fontWeight:700,color:toplamBakiye>=0?'#22c55e':'#ef4444'}}>{toplamBakiye.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})} ₺</span></span>
+        </div>
         <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Yeni Müşteri</button>
       </div>
+      );})()}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:'16px'}}>
         {customers.map(c=>{
           const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
@@ -3382,10 +3387,15 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
   // ── MÜŞTERİ LİSTESİ ──
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px'}}>
-        <h2 style={{fontWeight:700,fontSize:'16px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Müşteriler ({customers.length})</h2>
+      {(()=>{const toplamBakiye=customers.reduce((s,c)=>s+calcBalance(c.cariEntries||[],c.openingBalance||0),0);return(
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px',flexWrap:'wrap',gap:'10px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
+          <h2 style={{fontWeight:700,fontSize:'16px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Müşteriler ({customers.length})</h2>
+          <span style={{fontSize:'13px',color:'#64748b'}}>Toplam Bakiye: <span style={{fontWeight:700,color:toplamBakiye>=0?'#22c55e':'#ef4444'}}>{toplamBakiye.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})} ₺</span></span>
+        </div>
         <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Yeni Müşteri</button>
       </div>
+      );})()}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:'16px'}}>
         {customers.map(c=>{
           const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);

@@ -830,7 +830,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
   return(
     <Modal open={open} onClose={onClose} title={editingEntry?'Kaydı Düzenle':'Yeni Kayıt Ekle'} width={type==='bulk'?820:520}>
       <div style={{display:'flex',gap:'8px',marginBottom:'20px',flexWrap:'wrap'}}>
-        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],...(!editingEntry?[['bulk','Toplu Giriş','#f59e0b']]:[]),['bakiye_duzeltme','Bakiye Düzeltme','#f59e0b']].map(([v,l,c])=>(
+        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],...(!editingEntry?[['bulk','Toplu Giriş','#f59e0b']]:[])].map(([v,l,c])=>(
           <button key={v} onClick={()=>setType(v)}
             style={{flex:1,padding:'10px',borderRadius:'8px',border:`2px solid ${type===v?c:'rgba(255,255,255,0.1)'}`,background:type===v?c+'22':'transparent',color:type===v?c:'#94a3b8',cursor:'pointer',fontWeight:700,fontSize:'13px',transition:'all 0.15s'}}>{l}</button>
         ))}
@@ -996,7 +996,8 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
     else running=+(running-e.amount).toFixed(2);
     return{...e,runningBal:running};
   });
-  const tabs=[['cari','Cari Hesap'],['bilgi','Müşteri Bilgileri'],['ekstre','Ekstre']];
+  const[bdForm,setBdForm]=useState({date:new Date().toISOString().slice(0,10),direction:'azalis',amount:'',description:''});
+  const tabs=[['cari','Cari Hesap'],['bilgi','Müşteri Bilgileri'],['ekstre','Ekstre'],['bakiye_duzeltme','Bakiye Düzeltme']];
   return(
     <div>
       <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
@@ -1207,6 +1208,66 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
                   {waSending?'Gönderiliyor...':'Gönder'}
                 </button>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+      {tab==='bakiye_duzeltme'&&(()=>{
+        const duzeltmeler=entries.filter(e=>e.type==='bakiye_duzeltme').sort((a,b)=>a.date<b.date?1:-1);
+        const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
+        const handleBdSave=()=>{
+          const amt=parseFloat(bdForm.amount)||0;
+          if(!amt)return;
+          const entry={id:uid(),date:bdForm.date,type:'bakiye_duzeltme',description:bdForm.description||'Bakiye Düzeltme',amount:amt,direction:bdForm.direction};
+          handleAddEntry(entry);
+          setBdForm({date:new Date().toISOString().slice(0,10),direction:'azalis',amount:'',description:''});
+        };
+        return(
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'24px',alignItems:'start'}}>
+            <div style={{background:'rgba(30,39,64,.6)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px'}}>
+              <h3 style={{fontWeight:700,fontSize:'14px',marginBottom:'16px',color:'#f59e0b'}}>Yeni Bakiye Düzeltme</h3>
+              <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
+                  <input type="date" value={bdForm.date} onChange={e=>setBdForm(p=>({...p,date:e.target.value}))} style={inS}/>
+                </div>
+                <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>İşlem Yönü</label>
+                  <select value={bdForm.direction} onChange={e=>setBdForm(p=>({...p,direction:e.target.value}))} style={inS}>
+                    <option value="azalis">Azalış — bakiyeyi düşür (müşteri borcu azalır)</option>
+                    <option value="artis">Artış — bakiyeyi artır (müşteri borcu artar)</option>
+                  </select>
+                </div>
+                <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tutar (₺)</label>
+                  <input type="number" min="0" step="0.01" value={bdForm.amount} onChange={e=>setBdForm(p=>({...p,amount:e.target.value}))} placeholder="0.00" style={inS}/>
+                </div>
+                <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Açıklama</label>
+                  <input type="text" value={bdForm.description} onChange={e=>setBdForm(p=>({...p,description:e.target.value}))} placeholder="Ör: Küsuratı sıfırlama" style={inS}/>
+                </div>
+                <div style={{background:'rgba(245,158,11,.07)',border:'1px solid rgba(245,158,11,.2)',borderRadius:'8px',padding:'10px',fontSize:'12px',color:'#fcd34d'}}>
+                  Kasa ve kart çekimleri etkilenmez. Yalnızca bakiye ve ekstrede görünür.
+                </div>
+                <button onClick={handleBdSave} disabled={!parseFloat(bdForm.amount)} style={{background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px',opacity:!parseFloat(bdForm.amount)?0.5:1}}>Kaydet</button>
+              </div>
+            </div>
+            <div>
+              <h3 style={{fontWeight:700,fontSize:'14px',marginBottom:'16px',color:'#94a3b8'}}>Geçmiş Düzeltmeler</h3>
+              {duzeltmeler.length===0?(
+                <div style={{color:'#475569',fontSize:'13px',padding:'20px 0'}}>Henüz bakiye düzeltme kaydı yok.</div>
+              ):(
+                <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                  {duzeltmeler.map(e=>(
+                    <div key={e.id} style={{background:'rgba(30,39,64,.6)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'10px',padding:'12px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div>
+                        <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'3px'}}>{e.date}</div>
+                        <div style={{fontWeight:600,fontSize:'13px'}}>{e.description}</div>
+                        <div style={{fontSize:'12px',marginTop:'3px',color:e.direction==='azalis'?'#22c55e':'#ef4444',fontWeight:700}}>
+                          {(e.direction==='azalis'?'− ':'+ ')+(+(e.amount||0)).toLocaleString('tr-TR',{minimumFractionDigits:2})+' ₺'}
+                        </div>
+                      </div>
+                      <button onClick={()=>{if(window.confirm('Silinsin mi?'))handleDeleteEntry(e.id);}} style={{background:'none',border:'1px solid rgba(239,68,68,.3)',borderRadius:'6px',padding:'5px 10px',color:'#ef4444',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',gap:'4px'}}><IcoTrash size={12}/>Sil</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );

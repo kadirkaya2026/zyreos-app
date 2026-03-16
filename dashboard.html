@@ -221,7 +221,11 @@ function isWeekendOrHoliday(s){return !isBankingDay(s);}
 function fmt(n){return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n??0);}
 function fmtTL(n){return '₺'+fmt(n);}
 function calcBalance(entries,openingBalance=0){
-  return openingBalance+(entries||[]).reduce((s,e)=>e.type==='cekim'?s+e.netToCustomer:s-e.amount,0);
+  return openingBalance+(entries||[]).reduce((s,e)=>{
+    if(e.type==='cekim')return s+e.netToCustomer;
+    if(e.type==='bakiye_duzeltme')return s+(e.direction==='azalis'?-e.amount:e.amount);
+    return s-e.amount;
+  },0);
 }
 function calcCekim(amount,installment,customerRate,bank){
   const bankRate=bank.rates[installment-1];
@@ -731,6 +735,9 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
         if(editingEntry.type==='nakit_odeme'){
           setType('nakit_odeme');
           setNakit({date:editingEntry.date||today,description:editingEntry.description||'Nakit Ödeme',amount:String(editingEntry.amount||'')});
+        }else if(editingEntry.type==='bakiye_duzeltme'){
+          setType('bakiye_duzeltme');
+          setNakit({date:editingEntry.date||today,description:editingEntry.description||'Bakiye Düzeltme',amount:String(editingEntry.amount||''),direction:editingEntry.direction||'artis'});
         }else{
           setType('cekim');
           setForm({date:editingEntry.date||today,description:editingEntry.description||'Kart Çekimi',amount:String(editingEntry.amount||''),bank:editingEntry.bank||banks[0]?.name||'',installment:editingEntry.installment||1,customerRate:editingEntry.customerRate??customer?.commissionRate??3.5});
@@ -766,6 +773,10 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
         if(!selBank)return alert('Banka seçiniz.');
         const c=calcCekim(amt,form.installment,form.customerRate,selBank);
         onUpdate({...editingEntry,date:form.date,description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,...c});
+      }else if(type==='bakiye_duzeltme'){
+        const amt=parseFloat(nakit.amount)||0;
+        if(!amt)return alert('Tutar giriniz.');
+        onUpdate({...editingEntry,date:nakit.date,description:nakit.description||'Bakiye Düzeltme',amount:amt,direction:nakit.direction||'artis'});
       }else{
         const amt=parseFloat(nakit.amount)||0;
         if(!amt)return alert('Tutar giriniz.');
@@ -784,6 +795,10 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
       onSave({id:uid(),date:nakit.date,type:'nakit_odeme',description:nakit.description||'Nakit Ödeme',amount:amt});
+    }else if(type==='bakiye_duzeltme'){
+      const amt=parseFloat(nakit.amount)||0;
+      if(!amt)return alert('Tutar giriniz.');
+      onSave({id:uid(),date:nakit.date,type:'bakiye_duzeltme',description:nakit.description||'Bakiye Düzeltme',amount:amt,direction:nakit.direction||'artis'});
     }else{
       const valid=bulkRows.filter(r=>parseFloat(r.amount)>0);
       if(!valid.length)return alert('En az bir satıra tutar giriniz.');
@@ -814,8 +829,8 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'6px 8px',color:'#e2e8f0',fontSize:'12px',width:'100%',boxSizing:'border-box'};
   return(
     <Modal open={open} onClose={onClose} title={editingEntry?'Kaydı Düzenle':'Yeni Kayıt Ekle'} width={type==='bulk'?820:520}>
-      <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
-        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],...(!editingEntry?[['bulk','Toplu Giriş','#f59e0b']]:[])].map(([v,l,c])=>(
+      <div style={{display:'flex',gap:'8px',marginBottom:'20px',flexWrap:'wrap'}}>
+        {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],...(!editingEntry?[['bulk','Toplu Giriş','#f59e0b']]:[]),['bakiye_duzeltme','Bakiye Düzeltme','#f59e0b']].map(([v,l,c])=>(
           <button key={v} onClick={()=>setType(v)}
             style={{flex:1,padding:'10px',borderRadius:'8px',border:`2px solid ${type===v?c:'rgba(255,255,255,0.1)'}`,background:type===v?c+'22':'transparent',color:type===v?c:'#94a3b8',cursor:'pointer',fontWeight:700,fontSize:'13px',transition:'all 0.15s'}}>{l}</button>
         ))}
@@ -857,6 +872,21 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
           <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))}/></Field>
           <Field label="Ödeme Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="5000"/></Field>
+        </div>
+      ):type==='bakiye_duzeltme'?(
+        <div>
+          <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
+          <Field label="Yön" required>
+            <select value={nakit.direction||'artis'} onChange={e=>setNakit(p=>({...p,direction:e.target.value}))} style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'}}>
+              <option value="artis">Artış (Bakiye artar — müşteri borcu artar)</option>
+              <option value="azalis">Azalış (Bakiye azalır — müşteri borcu azalır)</option>
+            </select>
+          </Field>
+          <Field label="Tutar (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="1000"/></Field>
+          <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))} placeholder="Bakiye düzeltme nedeni..."/></Field>
+          <div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#fcd34d',marginTop:'8px'}}>
+            Bu kayıt yalnızca bakiyeyi etkiler. Çekim/ödeme istatistiklerinde ve kasada görünmez; sadece ekstrede "Bakiye Düzeltme" olarak yer alır.
+          </div>
         </div>
       ):(
         <div>
@@ -962,6 +992,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
   let running=customer.openingBalance||0;
   const rows=entries.map(e=>{
     if(e.type==='cekim')running=+(running+e.netToCustomer).toFixed(2);
+    else if(e.type==='bakiye_duzeltme')running=+(running+(e.direction==='azalis'?-e.amount:e.amount)).toFixed(2);
     else running=+(running-e.amount).toFixed(2);
     return{...e,runningBal:running};
   });
@@ -1015,18 +1046,20 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
                 <tbody>
                   {rows.map(e=>{
                     const isCekim=e.type==='cekim';
+                    const isDuzeltme=e.type==='bakiye_duzeltme';
                     const rIsPos=e.runningBal>0;
                     return(
-                      <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                      <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)',background:isDuzeltme?'rgba(245,158,11,0.05)':''}}>
                         <td style={{padding:'10px 12px',color:'#94a3b8',whiteSpace:'nowrap'}}>{e.date}</td>
                         <td style={{padding:'10px 12px'}}>
                           <div style={{fontWeight:600}}>{e.description}</div>
                           {isCekim&&<div style={{color:'#64748b',fontSize:'11px',marginTop:'2px'}}>{e.bank} • {e.installment} Taksit</div>}
+                          {isDuzeltme&&<div style={{color:'#f59e0b',fontSize:'11px',marginTop:'2px'}}>Bakiye Düzeltme • {e.direction==='azalis'?'Azalış':'Artış'}</div>}
                         </td>
                         <td className="tabular-nums" style={{padding:'10px 12px',color:isCekim?'#4f8ef7':'#475569',fontWeight:isCekim?700:400}}>{isCekim?fmtTL(e.amount):'—'}</td>
                         <td className="tabular-nums" style={{padding:'10px 12px',color:'#a855f7',fontWeight:600}}>{isCekim?`${fmtTL(e.customerComm)} (%${e.customerRate})`:'—'}</td>
-                        <td className="tabular-nums" style={{padding:'10px 12px',fontWeight:600}}>{isCekim?fmtTL(e.netToCustomer):'—'}</td>
-                        <td className="tabular-nums" style={{padding:'10px 12px',color:'#22c55e',fontWeight:600}}>{!isCekim?fmtTL(e.amount):'—'}</td>
+                        <td className="tabular-nums" style={{padding:'10px 12px',fontWeight:600}}>{isCekim?fmtTL(e.netToCustomer):isDuzeltme?<span style={{color:'#f59e0b'}}>{e.direction==='azalis'?'-':'+'}{}fmtTL(e.amount)</span>:'—'}</td>
+                        <td className="tabular-nums" style={{padding:'10px 12px',color:'#22c55e',fontWeight:600}}>{(!isCekim&&!isDuzeltme)?fmtTL(e.amount):'—'}</td>
                         <td className="tabular-nums" style={{padding:'10px 12px',color:rIsPos?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(Math.abs(e.runningBal))}<span style={{fontSize:'10px',marginLeft:'4px'}}>{rIsPos?'Borç':'Alacak'}</span></td>
                         <td style={{padding:'10px 12px',textAlign:'center'}}>
                           <div style={{display:'flex',gap:'4px',justifyContent:'center'}}>

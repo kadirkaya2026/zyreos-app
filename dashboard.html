@@ -187,6 +187,37 @@ const INIT_CUSTOMERS=[
 
 /* ── UTILS ── */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+
+// ── Bankacılık günü yardımcıları ──
+const TR_FIXED_HOLIDAYS=['01-01','04-23','05-01','05-19','07-15','08-30','10-29'];
+const TR_VARIABLE_HOLIDAYS=new Set([
+  '2026-03-19','2026-03-20','2026-03-21','2026-03-22',
+  '2026-05-26','2026-05-27','2026-05-28','2026-05-29','2026-05-30',
+  '2027-03-09','2027-03-10','2027-03-11',
+  '2027-05-16','2027-05-17','2027-05-18','2027-05-19',
+]);
+function isBankingDay(s){
+  const d=new Date(s+'T00:00:00');
+  const dow=d.getDay();
+  if(dow===0||dow===6)return false;
+  const mmdd=s.slice(5);
+  if(TR_FIXED_HOLIDAYS.includes(mmdd))return false;
+  if(TR_VARIABLE_HOLIDAYS.has(s))return false;
+  return true;
+}
+function getTransferDate(cekimDate){
+  const d=new Date(cekimDate+'T00:00:00');
+  d.setDate(d.getDate()+1);
+  for(let i=0;i<10;i++){
+    const s=d.toISOString().slice(0,10);
+    if(isBankingDay(s))return s;
+    d.setDate(d.getDate()+1);
+  }
+  return d.toISOString().slice(0,10);
+}
+function isWeekendOrHoliday(s){return !isBankingDay(s);}
+
+
 function fmt(n){return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n??0);}
 function fmtTL(n){return '₺'+fmt(n);}
 function calcBalance(entries,openingBalance=0){
@@ -903,12 +934,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
     const newEntries=Array.isArray(entry)?entry:[entry];
     const current=customer.cariEntries||[];
     const kasaEntries=newEntries.map(e=>{
-      if(e.type==='cekim'){
-        const netDeposit=e.amount-(e.bankCost||0);
-        const ownerShare=+(netDeposit*0.01).toFixed(2);
-        const kasaAmount=+(netDeposit-ownerShare).toFixed(2);
-        return{id:uid(),date:e.date,type:'giris',amount:kasaAmount,description:'Cekim - '+customer.name+' ('+e.bank+' '+e.installment+'T)',refId:e.id,refCustomer:customer.name,auto:true};
-      }else if(e.type==='nakit_odeme'){
+      if(e.type==='nakit_odeme'){
         return{id:uid(),date:e.date,type:'cikis',amount:e.amount,description:'Odeme - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true};
       }
       return null;
@@ -917,7 +943,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
   };
   const handleDeleteEntry=id=>{
     const entry=entries.find(e=>e.id===id);
-    onUpdateCustomer({...customer,cariEntries:entries.filter(e=>e.id!==id)},null,'delete',id);
+    onUpdateCustomer({...customer,cariEntries:entries.filter(e=>e.id!==id)},null,'delete',entry&&entry.type==='nakit_odeme'?id:null);
     if(entry&&entry.queueId&&entry.source==='whatsapp'){
       fetch(`/api/whatsapp/queue/${entry.queueId}/unassign`,{method:'PATCH',headers:{Authorization:'Bearer '+(localStorage.getItem('zyreos_token')||'')}}).catch(()=>{});
     }
@@ -925,17 +951,12 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
   const handleUpdateEntry=updated=>{
     const arr=Array.isArray(updated)?updated:[updated];
     const kasaUpdates=arr.map(e=>{
-      if(e.type==='cekim'){
-        const netDeposit=e.amount-(e.bankCost||0);
-        const ownerShare=+(netDeposit*0.01).toFixed(2);
-        const kasaAmount=+(netDeposit-ownerShare).toFixed(2);
-        return{refId:e.id,date:e.date,type:'giris',amount:kasaAmount,description:'Cekim - '+customer.name+' ('+e.bank+' '+e.installment+'T)'};
-      }else if(e.type==='nakit_odeme'){
+      if(e.type==='nakit_odeme'){
         return{refId:e.id,date:e.date,type:'cikis',amount:e.amount,description:'Odeme - '+customer.name};
       }
       return null;
     }).filter(Boolean);
-    onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})},null,'update',null,kasaUpdates);
+    onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})},null,kasaUpdates.length?'update':null,null,kasaUpdates);
   };
   // running balance rows
   let running=customer.openingBalance||0;
@@ -3047,7 +3068,7 @@ function useHashRouter(){
 }
 
 /* ── KASA PAGE ── */
-function KasaPage({kasa,onUpdateKasa}){
+function KasaPage({kasa,onUpdateKasa,customers}){
   const transactions=(kasa&&kasa.transactions)||[];
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
@@ -3056,26 +3077,58 @@ function KasaPage({kasa,onUpdateKasa}){
   const[typeFilter,setTypeFilter]=useState('all');
   const[addOpen,setAddOpen]=useState(false);
   const[addForm,setAddForm]=useState({date:today,type:'giris',amount:'',description:''});
+  const[kapatOpen,setKapatOpen]=useState(false);
+  const[kapatDate,setKapatDate]=useState(today);
+  const[kapatErr,setKapatErr]=useState('');
 
   const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
-  const filtered=transactions.filter(t=>{
+  // Eski per-transaction auto giris kayıtlarını filtrele (refId var = eski impl)
+  const storedTx=transactions.filter(t=>!(t.auto&&t.type==='giris'&&t.refId));
+
+  // Tüm cekimleri transferDate'e göre grupla → dailyCekimMap
+  const dailyCekimMap={};
+  const today2=new Date().toISOString().slice(0,10);
+  (customers||[]).forEach(c=>{
+    (c.cariEntries||[]).filter(e=>e.type==='cekim').forEach(e=>{
+      const net=e.amount-(e.bankCost||0);
+      const amount=+(net*0.99).toFixed(2);
+      const tDate=getTransferDate(e.date);
+      dailyCekimMap[tDate]=+((dailyCekimMap[tDate]||0)+amount).toFixed(2);
+    });
+  });
+
+  // Hangi günler zaten stored?
+  const storedDates=new Set(storedTx.filter(t=>t.auto&&t.type==='giris').map(t=>t.date));
+
+  // Virtual (bekleyen) entry'ler — transferDate >= today (henüz gelmemiş)
+  const virtualEntries=Object.entries(dailyCekimMap)
+    .filter(([date])=>!storedDates.has(date))
+    .map(([date,amount])=>{
+      const d=new Date(date+'T00:00:00');
+      const dow=d.getDay();
+      const label=dow===1?date+' Aktarım - Hafta Sonu/Tatil Çekim':date+' Aktarım - Günlük Çekim';
+      return{id:'virtual_'+date,date,type:'giris',amount,description:label,auto:true,virtual:true};
+    });
+
+  const allTransactions=[...storedTx,...virtualEntries].sort((a,b)=>a.date<b.date?-1:1);
+
+  const filtered=allTransactions.filter(t=>{
     if(dateFrom&&t.date<dateFrom)return false;
     if(dateTo&&t.date>dateTo)return false;
     if(typeFilter!=='all'&&t.type!==typeFilter)return false;
     return true;
-  }).sort((a,b)=>a.date<b.date?-1:1);
+  });
 
   const totalGiris=filtered.filter(t=>t.type==='giris').reduce((s,t)=>s+t.amount,0);
   const totalCikis=filtered.filter(t=>t.type==='cikis').reduce((s,t)=>s+t.amount,0);
-  const genelBakiye=transactions.reduce((s,t)=>t.type==='giris'?s+t.amount:s-t.amount,0);
+  const genelBakiye=allTransactions.reduce((s,t)=>t.type==='giris'?s+t.amount:s-t.amount,0);
 
   let running=0;
-  const allSorted=[...transactions].sort((a,b)=>a.date<b.date?-1:1);
   const runningMap={};
-  allSorted.forEach(t=>{running=+(running+(t.type==='giris'?t.amount:-t.amount)).toFixed(2);runningMap[t.id]=running;});
+  allTransactions.forEach(t=>{running=+(running+(t.type==='giris'?t.amount:-t.amount)).toFixed(2);runningMap[t.id]=running;});
 
   const handleAdd=()=>{
     const amt=parseFloat(addForm.amount);
@@ -3087,6 +3140,22 @@ function KasaPage({kasa,onUpdateKasa}){
   };
   const handleDelete=id=>{
     onUpdateKasa(prev=>({...prev,transactions:prev.transactions.filter(t=>t.id!==id)}));
+  };
+  const handleGunuKapat=()=>{
+    if(!kapatDate){setKapatErr('Tarih seçiniz.');return;}
+    const amount=dailyCekimMap[kapatDate]||0;
+    if(!amount){setKapatErr('Bu tarihte çekim kaydı bulunamadı.');return;}
+    if(storedDates.has(kapatDate)){setKapatErr('Bu gün zaten kasaya aktarıldı.');return;}
+    const entry={id:uid(),date:kapatDate,type:'giris',description:kapatDate+' Günlük Çekim Toplamı',amount,auto:true,virtual:false};
+    onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,entry]}));
+    setKapatOpen(false);setKapatErr('');
+  };
+
+  const rowStyle=(t)=>{
+    if(t.virtual)return{borderBottom:'1px solid rgba(255,255,255,.05)',borderLeft:'3px solid #f59e0b',color:'#fcd34d'};
+    if(t.auto&&t.type==='giris')return{borderBottom:'1px solid rgba(255,255,255,.05)',borderLeft:'3px solid #22c55e',color:'#e2e8f0'};
+    if(t.type==='cikis')return{borderBottom:'1px solid rgba(255,255,255,.05)',color:'#e2e8f0'};
+    return{borderBottom:'1px solid rgba(255,255,255,.05)',fontStyle:'italic',color:'#c4b5fd'};
   };
 
   return(
@@ -3105,7 +3174,8 @@ function KasaPage({kasa,onUpdateKasa}){
           <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Çıkış</div>
           <div style={{fontSize:'20px',fontWeight:700,color:'#ef4444'}}>{fmt(totalCikis)} ₺</div>
         </div>
-        <div style={{marginLeft:'auto',display:'flex',alignItems:'center'}}>
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>{setKapatDate(today);setKapatErr('');setKapatOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Günü Kapat / Kasaya Aktar</button>
           <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Manuel Hareket Ekle</button>
         </div>
       </div>
@@ -3123,22 +3193,27 @@ function KasaPage({kasa,onUpdateKasa}){
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
           <thead>
             <tr style={{background:'rgba(30,39,64,.8)',color:'#94a3b8'}}>
-              {['Tarih','Açıklama','Müşteri','Giriş','Çıkış','Bakiye',''].map(h=>(
+              {['Tarih','Açıklama','Durum','Giriş','Çıkış','Bakiye',''].map(h=>(
                 <th key={h} style={{padding:'10px 12px',textAlign:h==='Giriş'||h==='Çıkış'||h==='Bakiye'?'right':'left',fontWeight:600,borderBottom:'1px solid rgba(255,255,255,.08)'}}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtered.map(t=>(
-              <tr key={t.id} style={{borderBottom:'1px solid rgba(255,255,255,.05)',fontStyle:t.auto?'normal':'italic',color:t.auto?'#e2e8f0':'#c4b5fd'}}>
+              <tr key={t.id} style={rowStyle(t)}>
                 <td style={{padding:'9px 12px'}}>{fmtDate(t.date)}</td>
-                <td style={{padding:'9px 12px'}}>{t.description}{!t.auto&&<span style={{marginLeft:'6px',background:'rgba(139,92,246,.2)',color:'#c4b5fd',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Manuel</span>}</td>
-                <td style={{padding:'9px 12px',color:'#94a3b8'}}>{t.refCustomer||'-'}</td>
+                <td style={{padding:'9px 12px'}}>{t.description}</td>
+                <td style={{padding:'9px 12px'}}>
+                  {t.virtual&&<span style={{background:'rgba(245,158,11,.2)',color:'#fcd34d',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Bekliyor</span>}
+                  {!t.virtual&&t.auto&&t.type==='giris'&&<span style={{background:'rgba(34,197,94,.15)',color:'#22c55e',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Aktarıldı</span>}
+                  {!t.auto&&<span style={{background:'rgba(139,92,246,.2)',color:'#c4b5fd',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Manuel</span>}
+                  {t.auto&&t.type==='cikis'&&<span style={{background:'rgba(239,68,68,.15)',color:'#ef4444',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Ödeme</span>}
+                </td>
                 <td style={{padding:'9px 12px',textAlign:'right',color:'#22c55e'}}>{t.type==='giris'?fmt(t.amount)+' ₺':''}</td>
                 <td style={{padding:'9px 12px',textAlign:'right',color:'#ef4444'}}>{t.type==='cikis'?fmt(t.amount)+' ₺':''}</td>
                 <td style={{padding:'9px 12px',textAlign:'right',color:(runningMap[t.id]||0)>=0?'#22c55e':'#ef4444',fontWeight:600}}>{fmt(runningMap[t.id]||0)} ₺</td>
                 <td style={{padding:'9px 12px',textAlign:'right'}}>
-                  {!t.auto&&<button onClick={()=>handleDelete(t.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px 6px'}}><IcoTrash size={13}/></button>}
+                  {!t.auto&&!t.virtual&&<button onClick={()=>handleDelete(t.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px 6px'}}><IcoTrash size={13}/></button>}
                 </td>
               </tr>
             ))}
@@ -3148,6 +3223,29 @@ function KasaPage({kasa,onUpdateKasa}){
           </tbody>
         </table>
       </div>
+      {kapatOpen&&(
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
+          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
+            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Günü Kapat / Kasaya Aktar</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
+                <input type="date" value={kapatDate} onChange={e=>{setKapatDate(e.target.value);setKapatErr('');}} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              {kapatDate&&dailyCekimMap[kapatDate]>0&&!storedDates.has(kapatDate)&&(
+                <div style={{background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.3)',borderRadius:'8px',padding:'12px',fontSize:'13px'}}>
+                  <span style={{color:'#94a3b8'}}>Aktarılacak tutar: </span>
+                  <span style={{color:'#22c55e',fontWeight:700}}>{fmt(dailyCekimMap[kapatDate])} ₺</span>
+                </div>
+              )}
+              {kapatErr&&<div style={{color:'#ef4444',fontSize:'12px'}}>{kapatErr}</div>}
+            </div>
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
+              <button onClick={()=>{setKapatOpen(false);setKapatErr('');}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={handleGunuKapat} style={{background:'#f59e0b',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Kasaya Aktar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {addOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
           <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
@@ -3197,6 +3295,38 @@ function App(){
   const[allAdminUsers,setAllAdminUsers]=useState([]);
 
   const logout=()=>{clearAuth();setAuth(null);setAuthScreen('login');setInitialized(false);initRef.current=false;};
+
+  // ── Otomatik gece yarısı kasa aktarımı ──
+  useEffect(()=>{
+    if(!initialized||!auth)return;
+    const autoTransfer=()=>{
+      const today=new Date().toISOString().slice(0,10);
+      const dailyMap={};
+      customers.forEach(c=>{
+        (c.cariEntries||[]).filter(e=>e.type==='cekim').forEach(e=>{
+          const transferDate=getTransferDate(e.date);
+          if(transferDate>=today)return;
+          const net=e.amount-(e.bankCost||0);
+          const amt=+(net*0.99).toFixed(2);
+          dailyMap[transferDate]=+((dailyMap[transferDate]||0)+amt).toFixed(2);
+        });
+      });
+      const storedDates=new Set(
+        (kasa.transactions||[]).filter(t=>t.auto&&t.type==='giris'&&!t.refId).map(t=>t.date)
+      );
+      const missing=Object.entries(dailyMap).filter(([d])=>!storedDates.has(d));
+      if(missing.length===0)return;
+      const newEntries=missing.map(([date,amount])=>({
+        id:uid(),date,type:'giris',
+        description:date+' Aktarım - Çekim Toplamı',
+        amount,auto:true,virtual:false
+      }));
+      setKasa(prev=>({...prev,transactions:[...prev.transactions,...newEntries]}));
+    };
+    autoTransfer();
+    const interval=setInterval(autoTransfer,60000);
+    return()=>clearInterval(interval);
+  },[initialized,auth,customers]);
 
   useEffect(()=>{
     if(!auth){setInitialized(true);return;}
@@ -3313,7 +3443,7 @@ function App(){
               kasa={kasa} onUpdateKasa={setKasa}
             />
           )}
-          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={setKasa}/>}
+          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={setKasa} customers={customers}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}

@@ -1305,9 +1305,9 @@ function CustomersPage({customers,banks,onUpdateCustomers,onUpdateKasa}){
         onUpdateCustomer={(updated,kasaEntries,action,refId,kasaUpdates)=>{
           onUpdateCustomers(customers.map(c=>c.id===updated.id?updated:c));
           if(!onUpdateKasa)return;
-          if(kasaEntries&&kasaEntries.length>0)onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,...kasaEntries]}));
-          if(action==='delete'&&refId)onUpdateKasa(prev=>({...prev,transactions:prev.transactions.filter(t=>t.refId!==refId)}));
-          if(action==='update'&&kasaUpdates&&kasaUpdates.length>0)onUpdateKasa(prev=>({...prev,transactions:prev.transactions.map(t=>{const u=kasaUpdates.find(k=>k.refId===t.refId);return u?{...t,...u}:t;})}));
+          if(kasaEntries&&kasaEntries.length>0)onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),...kasaEntries]}));
+          if(action==='delete'&&refId)onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.refId!==refId)}));
+          if(action==='update'&&kasaUpdates&&kasaUpdates.length>0)onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).map(t=>{const u=kasaUpdates.find(k=>k.refId===t.refId);return u?{...t,...u}:t;})}));
         }}
         onUpdateKasa={onUpdateKasa}
       />
@@ -3236,12 +3236,12 @@ function KasaPage({kasa,onUpdateKasa,customers}){
     const amt=parseFloat(addForm.amount);
     if(!amt||!addForm.description.trim())return;
     const entry={id:uid(),date:addForm.date,type:addForm.type,amount:amt,description:addForm.description.trim(),auto:false};
-    onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,entry]}));
+    onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),entry]}));
     setAddOpen(false);
     setAddForm({date:today,type:'giris',amount:'',description:''});
   };
   const handleDelete=id=>{
-    onUpdateKasa(prev=>({...prev,transactions:prev.transactions.filter(t=>t.id!==id)}));
+    onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.id!==id)}));
   };
   const handleGunuKapat=()=>{
     if(!kapatDate){setKapatErr('Tarih seçiniz.');return;}
@@ -3249,7 +3249,7 @@ function KasaPage({kasa,onUpdateKasa,customers}){
     if(!amount){setKapatErr('Bu tarihte çekim kaydı bulunamadı.');return;}
     if(storedDates.has(kapatDate)){setKapatErr('Bu gün zaten kasaya aktarıldı.');return;}
     const entry={id:uid(),date:kapatDate,type:'giris',description:kapatDate+' Günlük Çekim Toplamı',amount,auto:true,virtual:false};
-    onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,entry]}));
+    onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),entry]}));
     setKapatOpen(false);setKapatErr('');
   };
 
@@ -3423,7 +3423,7 @@ function App(){
         description:date+' Aktarım - Çekim Toplamı',
         amount,auto:true,virtual:false
       }));
-      setKasa(prev=>({...prev,transactions:[...prev.transactions,...newEntries]}));
+      setKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),...newEntries]}));
     };
     autoTransfer();
     const interval=setInterval(autoTransfer,60000);
@@ -3436,7 +3436,7 @@ function App(){
       .then(data=>{
         if(data.customers&&data.customers.length>0)setCustomers(data.customers);
         if(data.banks&&data.banks.length>0)setBanks(data.banks);
-        if(data.kasa)setKasa(data.kasa);
+        if(data.kasa)setKasa({...data.kasa,transactions:Array.isArray(data.kasa.transactions)?data.kasa.transactions:[]});
         setInitialized(true);
       })
       .catch(e=>{
@@ -3589,13 +3589,13 @@ function CustomersPageWithDetail({customers,banks,onUpdateCustomers,initDetailId
     onUpdateCustomers(prev=>prev.map(c=>c.id===updated.id?updated:c));
     if(!onUpdateKasa)return;
     if(kasaEntries&&kasaEntries.length>0){
-      onUpdateKasa(prev=>({...prev,transactions:[...prev.transactions,...kasaEntries]}));
+      onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),...kasaEntries]}));
     }
     if(action==='delete'&&refId){
-      onUpdateKasa(prev=>({...prev,transactions:prev.transactions.filter(t=>t.refId!==refId)}));
+      onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.refId!==refId)}));
     }
     if(action==='update'&&kasaUpdates&&kasaUpdates.length>0){
-      onUpdateKasa(prev=>({...prev,transactions:prev.transactions.map(t=>{
+      onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).map(t=>{
         const u=kasaUpdates.find(k=>k.refId===t.refId);
         if(!u)return t;
         return{...t,date:u.date,type:u.type,amount:u.amount,description:u.description};

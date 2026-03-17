@@ -229,6 +229,7 @@ app.get('/api/data',auth,(req,res)=>{
     if(!fs.existsSync(file))return res.json({customers:[],banks:[],kasa:{transactions:[]}});
     const raw=JSON.parse(fs.readFileSync(file,'utf8'));
     if(!raw.kasa)raw.kasa={transactions:[]};
+    if(!Array.isArray(raw.kasa.transactions))raw.kasa.transactions=[];
     const data=ensureDigerBanka(raw,file);
     res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
@@ -240,7 +241,7 @@ app.post('/api/data',auth,(req,res)=>{
   try{
     fs.writeFileSync(file,JSON.stringify({...req.body,savedAt:new Date().toISOString()},null,2));
     res.json({ok:true});
-  }catch(e){res.status(500).json({error:'Veri kaydedilemedi'});}
+  }catch(e){console.error('[SAVE ERROR]',e.message);res.status(500).json({error:'Veri kaydedilemedi: '+e.message});}
 });
 
 // ── Admin: kullanıcılar

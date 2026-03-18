@@ -3352,7 +3352,7 @@ function KasaPage({kasa,onUpdateKasa,customers}){
                 <td style={{padding:'9px 12px',textAlign:'right',color:'#ef4444'}}>{t.type==='cikis'?fmt(t.amount)+' ₺':''}</td>
                 <td style={{padding:'9px 12px',textAlign:'right',color:(runningMap[t.id]||0)>=0?'#22c55e':'#ef4444',fontWeight:600}}>{fmt(runningMap[t.id]||0)} ₺</td>
                 <td style={{padding:'9px 12px',textAlign:'right'}}>
-                  {!t.auto&&!t.virtual&&<button onClick={()=>handleDelete(t.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px 6px'}}><IcoTrash size={13}/></button>}
+                  {(!t.virtual)&&<button onClick={()=>handleDelete(t.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px 6px'}}><IcoTrash size={13}/></button>}
                 </td>
               </tr>
             ))}
@@ -3420,6 +3420,8 @@ function App(){
   const[customers,setCustomers]=useState([]);
   const[banks,setBanks]=useState(INIT_BANKS);
   const[kasa,setKasa]=useState({transactions:[]});
+  const kasaRef=React.useRef(kasa);
+  useEffect(()=>{kasaRef.current=kasa;},[kasa]);
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
   const[mobileSidebarOpen,setMobileSidebarOpen]=useState(false);
   const isMobile=useIsMobile();
@@ -3451,7 +3453,7 @@ function App(){
         });
       });
       const storedDates=new Set(
-        (kasa.transactions||[]).filter(t=>t.auto&&t.type==='giris'&&!t.refId).map(t=>t.date)
+        (kasaRef.current.transactions||[]).filter(t=>t.auto&&t.type==='giris'&&!t.refId).map(t=>t.date)
       );
       const missing=Object.entries(dailyMap).filter(([d])=>!storedDates.has(d));
       if(missing.length===0)return;

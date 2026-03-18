@@ -3225,7 +3225,7 @@ function KasaPage({kasa,onUpdateKasa,customers}){
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
   // Eski per-transaction auto giris kayıtlarını filtrele (refId var = eski impl)
-  const storedTx=transactions.filter(t=>!(t.auto&&t.type==='giris'&&t.refId));
+  const storedTx=transactions.filter(t=>!(t.auto&&t.type==='giris'&&t.refId)&&t.type!=='skipped');
 
   // Tüm cekimleri transferDate'e göre grupla → dailyCekimMap
   const dailyCekimMap={};
@@ -3239,12 +3239,13 @@ function KasaPage({kasa,onUpdateKasa,customers}){
     });
   });
 
-  // Hangi günler zaten stored?
+  // Hangi günler zaten stored veya atlandı?
   const storedDates=new Set(storedTx.filter(t=>t.auto&&t.type==='giris').map(t=>t.date));
+  const skippedDates=new Set(storedTx.filter(t=>t.type==='skipped').map(t=>t.date));
 
-  // Virtual (bekleyen) entry'ler — transferDate >= today (henüz gelmemiş)
+  // Virtual (bekleyen) entry'ler — stored veya atlanmış olmayanlar
   const virtualEntries=Object.entries(dailyCekimMap)
-    .filter(([date])=>!storedDates.has(date))
+    .filter(([date])=>!storedDates.has(date)&&!skippedDates.has(date))
     .map(([date,amount])=>{
       const d=new Date(date+'T00:00:00');
       const dow=d.getDay();
@@ -3278,7 +3279,13 @@ function KasaPage({kasa,onUpdateKasa,customers}){
     setAddForm({date:today,type:'giris',amount:'',description:''});
   };
   const handleDelete=id=>{
-    onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.id!==id)}));
+    if(id.startsWith('virtual_')){
+      const date=id.replace('virtual_','');
+      const marker={id:'skip_'+date,date,type:'skipped',auto:true};
+      onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),marker]}));
+    }else{
+      onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.id!==id)}));
+    }
   };
   const handleGunuKapat=()=>{
     if(!kapatDate){setKapatErr('Tarih seçiniz.');return;}
@@ -3352,7 +3359,7 @@ function KasaPage({kasa,onUpdateKasa,customers}){
                 <td style={{padding:'9px 12px',textAlign:'right',color:'#ef4444'}}>{t.type==='cikis'?fmt(t.amount)+' ₺':''}</td>
                 <td style={{padding:'9px 12px',textAlign:'right',color:(runningMap[t.id]||0)>=0?'#22c55e':'#ef4444',fontWeight:600}}>{fmt(runningMap[t.id]||0)} ₺</td>
                 <td style={{padding:'9px 12px',textAlign:'right'}}>
-                  {(!t.virtual)&&<button onClick={()=>handleDelete(t.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px 6px'}}><IcoTrash size={13}/></button>}
+                  {<button onClick={()=>handleDelete(t.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px 6px'}}><IcoTrash size={13}/></button>}
                 </td>
               </tr>
             ))}

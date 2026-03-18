@@ -3437,38 +3437,6 @@ function App(){
 
   const logout=()=>{clearAuth();setAuth(null);setAuthScreen('login');setInitialized(false);initRef.current=false;};
 
-  // ── Otomatik gece yarısı kasa aktarımı ──
-  useEffect(()=>{
-    if(!initialized||!auth)return;
-    const autoTransfer=()=>{
-      const today=new Date().toISOString().slice(0,10);
-      const dailyMap={};
-      customers.forEach(c=>{
-        (c.cariEntries||[]).filter(e=>e.type==='cekim').forEach(e=>{
-          const transferDate=getTransferDate(e.date);
-          if(transferDate>=today)return;
-          const net=e.amount-(e.bankCost||0);
-          const amt=+(net*0.99).toFixed(2);
-          dailyMap[transferDate]=+((dailyMap[transferDate]||0)+amt).toFixed(2);
-        });
-      });
-      const storedDates=new Set(
-        (kasaRef.current.transactions||[]).filter(t=>t.auto&&t.type==='giris'&&!t.refId).map(t=>t.date)
-      );
-      const missing=Object.entries(dailyMap).filter(([d])=>!storedDates.has(d));
-      if(missing.length===0)return;
-      const newEntries=missing.map(([date,amount])=>({
-        id:uid(),date,type:'giris',
-        description:date+' Aktarım - Çekim Toplamı',
-        amount,auto:true,virtual:false
-      }));
-      setKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),...newEntries]}));
-    };
-    autoTransfer();
-    const interval=setInterval(autoTransfer,60000);
-    return()=>clearInterval(interval);
-  },[initialized,auth,customers]);
-
   useEffect(()=>{
     if(!auth){setInitialized(true);return;}
     apiFetchData(auth.token)

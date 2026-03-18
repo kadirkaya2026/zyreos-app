@@ -3241,7 +3241,7 @@ function KasaPage({kasa,onUpdateKasa,customers}){
 
   // Hangi günler zaten stored veya atlandı?
   const storedDates=new Set(storedTx.filter(t=>t.auto&&t.type==='giris').map(t=>t.date));
-  const skippedDates=new Set(storedTx.filter(t=>t.type==='skipped').map(t=>t.date));
+  const skippedDates=new Set(transactions.filter(t=>t.type==='skipped').map(t=>t.date));
 
   // Virtual (bekleyen) entry'ler — stored veya atlanmış olmayanlar
   const virtualEntries=Object.entries(dailyCekimMap)

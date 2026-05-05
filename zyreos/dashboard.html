@@ -206,6 +206,46 @@ const INIT_CUSTOMERS=[
 
 /* ── UTILS ── */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function localDateStr(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+const TR_FIXED_HOLIDAYS=['01-01','04-23','05-01','05-19','07-15','08-30','10-29'];
+const TR_VARIABLE_HOLIDAYS=new Set([
+  '2026-03-19','2026-03-20','2026-03-21','2026-03-22',
+  '2026-05-26','2026-05-27','2026-05-28','2026-05-29','2026-05-30',
+  '2027-03-09','2027-03-10','2027-03-11',
+  '2027-05-16','2027-05-17','2027-05-18','2027-05-19',
+]);
+function isWeekend(s){
+  const d=new Date(s+'T00:00:00');
+  const dow=d.getDay();
+  return dow===0||dow===6;
+}
+function isTurkishHoliday(s){
+  const mmdd=s.slice(5);
+  return TR_FIXED_HOLIDAYS.includes(mmdd)||TR_VARIABLE_HOLIDAYS.has(s);
+}
+function isBankingDay(s){
+  if(isWeekend(s))return false;
+  if(isTurkishHoliday(s))return false;
+  return true;
+}
+function addBusinessDays(dateStr,count){
+  const d=new Date(dateStr+'T00:00:00');
+  let added=0;
+  for(let i=0;i<30&&added<count;i++){
+    d.setDate(d.getDate()+1);
+    const s=localDateStr(d);
+    if(isBankingDay(s))added++;
+  }
+  return localDateStr(d);
+}
+function getSettlementDate(cekimDate){return addBusinessDays(cekimDate,2);}
+function getTransferDate(cekimDate){return getSettlementDate(cekimDate);}
+function isWeekendOrHoliday(s){return !isBankingDay(s);}
 function fmt(n){return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n??0);}
 function fmtTL(n){return '₺'+fmt(n);}
 function calcBalance(entries,openingBalance=0){
@@ -219,7 +259,7 @@ function calcCekim(amount,installment,customerRate,bank){
   const profit=+(amount*(customerRate-bankRate)/100).toFixed(2);
   return{customerComm,netToCustomer,bankRate,bankCost,profit};
 }
-function todayStr(){return new Date().toISOString().slice(0,10);}
+function todayStr(){return localDateStr(new Date());}
 function timeStr(){const d=new Date();return d.toLocaleTimeString('tr-TR');}
 
 /* ── ICONS (inline SVG components) ── */
@@ -549,10 +589,15 @@ function DashboardPage({customers,onNavigateCustomer}){
 
   const sum=(arr,field)=>arr.reduce((s,e)=>s+(e[field]||0),0);
   const filter=(from,to)=>allCekim.filter(e=>e.date>=from&&e.date<=to);
+  const filterSettlement=(from,to)=>allCekim.filter(e=>{
+    const settlementDate=getSettlementDate(e.date);
+    return settlementDate>=from&&settlementDate<=to;
+  });
 
   const todayCekim=filter(today,today);
   const weekCekim=filter(weekStartStr,today);
   const monthCekim=filter(monthStartStr,today);
+  const todaySettlement=filterSettlement(today,today);
 
   const recentCekim=[...allCekim].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
 
@@ -591,7 +636,7 @@ function DashboardPage({customers,onNavigateCustomer}){
 
       {/* Dönem Kartları */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'16px'}}>
-        <PeriodCard label="Bugün" sub={today} entries={todayCekim}/>
+        <PeriodCard label="Bugün Yatacak" sub={today} entries={todaySettlement}/>
         <PeriodCard label="Bu Hafta" sub={`${weekStartStr} — ${today}`} entries={weekCekim}/>
         <PeriodCard label="Bu Ay" sub={today.slice(0,7)} entries={monthCekim}/>
       </div>
@@ -1340,19 +1385,12 @@ function exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo}){
 /* ── POS HESAP SAYFASI ── */
 function POSPage({customers,banks}){
   const[selDate,setSelDate]=useState(todayStr());
+  const fmtLongDate=dateStr=>new Date(dateStr+'T12:00:00').toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',weekday:'long'});
 
-  const nextWorkday=(dateStr)=>{
-    const d=new Date(dateStr+'T12:00:00');
-    d.setDate(d.getDate()+1);
-    if(d.getDay()===6)d.setDate(d.getDate()+2);
-    if(d.getDay()===0)d.setDate(d.getDate()+1);
-    return d.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',weekday:'long'});
-  };
-
-  // Seçilen tarihteki tüm çekim kayıtları
+  // Seçilen tarihte bankaya yatacak tüm çekim kayıtları
   const dayEntries=customers.flatMap(c=>
-    (c.cariEntries||[]).filter(e=>e.type==='cekim'&&e.date===selDate)
-      .map(e=>({...e,customerName:c.name,customerCode:c.code}))
+    (c.cariEntries||[]).filter(e=>e.type==='cekim'&&getSettlementDate(e.date)===selDate)
+      .map(e=>({...e,customerName:c.name,customerCode:c.code,settlementDate:getSettlementDate(e.date)}))
   );
 
   // Banka bazında grupla
@@ -1393,14 +1431,14 @@ function POSPage({customers,banks}){
 
       {/* Tarih Seçici */}
       <Card>
-        <div style={{fontWeight:700,fontSize:'15px',marginBottom:'14px'}}>POS Hesap — Günlük Tahsilat</div>
+        <div style={{fontWeight:700,fontSize:'15px',marginBottom:'14px'}}>POS Hesap — Bankaya Yatacak Tutar</div>
         <div style={{display:'flex',gap:'14px',alignItems:'flex-end',flexWrap:'wrap'}}>
           <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>İşlem Tarihi</label>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Bankaya Yatış Tarihi</label>
             <input type="date" value={selDate} onChange={e=>setSelDate(e.target.value)} style={inS}/>
           </div>
           <div style={{padding:'8px 16px',borderRadius:'8px',background:'rgba(79,142,247,0.1)',border:'1px solid rgba(79,142,247,0.25)',color:'#4f8ef7',fontSize:'13px',fontWeight:600}}>
-            Ertesi İş Günü: {nextWorkday(selDate)}
+            Gösterilen yatış günü: {fmtLongDate(selDate)}
           </div>
         </div>
       </Card>
@@ -1409,7 +1447,7 @@ function POSPage({customers,banks}){
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'14px'}}>
         <MetricCard label="Toplam POS Çekim" value={fmtTL(grandTotal)} color="#4f8ef7"/>
         <MetricCard label="Toplam Banka Kesintisi" value={fmtTL(grandCut)} color="#ef4444"/>
-        <MetricCard label={`Yarın Yatacak (${bankRows.length} banka)`} value={fmtTL(grandNet)} color="#22c55e" large/>
+        <MetricCard label={`Seçilen Gün Yatacak (${bankRows.length} banka)`} value={fmtTL(grandNet)} color="#22c55e" large/>
         <MetricCard label="Şirket Sahibi Payı (%1)" value={fmtTL(grandOwnerShare)} color="#f59e0b"/>
         <MetricCard label="Net Kârım" value={fmtTL(grandRealProfit)} color="#a855f7" large/>
       </div>
@@ -1417,8 +1455,8 @@ function POSPage({customers,banks}){
       {dayEntries.length===0?(
         <Card style={{textAlign:'center',padding:'60px 20px',color:'#64748b'}}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{marginBottom:'12px',opacity:.4}}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-          <div style={{fontSize:'15px',fontWeight:600,marginBottom:'4px'}}>Bu tarihte işlem yok</div>
-          <div style={{fontSize:'13px'}}>Seçilen tarihte kayıtlı kart çekimi bulunamadı</div>
+          <div style={{fontSize:'15px',fontWeight:600,marginBottom:'4px'}}>Bu tarihte yatacak işlem yok</div>
+          <div style={{fontSize:'13px'}}>Seçilen tarihte bankaya yatacak kart çekimi bulunamadı</div>
         </Card>
       ):(
         <>
@@ -1430,7 +1468,7 @@ function POSPage({customers,banks}){
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
                 <thead>
-                  <tr>{['Banka','İşlem Adedi','Toplam Çekim','Banka Kesintisi','Yarın Yatacak','Şirket Sahibi Payı','Net Kârım'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
+                  <tr>{['Banka','İşlem Adedi','Toplam Çekim','Banka Kesintisi','Yatacak Tutar','Şirket Sahibi Payı','Net Kârım'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {bankRows.map(r=>(
@@ -1478,7 +1516,7 @@ function POSPage({customers,banks}){
               <div style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
                   <thead>
-                    <tr>{['Müşteri','Taksit','Banka Oranı','Çekim Tutarı','Banka Kesintisi','Net Yatacak'].map(h=><th key={h} style={{...thS,fontSize:'10px'}}>{h}</th>)}</tr>
+                    <tr>{['Müşteri','Çekim / Yatış','Taksit','Banka Oranı','Çekim Tutarı','Banka Kesintisi','Net Yatacak'].map(h=><th key={h} style={{...thS,fontSize:'10px'}}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {r.entries.map(e=>(
@@ -1486,6 +1524,10 @@ function POSPage({customers,banks}){
                         <td style={td}>
                           <div style={{fontWeight:600}}>{e.customerName}</div>
                           <div style={{color:'#64748b',fontSize:'11px'}}>{e.customerCode}</div>
+                        </td>
+                        <td style={td}>
+                          <div style={{color:'#94a3b8',fontSize:'11px'}}>Çekim: {e.date}</div>
+                          <div style={{color:'#22c55e',fontSize:'11px',fontWeight:700}}>Yatış: {e.settlementDate}</div>
                         </td>
                         <td style={{...td,textAlign:'center'}}><Badge color="#4f8ef7">{e.installment===1?'Peşin':`${e.installment} T`}</Badge></td>
                         <td className="tabular-nums" style={{...td,color:'#f59e0b',fontWeight:700}}>%{e.bankRate}</td>

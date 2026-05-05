@@ -33,6 +33,36 @@ const BANK_ALIASES={
   'iş bankası':'İş Bankası','isbank':'İş Bankası','işbank':'İş Bankası','maximum':'İş Bankası','is bankasi':'İş Bankası',
   'vakıf':'Vakıf','vakif':'Vakıf','vakıfbank':'Vakıf','vakifbank':'Vakıf'
 };
+const BANK_RATES_VERSION='iyzico-2026-05-05';
+const DEFAULT_BANKS=[
+  {id:1,name:'Akbank',fee:0,color:'#e30613',rates:[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:2,name:'QNB',fee:0,color:'#6d28d9',rates:[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:3,name:'Garanti',fee:0,color:'#00a651',rates:[3.65,6.54,8.40,10.27,12.01,13.56,15.54,17.41,19.21,21.03,22.90,24.77]},
+  {id:'diger-banka',name:'Diğer Banka',fee:0,color:'#94a3b8',rates:[3.65,6.54,8.40,10.27,12.01,13.56,15.54,17.41,19.21,21.03,22.90,24.77]},
+  {id:4,name:'Kuveyt',fee:0,color:'#0ea5e9',rates:[3.65,6.46,8.33,10.20,12.06,13.93,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:5,name:'Ziraat',fee:0,color:'#ef4444',rates:[3.65,5.79,7.48,9.38,10.76,12.78,14.64,16.45,18.07,19.90,21.64,23.10]},
+  {id:6,name:'Halk',fee:0,color:'#0369a1',rates:[3.65,6.20,8.03,9.87,11.72,13.55,15.40,17.25,19.10,20.95,22.77,24.60]},
+  {id:7,name:'İş Bankası',fee:0,color:'#1d4ed8',rates:[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:8,name:'Vakıf',fee:0,color:'#0f766e',rates:[3.65,6.32,8.09,9.86,11.63,13.40,15.18,16.95,18.72,20.49,22.26,24.03]},
+  {id:9,name:'YKB',fee:0,color:'#0066cc',rates:[3.65,6.15,7.80,9.49,11.21,12.75,14.50,16.25,18.12,19.90,21.64,23.00]}
+];
+function rateNum(v){return +(String(v??0).replace(',','.'))||0;}
+function normalizeBanksForData(banks,applyLatestRates){
+  const src=Array.isArray(banks)?banks:[];
+  const byName=new Map(src.map(b=>[String(b.name||'').toLowerCase(),b]));
+  const normalized=DEFAULT_BANKS.map(def=>{
+    const saved=byName.get(def.name.toLowerCase());
+    if(!saved)return{...def,rates:[...def.rates]};
+    const savedRates=Array.isArray(saved.rates)&&saved.rates.length===12?saved.rates.map(rateNum):def.rates;
+    return{...def,...saved,fee:rateNum(saved.fee),rates:applyLatestRates?[...def.rates]:savedRates};
+  });
+  src.forEach(b=>{
+    if(!DEFAULT_BANKS.some(def=>def.name.toLowerCase()===String(b.name||'').toLowerCase())){
+      normalized.push({...b,fee:rateNum(b.fee),rates:Array.isArray(b.rates)?b.rates.map(rateNum):Array(12).fill(0)});
+    }
+  });
+  return normalized;
+}
 
 function findBank(name,banks){
   if(!name||!banks||!banks.length)return null;
@@ -61,14 +91,10 @@ function isDuplicate(queue,from,tutar,receivedAt){
 function getDataFile(username){return path.join(DATA_DIR,`data_${username}.json`);}
 
 function ensureDigerBanka(data,file){
-  if(!data.banks||!Array.isArray(data.banks))return data;
-  if(data.banks.find(b=>b.name==='Diğer Banka'))return data;
-  const garanti=data.banks.find(b=>b.name==='Garanti');
-  const defaultRates=garanti?[...garanti.rates]:Array(12).fill(0);
-  const defaultFee=garanti?garanti.fee:0;
-  const newBank={id:'diger-banka',name:'Diğer Banka',color:'#94a3b8',rates:defaultRates,fee:defaultFee};
-  const updated={...data,banks:[...data.banks,newBank]};
-  if(file)try{fs.writeFileSync(file,JSON.stringify({...updated,savedAt:new Date().toISOString()},null,2));}catch(e){}
+  const applyLatestRates=data.bankRatesVersion!==BANK_RATES_VERSION;
+  const updated={...data,banks:normalizeBanksForData(data.banks,applyLatestRates),bankRatesVersion:BANK_RATES_VERSION};
+  const changed=applyLatestRates||JSON.stringify(data.banks)!==JSON.stringify(updated.banks);
+  if(file&&changed)try{fs.writeFileSync(file,JSON.stringify({...updated,savedAt:new Date().toISOString()},null,2));}catch(e){}
   return updated;
 }
 function readUsers(){try{return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'));}catch(e){return[];}}
@@ -226,7 +252,7 @@ app.get('/api/data',auth,(req,res)=>{
   res.set('Cache-Control','no-store');
   const file=getDataFile(req.user.username);
   try{
-    if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
+    if(!fs.existsSync(file))return res.json({customers:[],banks:DEFAULT_BANKS,bankRatesVersion:BANK_RATES_VERSION});
     const data=ensureDigerBanka(JSON.parse(fs.readFileSync(file,'utf8')),file);
     res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
@@ -236,7 +262,7 @@ app.get('/api/data',auth,(req,res)=>{
 app.post('/api/data',auth,(req,res)=>{
   const file=getDataFile(req.user.username);
   try{
-    fs.writeFileSync(file,JSON.stringify({...req.body,savedAt:new Date().toISOString()},null,2));
+    fs.writeFileSync(file,JSON.stringify({...req.body,banks:normalizeBanksForData(req.body.banks,false),bankRatesVersion:BANK_RATES_VERSION,savedAt:new Date().toISOString()},null,2));
     res.json({ok:true});
   }catch(e){res.status(500).json({error:'Veri kaydedilemedi'});}
 });

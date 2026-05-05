@@ -155,16 +155,35 @@ async function readDataFile(dirHandle){
 
 /* ── INITIAL DATA ── */
 const INIT_BANKS=[
-  {id:1,name:'Akbank',fee:0,color:'#e30613',rates:[3.59,6.71,8.58,10.45,12.31,14.18,16.05,17.92,19.79,21.66,23.53,25.40]},
-  {id:2,name:'QNB',fee:0,color:'#6d28d9',rates:[3.59,6.71,8.58,10.45,12.31,14.18,16.05,17.92,19.79,21.66,23.53,25.40]},
-  {id:3,name:'Garanti',fee:0,color:'#00a651',rates:[3.59,6.81,8.68,10.37,12.11,14.14,16.21,17.93,19.84,21.66,23.53,25.45]},
-  {id:4,name:'Kuveyt',fee:0,color:'#0ea5e9',rates:[3.59,6.56,8.43,10.30,12.16,14.03,16.05,17.92,19.79,21.66,23.53,25.40]},
-  {id:5,name:'Ziraat',fee:0,color:'#ef4444',rates:[3.59,6.49,8.09,10.19,12.03,13.59,15.65,17.55,19.35,20.85,22.85,24.85]},
-  {id:6,name:'Halk',fee:0,color:'#0369a1',rates:[3.59,6.30,8.13,9.97,11.82,13.65,15.50,17.35,19.20,21.05,22.87,24.70]},
-  {id:7,name:'İş Bankası',fee:0,color:'#1d4ed8',rates:[3.59,6.71,8.58,10.45,12.31,14.18,16.05,17.92,19.79,21.66,23.53,25.40]},
-  {id:8,name:'Vakıf',fee:0,color:'#0f766e',rates:[3.59,6.51,8.32,10.12,11.92,13.73,15.53,17.33,19.14,20.94,22.75,24.55]},
-  {id:9,name:'YKB',fee:0,color:'#0066cc',rates:[3.59,6.25,7.90,9.59,11.31,12.85,14.60,16.35,18.22,20.00,21.74,23.10]},
+  {id:1,name:'Akbank',fee:0,color:'#e30613',rates:[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:2,name:'QNB',fee:0,color:'#6d28d9',rates:[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:3,name:'Garanti',fee:0,color:'#00a651',rates:[3.65,6.54,8.40,10.27,12.01,13.56,15.54,17.41,19.21,21.03,22.90,24.77]},
+  {id:'diger-banka',name:'Diğer Banka',fee:0,color:'#94a3b8',rates:[3.65,6.54,8.40,10.27,12.01,13.56,15.54,17.41,19.21,21.03,22.90,24.77]},
+  {id:4,name:'Kuveyt',fee:0,color:'#0ea5e9',rates:[3.65,6.46,8.33,10.20,12.06,13.93,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:5,name:'Ziraat',fee:0,color:'#ef4444',rates:[3.65,5.79,7.48,9.38,10.76,12.78,14.64,16.45,18.07,19.90,21.64,23.10]},
+  {id:6,name:'Halk',fee:0,color:'#0369a1',rates:[3.65,6.20,8.03,9.87,11.72,13.55,15.40,17.25,19.10,20.95,22.77,24.60]},
+  {id:7,name:'İş Bankası',fee:0,color:'#1d4ed8',rates:[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30]},
+  {id:8,name:'Vakıf',fee:0,color:'#0f766e',rates:[3.65,6.32,8.09,9.86,11.63,13.40,15.18,16.95,18.72,20.49,22.26,24.03]},
+  {id:9,name:'YKB',fee:0,color:'#0066cc',rates:[3.65,6.15,7.80,9.49,11.21,12.75,14.50,16.25,18.12,19.90,21.64,23.00]},
 ];
+const BANK_RATES_VERSION='iyzico-2026-05-05';
+function rateNum(v){return +(String(v??0).replace(',','.'))||0;}
+function normalizeBanks(banks,applyLatestRates=false){
+  const src=Array.isArray(banks)?banks:[];
+  const byName=new Map(src.map(b=>[String(b.name||'').toLowerCase(),b]));
+  const normalized=INIT_BANKS.map(def=>{
+    const saved=byName.get(def.name.toLowerCase());
+    if(!saved)return{...def,rates:[...def.rates]};
+    const savedRates=Array.isArray(saved.rates)&&saved.rates.length===12?saved.rates.map(rateNum):def.rates;
+    return{...def,...saved,fee:rateNum(saved.fee),rates:applyLatestRates?[...def.rates]:savedRates};
+  });
+  src.forEach(b=>{
+    if(!INIT_BANKS.some(def=>def.name.toLowerCase()===String(b.name||'').toLowerCase())){
+      normalized.push({...b,fee:rateNum(b.fee),rates:Array.isArray(b.rates)?b.rates.map(rateNum):Array(12).fill(0)});
+    }
+  });
+  return normalized;
+}
 
 const INIT_CUSTOMERS=[
   {id:'c1',code:'A1',name:'Ahmet Yılmaz',phone:'0532 111 22 33',email:'ahmet@firma.com',address:'İstanbul',taxNo:'1234567890',commissionRate:3.5,notes:'VIP müşteri',
@@ -2393,21 +2412,45 @@ function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
 function BankSettingsPage({banks,onUpdateBanks}){
   const[open,setOpen]=useState(null);
   const[compareInst,setCompareInst]=useState(1);
+  const[draftBanks,setDraftBanks]=useState(()=>normalizeBanks(banks));
+  const[notice,setNotice]=useState('');
+  useEffect(()=>{setDraftBanks(normalizeBanks(banks));},[JSON.stringify(banks)]);
   const updateRate=(bankId,idx,val)=>{
-    onUpdateBanks(banks.map(b=>{
+    setDraftBanks(draftBanks.map(b=>{
       if(b.id!==bankId)return b;
       const rates=[...b.rates];
-      rates[idx]=parseFloat(val)||0;
+      rates[idx]=val;
       return{...b,rates};
     }));
   };
   const updateFee=(bankId,val)=>{
-    onUpdateBanks(banks.map(b=>b.id===bankId?{...b,fee:parseFloat(val)||0}:b));
+    setDraftBanks(draftBanks.map(b=>b.id===bankId?{...b,fee:val}:b));
+  };
+  const saveBanks=()=>{
+    onUpdateBanks(normalizeBanks(draftBanks));
+    setNotice('Banka oranları kaydedildi.');
+    setTimeout(()=>setNotice(''),3000);
+  };
+  const loadLatestRates=()=>{
+    setDraftBanks(normalizeBanks(draftBanks,true));
+    setNotice('Güncel iyzico oranları yüklendi. Kalıcı olması için Kaydet’e basın.');
+    setTimeout(()=>setNotice(''),4000);
   };
   return(
     <div>
+      <Card style={{marginBottom:'16px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+        <div>
+          <div style={{fontWeight:800,fontSize:'15px'}}>Banka oranları manuel düzenleme</div>
+          <div style={{color:'#94a3b8',fontSize:'12px',marginTop:'4px'}}>Oranları değiştirip Kaydet’e basınca POS, cari ve kar hesapları yeni değerleri kullanır.</div>
+          {notice&&<div style={{color:'#22c55e',fontSize:'12px',marginTop:'6px'}}>{notice}</div>}
+        </div>
+        <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+          <button onClick={loadLatestRates} style={{background:'#1e293b',border:'1px solid rgba(255,255,255,.12)',color:'#e2e8f0',borderRadius:'10px',padding:'9px 14px',cursor:'pointer',fontWeight:700}}>Güncel Oranları Yükle</button>
+          <button onClick={saveBanks} style={{background:'#22c55e',border:'none',color:'#052e16',borderRadius:'10px',padding:'9px 16px',cursor:'pointer',fontWeight:800}}>Kaydet</button>
+        </div>
+      </Card>
       <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'24px'}}>
-        {banks.map(b=>(
+        {draftBanks.map(b=>(
           <Card key={b.id} style={{padding:0,overflow:'hidden'}}>
             <button onClick={()=>setOpen(open===b.id?null:b.id)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',background:'none',border:'none',cursor:'pointer',color:'#e2e8f0'}}>
               <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -2421,16 +2464,16 @@ function BankSettingsPage({banks,onUpdateBanks}){
               <div style={{padding:'0 20px 20px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
                 <div style={{marginBottom:'16px',display:'flex',alignItems:'center',gap:'12px',paddingTop:'16px'}}>
                   <span style={{color:'#94a3b8',fontSize:'13px'}}>İşlem Bedeli (₺):</span>
-                  <input type="number" step="0.01" value={b.fee} onChange={e=>updateFee(b.id,e.target.value)}
+                  <input type="text" inputMode="decimal" value={b.fee} onChange={e=>updateFee(b.id,e.target.value)}
                     style={{...inputStyle,width:'100px',padding:'6px 10px',fontSize:'13px'}}/>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:'8px'}}>
                   {b.rates.map((r,i)=>(
                     <div key={i} style={{background:'#131929',borderRadius:'8px',padding:'10px',border:'1px solid rgba(255,255,255,0.06)'}}>
                       <div style={{color:'#64748b',fontSize:'10px',fontWeight:700,marginBottom:'6px',textTransform:'uppercase'}}>{i+1}. Taksit</div>
-                      <input type="number" step="0.01" value={r} onChange={e=>updateRate(b.id,i,e.target.value)}
+                      <input type="text" inputMode="decimal" value={r} onChange={e=>updateRate(b.id,i,e.target.value)}
                         style={{...inputStyle,padding:'5px 8px',fontSize:'13px',fontWeight:700,color:b.color,marginBottom:'4px'}}/>
-                      <div className="tabular-nums" style={{color:'#64748b',fontSize:'10px'}}>10K net: ₺{fmt(10000-(10000*r/100+b.fee))}</div>
+                      <div className="tabular-nums" style={{color:'#64748b',fontSize:'10px'}}>10K net: ₺{fmt(10000-(10000*rateNum(r)/100+rateNum(b.fee)))}</div>
                     </div>
                   ))}
                 </div>
@@ -2457,9 +2500,9 @@ function BankSettingsPage({banks,onUpdateBanks}){
               </tr>
             </thead>
             <tbody>
-              {[...banks].sort((a,b)=>a.rates[compareInst-1]-b.rates[compareInst-1]).map(b=>{
-                const rate=b.rates[compareInst-1];
-                const cost=+(10000*rate/100+b.fee).toFixed(2);
+              {[...draftBanks].sort((a,b)=>rateNum(a.rates[compareInst-1])-rateNum(b.rates[compareInst-1])).map(b=>{
+                const rate=rateNum(b.rates[compareInst-1]);
+                const cost=+(10000*rate/100+rateNum(b.fee)).toFixed(2);
                 const net=+(10000-cost).toFixed(2);
                 return(
                   <tr key={b.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
@@ -3449,7 +3492,7 @@ function App(){
     apiFetchData(auth.token)
       .then(data=>{
         if(data.customers&&data.customers.length>0)setCustomers(data.customers);
-        if(data.banks&&data.banks.length>0)setBanks(data.banks);
+        if(data.banks&&data.banks.length>0)setBanks(normalizeBanks(data.banks,data.bankRatesVersion!==BANK_RATES_VERSION));
         if(data.kasa)setKasa({...data.kasa,transactions:Array.isArray(data.kasa.transactions)?data.kasa.transactions:[]});
         setInitialized(true);
       })
@@ -3465,7 +3508,7 @@ function App(){
     clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
-      apiSaveData(auth.token,{customers,banks,kasa})
+      apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION})
         .then(()=>{
           setSaveStatus('saved');setSavedTime(timeStr());
           setTimeout(()=>{setSaveStatus('idle');setSavedTime('');},5000);
@@ -3506,7 +3549,7 @@ function App(){
         const data=JSON.parse(e.target.result);
         if(!data.customers||!data.banks)return alert('Geçersiz yedek dosyası.');
         if(!window.confirm(`${data.customers.length} müşteri yüklenecek. Mevcut veriler değiştirilecek. Devam?`))return;
-        setCustomers(data.customers);setBanks(data.banks);
+        setCustomers(data.customers);setBanks(normalizeBanks(data.banks));
       }catch{alert('Dosya okunamadı.');}
     };
     reader.readAsText(file);
@@ -3534,13 +3577,13 @@ function App(){
         if(saveTimerRef.current){
           clearTimeout(saveTimerRef.current);
           saveTimerRef.current=null;
-          apiSaveData(auth.token,{customers,banks,kasa}).finally(()=>{
+          apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION}).finally(()=>{
             navigate(p);
-            apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);if(data.kasa)setKasa(data.kasa);});
+            apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(normalizeBanks(data.banks,data.bankRatesVersion!==BANK_RATES_VERSION));if(data.kasa)setKasa(data.kasa);});
           });
         }else{
           navigate(p);
-          apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(data.banks);if(data.kasa)setKasa(data.kasa);});
+          apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(normalizeBanks(data.banks,data.bankRatesVersion!==BANK_RATES_VERSION));if(data.kasa)setKasa(data.kasa);});
         }
       }} collapsed={collapsed} setCollapsed={setCollapsed}
         onReset={handleReset} saveStatus={saveStatus}
@@ -3570,7 +3613,7 @@ function App(){
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}
           {activePage==='hesabim'&&<HesabimPage token={auth.token} username={auth.username} onUpdated={(newUsername)=>setAuth(p=>({...p,username:newUsername}))} onExport={exportBackup} onImport={importBackup} onReset={handleReset}/>}
-          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} onReload={()=>apiFetchData(auth.token).then(d=>{if(d.customers)setCustomers(d.customers);if(d.banks)setBanks(d.banks);})}/>}
+          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} onReload={()=>apiFetchData(auth.token).then(d=>{if(d.customers)setCustomers(d.customers);if(d.banks)setBanks(normalizeBanks(d.banks,d.bankRatesVersion!==BANK_RATES_VERSION));})}/>}
           {activePage==='waq'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}

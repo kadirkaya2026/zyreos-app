@@ -3517,6 +3517,7 @@ function App(){
   const[initialized,setInitialized]=useState(false);
   const[saveStatus,setSaveStatus]=useState('idle');
   const[savedTime,setSavedTime]=useState('');
+  const savedAtRef=useRef('');
   const[route,navigate]=useHashRouter();
   const{page:activePage,param:detailCustomerId}=route;
   const saveTimerRef=useRef(null);
@@ -3535,6 +3536,7 @@ function App(){
     setCustomers(nextCustomers);
     setBanks(nextBanks);
     setKasa(nextKasa);
+    savedAtRef.current=data.savedAt||'';
     lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa});
     isDirtyRef.current=false;
     setSaveStatus('idle');
@@ -3576,11 +3578,11 @@ function App(){
     clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
-      apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION})
+      apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
         .then(()=>{
-          lastServerSnapshotRef.current=stableSerialize({customers,banks,kasa});
-          isDirtyRef.current=false;
           setSaveStatus('saved');setSavedTime(timeStr());
+          // Kayıt sonrası güncel veriyi (birleştirilmiş hali) çek
+          apiFetchData(auth.token).then(applyServerData);
           setTimeout(()=>{setSaveStatus('idle');setSavedTime('');},5000);
         })
         .catch(e=>{
@@ -3650,7 +3652,7 @@ function App(){
         if(saveTimerRef.current&&isDirtyRef.current){
           clearTimeout(saveTimerRef.current);
           saveTimerRef.current=null;
-          apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION}).finally(()=>{
+          apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current}).finally(()=>{
             navigate(p);
             apiFetchData(auth.token).then(applyServerData);
           });

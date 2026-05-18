@@ -121,12 +121,8 @@ function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, 
   const incomingIds = new Set(incomingList.map(c => c.id));
 
   // 1. Alex'in panel açıldıktan sonra eklediği YENİ müşterileri koru
-  // (Eğer paneldeki savedAt bilgisi disktekinden eskiyse ve diskte yeni biri varsa)
   const alexNewCustomers = existingList.filter(c => {
     if (incomingIds.has(c.id)) return false;
-    // Eğer müşteri diskte var ama panelde yoksa:
-    // Bu müşteri gerçekten silindi mi yoksa Alex mi yeni ekledi?
-    // İpucu: Alex'in eklediği müşterilerde genelde alexGroupId olur veya createdAt paneli açtığımızdan sonradır.
     const createdAt = c.createdAt ? new Date(c.createdAt).getTime() : 0;
     const panelTime = lastSavedAtInPanel ? new Date(lastSavedAtInPanel).getTime() : 0;
     // Eğer müşteri paneldeki son kayıttan sonra oluşturulmuşsa, bu Alex'in yeni eklediği caridir.
@@ -148,9 +144,23 @@ function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, 
       (String(e.source || '').startsWith('whatsapp') || String(e.source || '').startsWith('alex'))
     );
 
+    // AYRICA: Panel açıldıktan sonra eklenmişse ama incoming'de yoksa (çakışma anında eklenen manuel olmayanlar)
+    const panelTime = lastSavedAtInPanel ? new Date(lastSavedAtInPanel).getTime() : 0;
+    const freshExternal = existingEntries.filter(e => {
+      if (incomingEntryIds.has(e.id)) return false;
+      const createdAt = e.createdAt ? new Date(e.createdAt).getTime() : 0;
+      return createdAt > panelTime;
+    });
+
+    // freshExternal zaten preservedExternal'in içinde olabilir, unik yapalım
+    const allPreserved = [...preservedExternal];
+    freshExternal.forEach(fe => {
+      if(!allPreserved.find(pe => pe.id === fe.id)) allPreserved.push(fe);
+    });
+
     return {
       ...incomingCustomer,
-      cariEntries: [...incomingEntries, ...preservedExternal]
+      cariEntries: [...incomingEntries, ...allPreserved]
     };
   });
 

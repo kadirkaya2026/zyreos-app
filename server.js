@@ -115,6 +115,20 @@ function readFreshUserData(username){
   if(!Array.isArray(data.kasa.transactions))data.kasa.transactions=[];
   return{file,data};
 }
+function mergeCustomersPreservingExternal(existingCustomers,incomingCustomers){
+  const existingList=Array.isArray(existingCustomers)?existingCustomers:[];
+  const incomingList=Array.isArray(incomingCustomers)?incomingCustomers:[];
+  const existingById=new Map(existingList.map(c=>[c.id,c]));
+  return incomingList.map(incomingCustomer=>{
+    const existingCustomer=existingById.get(incomingCustomer.id);
+    if(!existingCustomer)return incomingCustomer;
+    const existingEntries=Array.isArray(existingCustomer.cariEntries)?existingCustomer.cariEntries:[];
+    const incomingEntries=Array.isArray(incomingCustomer.cariEntries)?incomingCustomer.cariEntries:[];
+    const incomingIds=new Set(incomingEntries.map(e=>e.id));
+    const preservedExternal=existingEntries.filter(e=>e&&e.id&&!incomingIds.has(e.id)&&String(e.source||'').startsWith('whatsapp'));
+    return{...incomingCustomer,cariEntries:[...incomingEntries,...preservedExternal]};
+  });
+}
 
 function ensureDigerBanka(data,file){
   const applyLatestRates=data.bankRatesVersion!==BANK_RATES_VERSION;
@@ -287,7 +301,17 @@ app.get('/api/data',auth,(req,res)=>{
 app.post('/api/data',auth,(req,res)=>{
   const file=getDataFile(req.user.username);
   try{
-    fs.writeFileSync(file,JSON.stringify({...req.body,banks:normalizeBanksForData(req.body.banks,false),bankRatesVersion:BANK_RATES_VERSION,savedAt:new Date().toISOString()},null,2));
+    const fresh=readFreshUserData(req.user.username).data;
+    const mergedCustomers=mergeCustomersPreservingExternal(fresh.customers,req.body.customers);
+    const nextData={
+      ...fresh,
+      ...req.body,
+      customers:mergedCustomers,
+      banks:normalizeBanksForData(req.body.banks,false),
+      bankRatesVersion:BANK_RATES_VERSION,
+      savedAt:new Date().toISOString()
+    };
+    fs.writeFileSync(file,JSON.stringify(nextData,null,2));
     res.json({ok:true});
   }catch(e){console.error('[SAVE ERROR]',e.message);res.status(500).json({error:'Veri kaydedilemedi: '+e.message});}
 });

@@ -92,6 +92,13 @@ async function apiSaveData(token,payload){
   if(!r.ok)throw new Error('Kayıt başarısız');
   return r.json();
 }
+function stableSerialize(value){
+  if(Array.isArray(value))return'['+value.map(stableSerialize).join(',')+']';
+  if(value&&typeof value==='object'){
+    return'{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableSerialize(value[k])).join(',')+'}';
+  }
+  return JSON.stringify(value);
+}
 async function apiAdminUsers(token){
   const r=await fetch('/api/admin/users',{headers:{Authorization:'Bearer '+token}});
   if(!r.ok)throw new Error('Kullanıcılar alınamadı');
@@ -3497,8 +3504,31 @@ function App(){
   const{page:activePage,param:detailCustomerId}=route;
   const saveTimerRef=useRef(null);
   const initRef=useRef(false);
+  const hydratingRef=useRef(false);
+  const lastServerSnapshotRef=useRef('');
+  const isDirtyRef=useRef(false);
   const[waqCount,setWaqCount]=useState(0);
   const[allAdminUsers,setAllAdminUsers]=useState([]);
+
+  const applyServerData=useCallback((data)=>{
+    hydratingRef.current=true;
+    const nextCustomers=Array.isArray(data.customers)?data.customers:[];
+    const nextBanks=data.banks&&data.banks.length>0?normalizeBanks(data.banks,data.bankRatesVersion!==BANK_RATES_VERSION):INIT_BANKS;
+    const nextKasa=data.kasa?{...data.kasa,transactions:Array.isArray(data.kasa.transactions)?data.kasa.transactions:[]}:{transactions:[]};
+    setCustomers(nextCustomers);
+    setBanks(nextBanks);
+    setKasa(nextKasa);
+    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa});
+    isDirtyRef.current=false;
+    setSaveStatus('idle');
+    setSavedTime('');
+    setTimeout(()=>{hydratingRef.current=false;},0);
+  },[]);
+
+  const markDirty=useCallback((updater)=>{
+    isDirtyRef.current=true;
+    updater();
+  },[]);
 
   const logout=()=>{clearAuth();setAuth(null);setAuthScreen('login');setInitialized(false);initRef.current=false;};
 
@@ -3506,9 +3536,7 @@ function App(){
     if(!auth){setInitialized(true);return;}
     apiFetchData(auth.token)
       .then(data=>{
-        if(data.customers&&data.customers.length>0)setCustomers(data.customers);
-        if(data.banks&&data.banks.length>0)setBanks(normalizeBanks(data.banks,data.bankRatesVersion!==BANK_RATES_VERSION));
-        if(data.kasa)setKasa({...data.kasa,transactions:Array.isArray(data.kasa.transactions)?data.kasa.transactions:[]});
+        applyServerData(data);
         setInitialized(true);
       })
       .catch(e=>{
@@ -3520,11 +3548,21 @@ function App(){
   useEffect(()=>{
     if(!initialized||!auth)return;
     if(!initRef.current){initRef.current=true;return;}
+    if(hydratingRef.current)return;
+    const currentSnapshot=stableSerialize({customers,banks,kasa});
+    if(currentSnapshot===lastServerSnapshotRef.current){
+      isDirtyRef.current=false;
+      if(saveStatus==='saving')setSaveStatus('idle');
+      return;
+    }
+    if(!isDirtyRef.current)return;
     clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
       apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION})
         .then(()=>{
+          lastServerSnapshotRef.current=stableSerialize({customers,banks,kasa});
+          isDirtyRef.current=false;
           setSaveStatus('saved');setSavedTime(timeStr());
           setTimeout(()=>{setSaveStatus('idle');setSavedTime('');},5000);
         })
@@ -3564,13 +3602,16 @@ function App(){
         const data=JSON.parse(e.target.result);
         if(!data.customers||!data.banks)return alert('Geçersiz yedek dosyası.');
         if(!window.confirm(`${data.customers.length} müşteri yüklenecek. Mevcut veriler değiştirilecek. Devam?`))return;
-        setCustomers(data.customers);setBanks(normalizeBanks(data.banks));
+        markDirty(()=>{
+          setCustomers(data.customers);
+          setBanks(normalizeBanks(data.banks));
+        });
       }catch{alert('Dosya okunamadı.');}
     };
     reader.readAsText(file);
   };
 
-  const handleReset=()=>{if(window.confirm('Tüm veriler sıfırlanacak. Emin misiniz?')){setCustomers(INIT_CUSTOMERS);setBanks(INIT_BANKS);}};
+  const handleReset=()=>{if(window.confirm('Tüm veriler sıfırlanacak. Emin misiniz?')){markDirty(()=>{setCustomers(INIT_CUSTOMERS);setBanks(INIT_BANKS);});}};
 
   if(!auth){
     if(authScreen==='register')return<RegisterPage onGoLogin={()=>setAuthScreen('login')}/>;
@@ -3589,16 +3630,16 @@ function App(){
     <div style={{display:'flex',minHeight:'100vh',background:'#0a0d14'}}>
       {isMobile&&mobileSidebarOpen&&<div onClick={()=>setMobileSidebarOpen(false)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',zIndex:199}}/>}
       <Sidebar page={activePage} setPage={p=>{
-        if(saveTimerRef.current){
+        if(saveTimerRef.current&&isDirtyRef.current){
           clearTimeout(saveTimerRef.current);
           saveTimerRef.current=null;
           apiSaveData(auth.token,{customers,banks,kasa,bankRatesVersion:BANK_RATES_VERSION}).finally(()=>{
             navigate(p);
-            apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(normalizeBanks(data.banks,data.bankRatesVersion!==BANK_RATES_VERSION));if(data.kasa)setKasa(data.kasa);});
+            apiFetchData(auth.token).then(applyServerData);
           });
         }else{
           navigate(p);
-          apiFetchData(auth.token).then(data=>{if(data.customers)setCustomers(data.customers);if(data.banks)setBanks(normalizeBanks(data.banks,data.bankRatesVersion!==BANK_RATES_VERSION));if(data.kasa)setKasa(data.kasa);});
+          apiFetchData(auth.token).then(applyServerData);
         }
       }} collapsed={collapsed} setCollapsed={setCollapsed}
         onReset={handleReset} saveStatus={saveStatus}
@@ -3612,23 +3653,23 @@ function App(){
           {activePage==='dashboard'&&<DashboardPage customers={customers} onNavigateCustomer={id=>navigate('customers',id)}/>}
           {activePage==='customers'&&(
             <CustomersPageWithDetail
-              customers={customers} banks={banks} onUpdateCustomers={setCustomers}
+              customers={customers} banks={banks} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))}
               initDetailId={detailCustomerId} onClearDetail={()=>navigate('customers')}
-              kasa={kasa} onUpdateKasa={setKasa}
+              kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}
             />
           )}
-          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={setKasa} customers={customers}/>}
+          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
-          {activePage==='dekont'&&<DekontPage customers={customers} banks={banks} onUpdateCustomers={setCustomers}/>}
-          {activePage==='banks'&&<BankSettingsPage banks={banks} onUpdateBanks={setBanks}/>}
+          {activePage==='dekont'&&<DekontPage customers={customers} banks={banks} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))}/>}
+          {activePage==='banks'&&<BankSettingsPage banks={banks} onUpdateBanks={(updater)=>markDirty(()=>setBanks(updater))}/>}
           {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}
           {activePage==='hesabim'&&<HesabimPage token={auth.token} username={auth.username} onUpdated={(newUsername)=>setAuth(p=>({...p,username:newUsername}))} onExport={exportBackup} onImport={importBackup} onReset={handleReset}/>}
-          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} onReload={()=>apiFetchData(auth.token).then(d=>{if(d.customers)setCustomers(d.customers);if(d.banks)setBanks(normalizeBanks(d.banks,d.bankRatesVersion!==BANK_RATES_VERSION));})}/>}
+          {activePage==='waq'&&auth.role==='admin'&&<WhatsAppQueuePage token={auth.token} allUsers={allAdminUsers} onReload={()=>apiFetchData(auth.token).then(applyServerData)}/>}
           {activePage==='waq'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>
           )}

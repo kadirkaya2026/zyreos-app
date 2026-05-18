@@ -701,6 +701,71 @@ app.post('/api/alex/sync',(req,res)=>{
       return res.json({success:true,customerName:customer.name});
     }
 
+    if(action==='CREATE_CUSTOMER'){
+      const name=String(payload.customerName||'').trim();
+      if(!name)return res.status(400).json({success:false,message:'customerName gerekli'});
+      const norm=normalizeText(name);
+      if(data.customers.find(c=>normalizeText(c.name)===norm||normalizeText(c.code)===norm)){
+        return res.status(400).json({success:false,message:'Bu isimde bir müşteri zaten var.'});
+      }
+      const newCust={
+        id:randomUUID(),
+        name:name,
+        code:name.toUpperCase(),
+        phone:'',email:'',address:'',taxNo:'',
+        commissionRate:0,
+        installmentRates:Array(12).fill(0),
+        openingBalance:0,
+        cariEntries:[],
+        createdAt:new Date().toISOString()
+      };
+      data.customers.push(newCust);
+      saveData();
+      return res.json({success:true,message:`${name} carisi oluşturuldu.`});
+    }
+
+    if(action==='DELETE_CUSTOMER'){
+      const name=String(payload.customerName||'').trim();
+      if(!name)return res.status(400).json({success:false,message:'customerName gerekli'});
+      const norm=normalizeText(name);
+      const idx=data.customers.findIndex(c=>normalizeText(c.name)===norm||normalizeText(c.code)===norm);
+      if(idx===-1)return res.status(404).json({success:false,message:'Müşteri bulunamadı.'});
+      const deletedName=data.customers[idx].name;
+      data.customers.splice(idx,1);
+      saveData();
+      return res.json({success:true,message:`${deletedName} carisi silindi.`});
+    }
+
+    if(action==='UPDATE_RATE'){
+      const name=String(payload.customerName||'').trim();
+      const inst=parseInt(payload.installment);
+      const rate=parseFloat(payload.newRate);
+      if(!name||!inst||isNaN(rate))return res.status(400).json({success:false,message:'customerName, installment ve newRate gerekli'});
+      if(inst<1||inst>12)return res.status(400).json({success:false,message:'Taksit 1-12 arasında olmalı.'});
+      const norm=normalizeText(name);
+      const customer=data.customers.find(c=>normalizeText(c.name)===norm||normalizeText(c.code)===norm);
+      if(!customer)return res.status(404).json({success:false,message:'Müşteri bulunamadı.'});
+      if(!Array.isArray(customer.installmentRates))customer.installmentRates=Array(12).fill(customer.commissionRate||0);
+      customer.installmentRates[inst-1]=rate;
+      saveData();
+      return res.json({success:true,message:`${customer.name} için ${inst} taksit oranı %${rate} olarak güncellendi.`});
+    }
+
+    if(action==='DELETE_LAST_CARD'){
+      const customer=findCustomerByGroup();
+      if(!customer)return res.status(400).json({success:false,message:'Bu grup henüz bir müşteriye bağlanmamış.'});
+      const entries=customer.cariEntries||[];
+      let lastIdx=-1;
+      for(let i=entries.length-1;i>=0;i--){
+        if(entries[i].type==='cekim'){lastIdx=i;break;}
+      }
+      if(lastIdx===-1)return res.status(404).json({success:false,message:'Silinecek kart çekimi bulunamadı.'});
+      const deleted=entries[lastIdx];
+      entries.splice(lastIdx,1);
+      saveData();
+      return res.json({success:true,message:'Son kart çekimi silindi.',deletedAmount:deleted.amount,deletedDate:deleted.date});
+    }
+
     const customer=findCustomerByGroup();
     if(!customer){
       return res.status(400).json({success:false,message:'Bu grup henüz bir müşteriye bağlanmamış. Önce LINK_GROUP ile bağlayın.'});

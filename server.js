@@ -120,12 +120,18 @@ function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, 
   const incomingList = Array.isArray(incomingCustomers) ? incomingCustomers : [];
   const incomingIds = new Set(incomingList.map(c => c.id));
 
+  // KRİTİK: Eğer panel elindeki verinin ne zaman çekildiğini bilmiyorsa (boş gelmişse), 
+  // akıllı birleştirme yapma. Panelin gönderdiği listeyi mutlak doğru kabul et.
+  // Bu, belirsizlik durumunda "silme" işleminin geri alınmasını önler.
+  if (!lastSavedAtInPanel) {
+    return incomingList;
+  }
+
   // 1. Alex'in panel açıldıktan sonra eklediği YENİ müşterileri koru
   const alexNewCustomers = existingList.filter(c => {
     if (incomingIds.has(c.id)) return false;
     const createdAt = c.createdAt ? new Date(c.createdAt).getTime() : 0;
-    const panelTime = lastSavedAtInPanel ? new Date(lastSavedAtInPanel).getTime() : 0;
-    // Eğer müşteri paneldeki son kayıttan sonra oluşturulmuşsa, bu Alex'in yeni eklediği caridir.
+    const panelTime = new Date(lastSavedAtInPanel).getTime();
     return createdAt > panelTime;
   });
 
@@ -140,7 +146,7 @@ function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, 
 
     // Panel açıldıktan SONRA eklenmiş olan 'external' kaynaklı (WhatsApp/Alex) işlemleri koru.
     // Eğer işlem panel açılmadan önce varsa ve şu an gelen pakette yoksa, kullanıcı bunu panelden silmiştir.
-    const panelTime = lastSavedAtInPanel ? new Date(lastSavedAtInPanel).getTime() : 0;
+    const panelTime = new Date(lastSavedAtInPanel).getTime();
     
     const preservedExternal = existingEntries.filter(e => {
       if (!e || !e.id) return false;
@@ -165,9 +171,16 @@ function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, 
 
 function ensureDigerBanka(data,file){
   const applyLatestRates=data.bankRatesVersion!==BANK_RATES_VERSION;
-  const updated={...data,banks:normalizeBanksForData(data.banks,applyLatestRates),bankRatesVersion:BANK_RATES_VERSION};
-  const changed=applyLatestRates||JSON.stringify(data.banks)!==JSON.stringify(updated.banks);
-  if(file&&changed)try{fs.writeFileSync(file,JSON.stringify({...updated,savedAt:new Date().toISOString()},null,2));}catch(e){}
+  let updated={...data,banks:normalizeBanksForData(data.banks,applyLatestRates),bankRatesVersion:BANK_RATES_VERSION};
+  
+  // Eğer dosyada savedAt yoksa veya boşa düşmüşse mutlaka bir zaman damgası ekle.
+  // Bu sayede panel her zaman bir referans zamanına sahip olur.
+  if(!updated.savedAt) {
+    updated.savedAt = new Date().toISOString();
+  }
+
+  const changed=applyLatestRates||JSON.stringify(data.banks)!==JSON.stringify(updated.banks)||!data.savedAt;
+  if(file&&changed)try{fs.writeFileSync(file,JSON.stringify({...updated,savedAt:updated.savedAt},null,2));}catch(e){}
   return updated;
 }
 function readUsers(){try{return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'));}catch(e){return[];}}

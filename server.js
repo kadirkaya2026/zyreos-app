@@ -138,29 +138,25 @@ function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, 
     const incomingEntries = Array.isArray(incomingCustomer.cariEntries) ? incomingCustomer.cariEntries : [];
     const incomingEntryIds = new Set(incomingEntries.map(e => e.id));
 
-    // Panelde olmayan ama diskte olan 'external' kaynaklı (WhatsApp/Alex) işlemleri koru
-    const preservedExternal = existingEntries.filter(e => 
-      e && e.id && !incomingEntryIds.has(e.id) && 
-      (String(e.source || '').startsWith('whatsapp') || String(e.source || '').startsWith('alex'))
-    );
-
-    // AYRICA: Panel açıldıktan sonra eklenmişse ama incoming'de yoksa (çakışma anında eklenen manuel olmayanlar)
+    // Panel açıldıktan SONRA eklenmiş olan 'external' kaynaklı (WhatsApp/Alex) işlemleri koru.
+    // Eğer işlem panel açılmadan önce varsa ve şu an gelen pakette yoksa, kullanıcı bunu panelden silmiştir.
     const panelTime = lastSavedAtInPanel ? new Date(lastSavedAtInPanel).getTime() : 0;
-    const freshExternal = existingEntries.filter(e => {
-      if (incomingEntryIds.has(e.id)) return false;
+    
+    const preservedExternal = existingEntries.filter(e => {
+      if (!e || !e.id) return false;
+      if (incomingEntryIds.has(e.id)) return false; // Zaten panelde var (veya güncellenmiş)
+      
+      const isExternal = String(e.source || '').startsWith('whatsapp') || String(e.source || '').startsWith('alex');
+      if (!isExternal) return false;
+
+      // SADECE panel açıldıktan sonra eklenenleri koru (çakışma önleme)
       const createdAt = e.createdAt ? new Date(e.createdAt).getTime() : 0;
       return createdAt > panelTime;
     });
 
-    // freshExternal zaten preservedExternal'in içinde olabilir, unik yapalım
-    const allPreserved = [...preservedExternal];
-    freshExternal.forEach(fe => {
-      if(!allPreserved.find(pe => pe.id === fe.id)) allPreserved.push(fe);
-    });
-
     return {
       ...incomingCustomer,
-      cariEntries: [...incomingEntries, ...allPreserved]
+      cariEntries: [...incomingEntries, ...preservedExternal]
     };
   });
 

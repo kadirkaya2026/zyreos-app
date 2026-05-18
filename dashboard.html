@@ -259,6 +259,23 @@ function isWeekendOrHoliday(s){return !isBankingDay(s);}
 
 function fmt(n){return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n??0);}
 function fmtTL(n){return '₺'+fmt(n);}
+function fmtDate(d){return d?d.split('-').reverse().join('.'):'';}
+function fmtEntryTime(ts){
+  if(!ts)return'';
+  const parsed=new Date(ts);
+  if(Number.isNaN(parsed.getTime()))return'';
+  return parsed.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+}
+function renderDateCell(entry){
+  const time=fmtEntryTime(entry.createdAt);
+  if(!time)return<>{fmtDate(entry.date||'')}</>;
+  return(
+    <div style={{display:'flex',flexDirection:'column',lineHeight:1.2}}>
+      <span>{fmtDate(entry.date||'')}</span>
+      <span style={{fontSize:'11px',color:'#64748b'}}>{time}</span>
+    </div>
+  );
+}
 function calcBalance(entries,openingBalance=0){
   return openingBalance+(entries||[]).reduce((s,e)=>{
     if(e.type==='cekim')return s+e.netToCustomer;
@@ -510,25 +527,25 @@ function exportPDF(customer,opts){
     const rColor=running>=0?'#c53030':'#276749';
     if(e.type==='cekim'){
       return`<tr>
-        <td>${e.date}</td><td>${e.description}<br/><small style="color:#666">${e.bank} • ${e.installment===1?'Peşin':`${e.installment} Taksit`}</small></td>
+        <td>${fmtDate(e.date)}${e.createdAt?`<br/><small style="color:#64748b">${fmtEntryTime(e.createdAt)}</small>`:''}</td><td>${e.description}<br/><small style="color:#666">${e.bank} • ${e.installment===1?'Peşin':`${e.installment} Taksit`}</small></td>
         <td class="num">₺${fmt(e.amount)}</td><td class="num">₺${fmt(e.customerComm||0)} (%${e.customerRate})</td>
         <td class="num">₺${fmt(e.netToCustomer)}</td><td class="num">—</td>
         <td class="num" style="color:${rColor}">₺${fmt(Math.abs(running))} ${running>=0?'Borç':'Alacak'}</td></tr>`;
     }else if(e.type==='bakiye_duzeltme'){
       return`<tr style="background:#fffbeb">
-        <td>${e.date}</td><td>${e.description}<br/><small style="color:#b7791f">Bakiye Düzeltme • ${e.direction==='azalis'?'Azalış':'Artış'}</small></td>
+        <td>${fmtDate(e.date)}${e.createdAt?`<br/><small style="color:#64748b">${fmtEntryTime(e.createdAt)}</small>`:''}</td><td>${e.description}<br/><small style="color:#b7791f">Bakiye Düzeltme • ${e.direction==='azalis'?'Azalış':'Artış'}</small></td>
         <td class="num">—</td><td class="num">—</td><td class="num">—</td>
         <td class="num" style="color:#b7791f">${e.direction==='azalis'?'-':'+'}₺${fmt(e.amount)}</td>
         <td class="num" style="color:${rColor}">₺${fmt(Math.abs(running))} ${running>=0?'Borç':'Alacak'}</td></tr>`;
     }else if(e.type==='nakit_tahsilat'){
       return`<tr>
-        <td>${e.date}</td><td>${e.description}<br/><small style="color:#0891b2">Nakit Tahsilat</small></td>
+        <td>${fmtDate(e.date)}${e.createdAt?`<br/><small style="color:#64748b">${fmtEntryTime(e.createdAt)}</small>`:''}</td><td>${e.description}<br/><small style="color:#0891b2">Nakit Tahsilat</small></td>
         <td class="num">—</td><td class="num">—</td><td class="num">—</td>
         <td class="num" style="color:#0891b2">₺${fmt(e.amount)}</td>
         <td class="num" style="color:${rColor}">₺${fmt(Math.abs(running))} ${running>=0?'Borç':'Alacak'}</td></tr>`;
     }else{
       return`<tr>
-        <td>${e.date}</td><td>${e.description}</td>
+        <td>${fmtDate(e.date)}${e.createdAt?`<br/><small style="color:#64748b">${fmtEntryTime(e.createdAt)}</small>`:''}</td><td>${e.description}</td>
         <td class="num">—</td><td class="num">—</td><td class="num">—</td>
         <td class="num" style="color:#276749">₺${fmt(e.amount)}</td>
         <td class="num" style="color:${rColor}">₺${fmt(Math.abs(running))} ${running>=0?'Borç':'Alacak'}</td></tr>`;
@@ -709,7 +726,7 @@ function DashboardPage({customers,onNavigateCustomer}){
               <tbody>
                 {recentCekim.map(e=>(
                   <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <td style={{padding:'8px',color:'#94a3b8',whiteSpace:'nowrap'}}>{e.date}</td>
+                    <td style={{padding:'8px',color:'#94a3b8',whiteSpace:'nowrap'}}>{renderDateCell(e)}</td>
                     <td style={{padding:'8px'}}><span style={{fontWeight:600}}>{e.customerName}</span></td>
                     <td className="tabular-nums" style={{padding:'8px',color:'#4f8ef7',fontWeight:600}}>{fmtTL(e.amount)}</td>
                     <td className="tabular-nums" style={{padding:'8px',color:e.profit>=0?'#22c55e':'#ef4444',fontWeight:700}}>{fmtTL(e.profit)}</td>
@@ -857,19 +874,19 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       if(!amt)return alert('Tutar giriniz.');
       if(!selBank)return alert('Banka seçiniz.');
       const c=calcCekim(amt,form.installment,form.customerRate,selBank);
-      onSave({id:uid(),date:form.date,type:'cekim',description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,...c});
+      onSave({id:uid(),date:form.date,type:'cekim',description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,createdAt:new Date().toISOString(),...c});
     }else if(type==='nakit_odeme'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
-      onSave({id:uid(),date:nakit.date,type:'nakit_odeme',description:nakit.description||'Nakit Ödeme',amount:amt});
+      onSave({id:uid(),date:nakit.date,type:'nakit_odeme',description:nakit.description||'Nakit Ödeme',amount:amt,createdAt:new Date().toISOString()});
     }else if(type==='nakit_tahsilat'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
-      onSave({id:uid(),date:nakit.date,type:'nakit_tahsilat',description:nakit.description||'Nakit Tahsilat',amount:amt});
+      onSave({id:uid(),date:nakit.date,type:'nakit_tahsilat',description:nakit.description||'Nakit Tahsilat',amount:amt,createdAt:new Date().toISOString()});
     }else if(type==='bakiye_duzeltme'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
-      onSave({id:uid(),date:nakit.date,type:'bakiye_duzeltme',description:nakit.description||'Bakiye Düzeltme',amount:amt,direction:nakit.direction||'artis'});
+      onSave({id:uid(),date:nakit.date,type:'bakiye_duzeltme',description:nakit.description||'Bakiye Düzeltme',amount:amt,direction:nakit.direction||'artis',createdAt:new Date().toISOString()});
     }else{
       const valid=bulkRows.filter(r=>parseFloat(r.amount)>0);
       if(!valid.length)return alert('En az bir satıra tutar giriniz.');
@@ -879,7 +896,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
         const inst=parseInt(r.installment)||1;
         const rate=parseFloat(r.customerRate)||(customer?.installmentRates?.[inst-1]??3.5);
         const c=calcCekim(amt,inst,rate,bank);
-        return{id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',amount:amt,bank:bank.name,installment:inst,customerRate:rate,...c};
+        return{id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',amount:amt,bank:bank.name,installment:inst,customerRate:rate,createdAt:new Date().toISOString(),...c};
       });
       onSave(allEntries);
     }
@@ -1045,10 +1062,10 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
     const current=customer.cariEntries||[];
     const kasaEntries=newEntries.map(e=>{
       if(e.type==='nakit_odeme'){
-        return{id:uid(),date:e.date,type:'cikis',amount:e.amount,description:'Ödeme - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true};
+        return{id:uid(),date:e.date,type:'cikis',amount:e.amount,description:'Ödeme - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true,createdAt:e.createdAt||new Date().toISOString()};
       }
       if(e.type==='nakit_tahsilat'){
-        return{id:uid(),date:e.date,type:'giris',amount:e.amount,description:'Nakit Tahsilat - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true};
+        return{id:uid(),date:e.date,type:'giris',amount:e.amount,description:'Nakit Tahsilat - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true,createdAt:e.createdAt||new Date().toISOString()};
       }
       return null;
     }).filter(Boolean);
@@ -1139,7 +1156,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
                     const rIsPos=e.runningBal>0;
                     return(
                       <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)',background:isDuzeltme?'rgba(245,158,11,0.05)':isTahsilat?'rgba(6,182,212,0.05)':''}}>
-                        <td style={{padding:'10px 12px',color:'#94a3b8',whiteSpace:'nowrap'}}>{e.date}</td>
+                        <td style={{padding:'10px 12px',color:'#94a3b8',whiteSpace:'nowrap'}}>{renderDateCell(e)}</td>
                         <td style={{padding:'10px 12px'}}>
                           <div style={{fontWeight:600}}>{e.description}</div>
                           {isCekim&&<div style={{color:'#64748b',fontSize:'11px',marginTop:'2px'}}>{e.bank} • {e.installment} Taksit</div>}
@@ -1241,7 +1258,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
                     const rIsPos=e.runningBal>0;
                     return(
                       <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                        <td style={{padding:'10px 14px',color:'#94a3b8'}}>{e.date}</td>
+                        <td style={{padding:'10px 14px',color:'#94a3b8'}}>{renderDateCell(e)}</td>
                         <td style={{padding:'10px 14px',fontWeight:600}}>{e.description}{isCekim&&<span style={{color:'#64748b',fontSize:'11px',marginLeft:'6px'}}>({e.bank} {e.installment}T)</span>}</td>
                         <td className="tabular-nums" style={{padding:'10px 14px',color:isCekim?'#4f8ef7':'#475569'}}>{isCekim?fmtTL(e.amount):'—'}</td>
                         <td className="tabular-nums" style={{padding:'10px 14px',color:'#a855f7'}}>{isCekim?fmtTL(e.customerComm):'—'}</td>
@@ -1307,7 +1324,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
         const handleBdSave=()=>{
           const amt=parseFloat(bdForm.amount)||0;
           if(!amt)return;
-          const entry={id:uid(),date:bdForm.date,type:'bakiye_duzeltme',description:bdForm.description||'Bakiye Düzeltme',amount:amt,direction:bdForm.direction};
+          const entry={id:uid(),date:bdForm.date,type:'bakiye_duzeltme',description:bdForm.description||'Bakiye Düzeltme',amount:amt,direction:bdForm.direction,createdAt:new Date().toISOString()};
           handleAddEntry(entry);
           setBdForm({date:new Date().toISOString().slice(0,10),direction:'azalis',amount:'',description:''});
         };
@@ -1466,7 +1483,7 @@ function exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo}){
   const periodLabel=dateFrom||dateTo?`${dateFrom||'—'} / ${dateTo||'—'}`:'Tüm Dönem';
   const rowsHTML=rows.map((r,i)=>`
     <tr style="background:${i%2===0?'#fff':'#f8fafc'}">
-      <td style="padding:6px 10px;font-size:11px;color:#374151;white-space:nowrap">${r.date}</td>
+      <td style="padding:6px 10px;font-size:11px;color:#374151;white-space:nowrap">${fmtDate(r.date)}${r.createdAt?`<br><span style="color:#9ca3af;font-size:10px">${fmtEntryTime(r.createdAt)}</span>`:''}</td>
       <td style="padding:6px 10px;font-size:11px;color:#111827;font-weight:600">${r.customerName}<br><span style="color:#6b7280;font-size:10px;font-weight:400">${r.customerCode}</span></td>
       <td style="padding:6px 10px;font-size:11px;color:#6b7280">${r.bank}</td>
       <td style="padding:6px 10px;font-size:10px;color:#6b7280;text-align:center">${r.installment===1?'Peşin':`${r.installment} T`}</td>
@@ -1822,7 +1839,7 @@ function ReportsPage({customers}){
                       if(e.type==='cekim')running+=e.netToCustomer;else running-=e.amount;
                       return(
                         <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                          <td className="tabular-nums" style={{...td,color:'#64748b',whiteSpace:'nowrap'}}>{e.date}</td>
+                          <td className="tabular-nums" style={{...td,color:'#64748b',whiteSpace:'nowrap'}}>{renderDateCell(e)}</td>
                           <td style={td}>
                             <div style={{fontWeight:600}}>{e.description}</div>
                             {e.type==='cekim'&&<div style={{color:'#64748b',fontSize:'11px'}}>{e.bank} • {e.installment===1?'Peşin':`${e.installment} Taksit`}</div>}
@@ -1976,7 +1993,7 @@ function ProfitPage({customers}){
             <tbody>
               {rows.map((r,i)=>(
                 <tr key={r.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)',background:r.profit<0?'rgba(239,68,68,0.04)':'transparent'}}>
-                  <td className="tabular-nums" style={{...s,color:'#64748b',whiteSpace:'nowrap'}}>{r.date}</td>
+                  <td className="tabular-nums" style={{...s,color:'#64748b',whiteSpace:'nowrap'}}>{renderDateCell(r)}</td>
                   <td style={s}>
                     <div style={{fontWeight:600,fontSize:'13px'}}>{r.customerName}</div>
                     <div style={{color:'#64748b',fontSize:'11px'}}>{r.customerCode}</div>
@@ -3412,7 +3429,7 @@ function KasaPage({kasa,onUpdateKasa,customers}){
           <tbody>
             {filtered.map(t=>(
               <tr key={t.id} style={rowStyle(t)}>
-                <td style={{padding:'9px 12px'}}>{fmtDate(t.date)}</td>
+                <td style={{padding:'9px 12px'}}>{renderDateCell(t)}</td>
                 <td style={{padding:'9px 12px'}}>{t.description}</td>
                 <td style={{padding:'9px 12px'}}>
                   {t.virtual&&<span style={{background:'rgba(245,158,11,.2)',color:'#fcd34d',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Bekliyor</span>}

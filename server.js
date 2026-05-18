@@ -610,6 +610,7 @@ app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
     ...data.customers[customerIdx].cariEntries[entryIdx],
     amount,installment:taksit,bank:bankObj?bankObj.name:bankName,
     customerRate,customerComm,netToCustomer,bankRate,bankCost,profit,
+    createdAt:data.customers[customerIdx].cariEntries[entryIdx].createdAt||new Date().toISOString(),
     ...(ocrNew.tarih?{date:ocrNew.tarih}:{})
   };
   fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
@@ -775,20 +776,46 @@ app.post('/api/alex/sync',(req,res)=>{
         return res.status(400).json({success:false,message:'date gerekli'});
       }
       const previousBalance=computeBalance(customer.cariEntries,customer.openingBalance||0,reportDate);
-      const todayCards=(customer.cariEntries||[]).filter(e=>e.type==='cekim'&&e.date===reportDate);
+      const todayCards=(customer.cariEntries||[])
+        .filter(e=>e.type==='cekim'&&e.date===reportDate)
+        .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
       const todayCardsNet=+todayCards.reduce((s,e)=>s+(parseFloat(e.netToCustomer)||0),0).toFixed(2);
       const todayCardsCount=todayCards.length;
+      const todayCustomerCommTotal=+todayCards.reduce((s,e)=>s+(parseFloat(e.customerComm)||0),0).toFixed(2);
+      const todayBankCostTotal=+todayCards.reduce((s,e)=>s+(parseFloat(e.bankCost)||0),0).toFixed(2);
+      const todayProfitTotal=+todayCards.reduce((s,e)=>s+(parseFloat(e.profit)||0),0).toFixed(2);
       const todayPayments=+((customer.cariEntries||[])
         .filter(e=>e.type==='nakit_odeme'&&e.date===reportDate)
         .reduce((s,e)=>s+(parseFloat(e.amount)||0),0)).toFixed(2);
       const totalBalance=+(previousBalance+todayCardsNet-todayPayments).toFixed(2);
+      const todayCardDetails=todayCards.map(e=>({
+        id:e.id,
+        date:e.date,
+        createdAt:e.createdAt||null,
+        description:e.description||'Kart Çekimi',
+        grossAmount:+(parseFloat(e.amount)||0).toFixed(2),
+        installment:parseInt(e.installment,10)||1,
+        bank:e.bank||'',
+        customerRate:+(parseFloat(e.customerRate)||0).toFixed(2),
+        customerComm:+(parseFloat(e.customerComm)||0).toFixed(2),
+        netToCustomer:+(parseFloat(e.netToCustomer)||0).toFixed(2),
+        bankRate:+(parseFloat(e.bankRate)||0).toFixed(2),
+        bankCost:+(parseFloat(e.bankCost)||0).toFixed(2),
+        profit:+(parseFloat(e.profit)||0).toFixed(2)
+      }));
+      const latestCard=todayCardDetails[0]||null;
       return res.json({
         success:true,
         previousBalance,
         todayCardsNet,
         todayCardsCount,
         todayPayments,
-        totalBalance
+        totalBalance,
+        todayCustomerCommTotal,
+        todayBankCostTotal,
+        todayProfitTotal,
+        todayCards:todayCardDetails,
+        latestCard
       });
     }
 

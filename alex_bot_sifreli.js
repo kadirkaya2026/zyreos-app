@@ -4,7 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const GEMINI_KEY = "AIzaSyAZ5z61t_jrxX7tmhWoCrHHbLKSwLstDtc";
+const GEMINI_KEY = "GEMINI_KEY_PLACEHOLDER";
 const ZYREOS_API = "https://zyreos-app-production.up.railway.app/api/alex/sync";
 const ALEX_TOKEN = "zyreos_alex_secret_key_2026";
 const botSentIds = new Set(); 

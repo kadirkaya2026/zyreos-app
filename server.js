@@ -115,19 +115,46 @@ function readFreshUserData(username){
   if(!Array.isArray(data.kasa.transactions))data.kasa.transactions=[];
   return{file,data};
 }
-function mergeCustomersPreservingExternal(existingCustomers,incomingCustomers){
-  const existingList=Array.isArray(existingCustomers)?existingCustomers:[];
-  const incomingList=Array.isArray(incomingCustomers)?incomingCustomers:[];
-  const existingById=new Map(existingList.map(c=>[c.id,c]));
-  return incomingList.map(incomingCustomer=>{
-    const existingCustomer=existingById.get(incomingCustomer.id);
-    if(!existingCustomer)return incomingCustomer;
-    const existingEntries=Array.isArray(existingCustomer.cariEntries)?existingCustomer.cariEntries:[];
-    const incomingEntries=Array.isArray(incomingCustomer.cariEntries)?incomingCustomer.cariEntries:[];
-    const incomingIds=new Set(incomingEntries.map(e=>e.id));
-    const preservedExternal=existingEntries.filter(e=>e&&e.id&&!incomingIds.has(e.id)&&String(e.source||'').startsWith('whatsapp'));
-    return{...incomingCustomer,cariEntries:[...incomingEntries,...preservedExternal]};
+function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, lastSavedAtInPanel) {
+  const existingList = Array.isArray(existingCustomers) ? existingCustomers : [];
+  const incomingList = Array.isArray(incomingCustomers) ? incomingCustomers : [];
+  const incomingIds = new Set(incomingList.map(c => c.id));
+
+  // 1. Alex'in panel açıldıktan sonra eklediği YENİ müşterileri koru
+  // (Eğer paneldeki savedAt bilgisi disktekinden eskiyse ve diskte yeni biri varsa)
+  const alexNewCustomers = existingList.filter(c => {
+    if (incomingIds.has(c.id)) return false;
+    // Eğer müşteri diskte var ama panelde yoksa:
+    // Bu müşteri gerçekten silindi mi yoksa Alex mi yeni ekledi?
+    // İpucu: Alex'in eklediği müşterilerde genelde alexGroupId olur veya createdAt paneli açtığımızdan sonradır.
+    const createdAt = c.createdAt ? new Date(c.createdAt).getTime() : 0;
+    const panelTime = lastSavedAtInPanel ? new Date(lastSavedAtInPanel).getTime() : 0;
+    // Eğer müşteri paneldeki son kayıttan sonra oluşturulmuşsa, bu Alex'in yeni eklediği caridir.
+    return createdAt > panelTime;
   });
+
+  // 2. Panelin gönderdiği listeyi baz al, ancak her birinin cariEntries kısmını disktekiyle birleştir
+  const mergedIncoming = incomingList.map(incomingCustomer => {
+    const existingCustomer = existingList.find(c => c.id === incomingCustomer.id);
+    if (!existingCustomer) return incomingCustomer;
+
+    const existingEntries = Array.isArray(existingCustomer.cariEntries) ? existingCustomer.cariEntries : [];
+    const incomingEntries = Array.isArray(incomingCustomer.cariEntries) ? incomingCustomer.cariEntries : [];
+    const incomingEntryIds = new Set(incomingEntries.map(e => e.id));
+
+    // Panelde olmayan ama diskte olan 'external' kaynaklı (WhatsApp/Alex) işlemleri koru
+    const preservedExternal = existingEntries.filter(e => 
+      e && e.id && !incomingEntryIds.has(e.id) && 
+      (String(e.source || '').startsWith('whatsapp') || String(e.source || '').startsWith('alex'))
+    );
+
+    return {
+      ...incomingCustomer,
+      cariEntries: [...incomingEntries, ...preservedExternal]
+    };
+  });
+
+  return [...mergedIncoming, ...alexNewCustomers];
 }
 
 function ensureDigerBanka(data,file){
@@ -302,7 +329,8 @@ app.post('/api/data',auth,(req,res)=>{
   const file=getDataFile(req.user.username);
   try{
     const fresh=readFreshUserData(req.user.username).data;
-    const mergedCustomers=mergeCustomersPreservingExternal(fresh.customers,req.body.customers);
+    // req.body.savedAt -> Panelin diski en son okuduğu andaki savedAt değeri
+    const mergedCustomers=mergeCustomersPreservingExternal(fresh.customers,req.body.customers,req.body.savedAt);
     const nextData={
       ...fresh,
       ...req.body,

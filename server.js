@@ -89,6 +89,32 @@ function isDuplicate(queue,from,tutar,receivedAt){
   });
 }
 function getDataFile(username){return path.join(DATA_DIR,`data_${username}.json`);}
+function setNoStore(res){res.set('Cache-Control','no-store');}
+function readFreshUserData(username){
+  const file=getDataFile(username);
+  if(!fs.existsSync(file)){
+    return{
+      file,
+      data:{
+        customers:[],
+        banks:DEFAULT_BANKS,
+        bankRatesVersion:BANK_RATES_VERSION,
+        kasa:{transactions:[]}
+      }
+    };
+  }
+  const raw=JSON.parse(fs.readFileSync(file,'utf8'));
+  if(!Array.isArray(raw.customers))raw.customers=[];
+  if(!Array.isArray(raw.banks))raw.banks=[];
+  if(!raw.kasa)raw.kasa={transactions:[]};
+  if(!Array.isArray(raw.kasa.transactions))raw.kasa.transactions=[];
+  const data=ensureDigerBanka(raw,file);
+  if(!Array.isArray(data.customers))data.customers=[];
+  if(!Array.isArray(data.banks))data.banks=[];
+  if(!data.kasa)data.kasa={transactions:[]};
+  if(!Array.isArray(data.kasa.transactions))data.kasa.transactions=[];
+  return{file,data};
+}
 
 function ensureDigerBanka(data,file){
   const applyLatestRates=data.bankRatesVersion!==BANK_RATES_VERSION;
@@ -249,14 +275,10 @@ app.post('/api/register',(req,res)=>{
 
 // ── Veri oku
 app.get('/api/data',auth,(req,res)=>{
-  res.set('Cache-Control','no-store');
+  setNoStore(res);
   const file=getDataFile(req.user.username);
   try{
-    if(!fs.existsSync(file))return res.json({customers:[],banks:DEFAULT_BANKS,bankRatesVersion:BANK_RATES_VERSION,kasa:{transactions:[]}});
-    const raw=JSON.parse(fs.readFileSync(file,'utf8'));
-    if(!raw.kasa)raw.kasa={transactions:[]};
-    if(!Array.isArray(raw.kasa.transactions))raw.kasa.transactions=[];
-    const data=ensureDigerBanka(raw,file);
+    const{data}=readFreshUserData(req.user.username);
     res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });
@@ -272,14 +294,14 @@ app.post('/api/data',auth,(req,res)=>{
 
 // ── Admin: kullanıcılar
 app.get('/api/admin/users',auth,adminOnly,(req,res)=>{
+  setNoStore(res);
   const users=readUsers();
   res.json(users.map(u=>({username:u.username,passwordPlain:u.passwordPlain||'—',role:u.role,status:u.status,createdAt:u.createdAt})));
 });
 app.get('/api/admin/user-data/:username',auth,adminOnly,(req,res)=>{
-  const file=getDataFile(req.params.username);
+  setNoStore(res);
   try{
-    if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
-    const data=ensureDigerBanka(JSON.parse(fs.readFileSync(file,'utf8')),file);
+    const{data}=readFreshUserData(req.params.username);
     res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });
@@ -415,6 +437,7 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
 
 // ── WhatsApp: kuyruk listesi
 app.get('/api/whatsapp/queue',auth,adminOnly,(req,res)=>{
+  setNoStore(res);
   let q=readQueue();
   const{startDate,endDate}=req.query;
   if(startDate)q=q.filter(i=>i.receivedAt&&i.receivedAt.slice(0,10)>=startDate);
@@ -609,13 +632,7 @@ app.post('/api/alex/sync',(req,res)=>{
     if(!action)return res.status(400).json({success:false,message:'action gerekli'});
     if(!groupId)return res.status(400).json({success:false,message:'groupId gerekli'});
 
-    const file=getDataFile('admin');
-    let raw={customers:[],banks:DEFAULT_BANKS,kasa:{transactions:[]}};
-    if(fs.existsSync(file))raw=JSON.parse(fs.readFileSync(file,'utf8'));
-    if(!raw.kasa)raw.kasa={transactions:[]};
-    if(!Array.isArray(raw.kasa.transactions))raw.kasa.transactions=[];
-    const data=ensureDigerBanka(raw,file);
-    if(!Array.isArray(data.customers))data.customers=[];
+    const{file,data}=readFreshUserData('admin');
 
     const saveData=()=>{
       fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));

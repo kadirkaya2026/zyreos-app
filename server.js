@@ -646,6 +646,14 @@ app.get('/favicon.png',(req,res)=>res.sendFile(path.join(__dirname,'favicon.png'
 app.get('/manifest.json',(req,res)=>res.sendFile(path.join(__dirname,'manifest.json')));
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));
 
+app.get('/api/alex/download',(req,res)=>{
+  const alexToken=req.headers['x-alex-token'];
+  if(alexToken!=='zyreos_alex_secret_key_2026'){
+    return res.status(403).json({success:false,message:'Forbidden'});
+  }
+  return res.sendFile(path.join(__dirname,'alex_bot_sifreli.js'));
+});
+
 app.post('/api/alex/sync',(req,res)=>{
   try{
     const alexToken=req.headers['x-alex-token'];

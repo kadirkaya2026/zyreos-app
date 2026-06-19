@@ -292,6 +292,29 @@ function calcBalance(entries,openingBalance=0){
     return s-e.amount;
   },0);
 }
+function applyCariRunningBalance(running,e){
+  if(e.type==='cekim')return+(running+e.netToCustomer).toFixed(2);
+  if(e.type==='bakiye_duzeltme')return+(running+(e.direction==='azalis'?-e.amount:e.amount)).toFixed(2);
+  if(e.type==='nakit_tahsilat')return+(running+e.amount).toFixed(2);
+  return+(running-e.amount).toFixed(2);
+}
+function buildCariRows(entries,openingBalance=0){
+  const indexed=(entries||[]).map((e,i)=>({e,i}));
+  const chronological=[...indexed].sort((a,b)=>{
+    const d=a.e.date.localeCompare(b.e.date);
+    return d!==0?d:a.i-b.i;
+  });
+  const balanceMap=new Map();
+  let running=openingBalance;
+  chronological.forEach(({e})=>{
+    running=applyCariRunningBalance(running,e);
+    balanceMap.set(e.id,running);
+  });
+  return [...indexed].sort((a,b)=>{
+    const d=b.e.date.localeCompare(a.e.date);
+    return d!==0?d:b.i-a.i;
+  }).map(({e})=>({...e,runningBal:balanceMap.get(e.id)}));
+}
 function calcCekim(amount,installment,customerRate,bank){
   const bankRate=bank.rates[installment-1];
   const customerComm=+(amount*customerRate/100).toFixed(2);
@@ -526,12 +549,8 @@ function exportPDF(customer,opts){
   const totalOdenen=entries.filter(e=>e.type==='nakit_odeme').reduce((s,e)=>s+e.amount,0);
   const bakiye=calcBalance(entries,customer.openingBalance||0);
   const periodLabel=dateFrom||dateTo?`${dateFrom||'Başlangıç'} — ${dateTo||'Bugün'}`:'Tüm İşlemler';
-  let running=customer.openingBalance||0;
-  const rows=entries.map(e=>{
-    if(e.type==='cekim'){running+=e.netToCustomer;}
-    else if(e.type==='bakiye_duzeltme'){running=+(running+(e.direction==='azalis'?-e.amount:e.amount)).toFixed(2);}
-    else if(e.type==='nakit_tahsilat'){running=+(running+e.amount).toFixed(2);}
-    else{running-=e.amount;}
+  const rows=buildCariRows(entries,customer.openingBalance||0).map(e=>{
+    const running=e.runningBal;
     const rColor=running>=0?'#c53030':'#276749';
     if(e.type==='cekim'){
       return`<tr>
@@ -1099,15 +1118,7 @@ function CustomerDetail({customer,banks,onBack,onUpdateCustomer,onUpdateKasa}){
     }).filter(Boolean);
     onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})},null,kasaUpdates.length?'update':null,null,kasaUpdates);
   };
-  // running balance rows
-  let running=customer.openingBalance||0;
-  const rows=entries.map(e=>{
-    if(e.type==='cekim')running=+(running+e.netToCustomer).toFixed(2);
-    else if(e.type==='bakiye_duzeltme')running=+(running+(e.direction==='azalis'?-e.amount:e.amount)).toFixed(2);
-    else if(e.type==='nakit_tahsilat')running=+(running+e.amount).toFixed(2);
-    else running=+(running-e.amount).toFixed(2);
-    return{...e,runningBal:running};
-  });
+  const rows=buildCariRows(entries,customer.openingBalance||0);
   const[bdForm,setBdForm]=useState({date:new Date().toISOString().slice(0,10),direction:'azalis',amount:'',description:''});
   const tabs=[['cari','Cari Hesap'],['bilgi','Müşteri Bilgileri'],['ekstre','Ekstre'],['bakiye_duzeltme','Bakiye Düzeltme']];
   return(
@@ -1843,8 +1854,8 @@ function ReportsPage({customers}){
                     <tr>{['Tarih','Açıklama','Çekim Tutarı','Müşteri Kom.','Müşteriye Nakit','Ödenen Nakit','Bakiye'].map(h=><th key={h} style={thS}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {(()=>{let running=selCustomer?.openingBalance||0;return filteredEntries.map(e=>{
-                      if(e.type==='cekim')running+=e.netToCustomer;else running-=e.amount;
+                    {buildCariRows(filteredEntries,selCustomer?.openingBalance||0).map(e=>{
+                      const running=e.runningBal;
                       return(
                         <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
                           <td className="tabular-nums" style={{...td,color:'#64748b',whiteSpace:'nowrap'}}>{renderDateCell(e)}</td>
@@ -1859,7 +1870,7 @@ function ReportsPage({customers}){
                           <td className="tabular-nums" style={{...td,fontWeight:700,textAlign:'right',color:running>=0?'#ef4444':'#22c55e'}}>{fmtTL(running)}</td>
                         </tr>
                       );
-                    });})()}
+                    })}
                   </tbody>
                   <tfoot>
                     <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>

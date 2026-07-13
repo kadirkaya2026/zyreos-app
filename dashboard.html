@@ -1122,13 +1122,27 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           {selCompanyId&&<div style={{marginBottom:'10px',padding:'8px 12px',borderRadius:'8px',background:'rgba(79,142,247,0.08)',border:'1px solid rgba(79,142,247,0.2)',fontSize:'12px',color:'#4f8ef7'}}>
             Şirket: <b>{mc?.name}</b> | POS: <b>{posType==='fiziki'?'Fiziki':'Sanal'}</b>
           </div>}
-          <div style={{marginBottom:'10px'}}>
+          <div style={{marginBottom:'10px',display:'grid',gridTemplateColumns:selCompanyId?'1fr auto':'1fr',gap:'0 16px',alignItems:'end'}}>
             <Field label="Şirket" required>
               <Select value={selCompanyId} onChange={e=>{setSelCompanyId(e.target.value);setPosType('sanal');}}>
                 <option value="">— Şirket Seçiniz —</option>
                 {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </Field>
+            {selCompanyId&&(
+              <Field label="POS Tipi">
+                <div style={{display:'flex',gap:'12px',paddingTop:'4px',paddingBottom:'8px',whiteSpace:'nowrap'}}>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='sanal'?'#4f8ef7':'#94a3b8',fontWeight:posType==='sanal'?700:400}}>
+                    <input type="radio" name="posTypeBulk" checked={posType==='sanal'} onChange={()=>{setPosType('sanal');}} style={{accentColor:'#4f8ef7'}}/>
+                    Sanal POS
+                  </label>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='fiziki'?'#f59e0b':'#94a3b8',fontWeight:posType==='fiziki'?700:400}}>
+                    <input type="radio" name="posTypeBulk" checked={posType==='fiziki'} onChange={()=>{setPosType('fiziki');setBulkRows(p=>p.map(r=>({...r,installment:1})));}} style={{accentColor:'#f59e0b'}}/>
+                    Fiziki POS
+                  </label>
+                </div>
+              </Field>
+            )}
           </div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
@@ -2714,6 +2728,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const[dateFrom,setDateFrom]=useState('');
   const[dateTo,setDateTo]=useState('');
   const[payModal,setPayModal]=useState(null);
+  const[editPayId,setEditPayId]=useState(null);
   const[payForm,setPayForm]=useState({amount:'',date:todayStr(),note:''});
 
   const totalPercent=partners.reduce((s,p)=>s+(p.percent||0),0);
@@ -2744,6 +2759,18 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
     if(!amt)return alert('Tutar giriniz.');
     const partner=partners.find(p=>p.id===payModal);
     if(!partner)return;
+    if(editPayId){
+      if(onUpdatePayments){
+        onUpdatePayments(prev=>(prev||[]).map(p=>p.id===editPayId?{...p,amount:amt,date:payForm.date,note:payForm.note.trim()}:p));
+      }
+      if(onUpdateKasa){
+        onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).map(t=>t.partnerPaymentId===editPayId
+          ?{...t,date:payForm.date,amount:amt,description:'Ortak Ödeme: '+partner.name+(payForm.note?' — '+payForm.note.trim():'')}
+          :t)}));
+      }
+      setPayModal(null);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:''});
+      return;
+    }
     const payId=uid();
     const payments=Array.isArray(partnerPayments)?partnerPayments:[];
     if(onUpdatePayments){
@@ -2753,7 +2780,13 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       const kasaEntry={id:uid(),date:payForm.date,type:'cikis',amount:amt,description:'Ortak Ödeme: '+partner.name+(payForm.note?' — '+payForm.note.trim():''),auto:true,partnerPaymentId:payId};
       onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),kasaEntry]}));
     }
-    setPayModal(null);setPayForm({amount:'',date:todayStr(),note:''});
+    setPayModal(null);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:''});
+  };
+
+  const openEditPayment=(p)=>{
+    setEditPayId(p.id);
+    setPayModal(p.partnerId);
+    setPayForm({amount:String(p.amount),date:p.date,note:p.note||''});
   };
 
   const handleDeletePayment=(payId)=>{
@@ -2878,7 +2911,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                       <td className="tabular-nums" style={{padding:'10px 14px',color:remaining>0?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(remaining)}</td>
                       <td style={{padding:'10px 14px'}}>
                         <div style={{display:'flex',gap:'6px'}}>
-                          <button onClick={()=>{setPayModal(p.id);setPayForm({amount:'',date:todayStr(),note:''});}} style={{background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#22c55e',fontSize:'11px',fontWeight:600}}>Ödeme Yap</button>
+                          <button onClick={()=>{setPayModal(p.id);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:''});}} style={{background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#22c55e',fontSize:'11px',fontWeight:600}}>Ödeme Yap</button>
                           <button onClick={()=>openEdit(p)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
                           <button onClick={()=>handleDelete(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
                         </div>
@@ -2930,7 +2963,10 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                     <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:'#22c55e',fontWeight:700}}>{fmtTL(p.amount)}</td>
                     <td style={{padding:'10px 14px',color:'#94a3b8'}}>{p.note||'—'}</td>
                     <td style={{padding:'10px 14px'}}>
-                      <button onClick={()=>handleDeletePayment(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                      <div style={{display:'flex',gap:'6px'}}>
+                        <button onClick={()=>openEditPayment(p)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
+                        <button onClick={()=>handleDeletePayment(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2944,7 +2980,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       {payModal&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
           <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
-            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Ortak Ödeme — {(partners.find(p=>p.id===payModal)||{}).name}</h3>
+            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>{editPayId?'Ödeme Düzenle':'Ortak Ödeme'} — {(partners.find(p=>p.id===payModal)||{}).name}</h3>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
                 <input type="date" value={payForm.date} onChange={e=>setPayForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
@@ -2957,8 +2993,8 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               </div>
             </div>
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
-              <button onClick={()=>setPayModal(null)} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
-              <button onClick={handlePay} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Ödeme Yap</button>
+              <button onClick={()=>{setPayModal(null);setEditPayId(null);}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={handlePay} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>{editPayId?'Güncelle':'Ödeme Yap'}</button>
             </div>
           </div>
         </div>

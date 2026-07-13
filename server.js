@@ -101,7 +101,9 @@ function readFreshUserData(username){
         bankRatesVersion:BANK_RATES_VERSION,
         kasa:{transactions:[]},
         companies:[],
-        partners:[]
+        partners:[],
+        expenses:[],
+        partnerPayments:[]
       }
     };
   }
@@ -112,6 +114,8 @@ function readFreshUserData(username){
   if(!Array.isArray(raw.kasa.transactions))raw.kasa.transactions=[];
   if(!Array.isArray(raw.companies))raw.companies=[];
   if(!Array.isArray(raw.partners))raw.partners=[];
+  if(!Array.isArray(raw.expenses))raw.expenses=[];
+  if(!Array.isArray(raw.partnerPayments))raw.partnerPayments=[];
   const data=ensureDigerBanka(raw,file);
   if(!Array.isArray(data.customers))data.customers=[];
   if(!Array.isArray(data.banks))data.banks=[];
@@ -119,6 +123,8 @@ function readFreshUserData(username){
   if(!Array.isArray(data.kasa.transactions))data.kasa.transactions=[];
   if(!Array.isArray(data.companies))data.companies=[];
   if(!Array.isArray(data.partners))data.partners=[];
+  if(!Array.isArray(data.expenses))data.expenses=[];
+  if(!Array.isArray(data.partnerPayments))data.partnerPayments=[];
   return{file,data};
 }
 function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, lastSavedAtInPanel) {

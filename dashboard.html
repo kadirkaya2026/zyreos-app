@@ -259,6 +259,11 @@ function addBusinessDays(dateStr,count){
   }
   return localDateStr(d);
 }
+function addCalendarDays(dateStr,days){
+  const d=new Date(dateStr+'T12:00:00');
+  d.setDate(d.getDate()+days);
+  return localDateStr(d);
+}
 function getSettlementDate(cekimDate){return addBusinessDays(cekimDate,2);}
 function getTransferDate(cekimDate){return getSettlementDate(cekimDate);}
 function isWeekendOrHoliday(s){return !isBankingDay(s);}
@@ -830,9 +835,21 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
   const today=todayStr();
   const[form,setForm]=useState({date:today,description:'Kart Çekimi',amount:'',bank:'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
   const[nakit,setNakit]=useState({date:today,description:'Nakit Ödeme',amount:''});
-  const newBulkRow=()=>({id:uid(),date:today,amount:'',bank:banks[0]?.name||'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
+  const newBulkRow=()=>({id:uid(),date:today,amount:'',bank:'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
   const[bulkRows,setBulkRows]=useState([newBulkRow()]);
   const[selCompanyId,setSelCompanyId]=useState('');
+  const[posType,setPosType]=useState('sanal');
+
+  const migrateCompany=(c)=>{
+    if(c.bankRates&&c.bankRates.length>0)return c;
+    const oldRates=c.rates||Array(12).fill(0);
+    return{...c,bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:[...oldRates],fizikiRate:parseFloat(oldRates[0])||0}))};
+  };
+
+  const selCompany=selCompanyId?(companies||[]).find(c=>c.id===selCompanyId):null;
+  const mc=selCompany?migrateCompany(selCompany):null;
+  const companyBankList=mc?mc.bankRates.map(br=>br.bankName):banks.map(b=>b.name);
+
   useEffect(()=>{
     if(open){
       if(editingEntry){
@@ -847,44 +864,99 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           setNakit({date:editingEntry.date||today,description:editingEntry.description||'Bakiye Düzeltme',amount:String(editingEntry.amount||''),direction:editingEntry.direction||'artis'});
         }else{
           setType('cekim');
-          setForm({date:editingEntry.date||today,description:editingEntry.description||'Kart Çekimi',amount:String(editingEntry.amount||''),bank:editingEntry.bank||banks[0]?.name||'',installment:editingEntry.installment||1,customerRate:editingEntry.customerRate??customer?.commissionRate??3.5});
+          setForm({date:editingEntry.date||today,description:editingEntry.description||'Kart Çekimi',amount:String(editingEntry.amount||''),bank:editingEntry.bank||'',installment:editingEntry.installment||1,customerRate:editingEntry.customerRate??customer?.commissionRate??3.5});
           setSelCompanyId(editingEntry.companyId||'');
+          setPosType(editingEntry.posType||'sanal');
         }
         setBulkRows([newBulkRow()]);
       }else{
         setType('cekim');
         const defRate=customer?.installmentRates?.[0]??customer?.commissionRate??3.5;
-        setForm({date:today,description:'Kart Çekimi',amount:'',bank:banks[0]?.name||'',installment:1,customerRate:defRate});
+        setForm({date:today,description:'Kart Çekimi',amount:'',bank:'',installment:1,customerRate:defRate});
         setNakit({date:today,description:'Nakit Ödeme',amount:''});
         setBulkRows([newBulkRow()]);
         setSelCompanyId('');
+        setPosType('sanal');
       }
     }
   },[open,customer,editingEntry]);
+
+  // Şirket değiştiğinde ilk bankayı seç
+  useEffect(()=>{
+    if(mc&&mc.bankRates.length>0&&!mc.bankRates.find(br=>br.bankName===form.bank)){
+      setForm(f=>({...f,bank:mc.bankRates[0].bankName}));
+    }
+  },[selCompanyId]);
+
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
   const handleInstallmentChange=(val)=>{
     const inst=parseInt(val);
     const autoRate=customer?.installmentRates?.[inst-1]??customer?.commissionRate??3.5;
     setForm(p=>({...p,installment:inst,customerRate:autoRate}));
   };
-  const selBank=banks.find(b=>b.name===form.bank)||banks[0];
-  const selCompany=(companies||[]).find(c=>c.id===selCompanyId)||null;
+
+  // Efektif banka oranı hesabı
+  const getEffectiveRate=()=>{
+    if(!mc)return null;
+    const brEntry=mc.bankRates.find(br=>br.bankName===form.bank);
+    if(!brEntry)return null;
+    if(posType==='fiziki')return brEntry.fizikiRate||0;
+    return brEntry.sanalRates[(form.installment||1)-1]||0;
+  };
+
+  const effectiveRate=getEffectiveRate();
+  const effectiveBank=effectiveRate!==null?{name:form.bank,rates:Array(12).fill(effectiveRate),fee:0}:(banks.find(b=>b.name===form.bank)||banks[0]);
+
   const calc=useMemo(()=>{
-    if(!form.amount||!selBank)return null;
+    if(!form.amount)return null;
     const amt=parseFloat(form.amount)||0;
     if(!amt)return null;
-    const effectiveBank=selCompany?{...selBank,rates:selCompany.rates}:selBank;
-    return calcCekim(amt,form.installment,form.customerRate,effectiveBank);
-  },[form.amount,form.installment,form.customerRate,selBank,selCompanyId,selCompany]);
+    if(mc&&effectiveRate!==null){
+      const bankRate=effectiveRate;
+      const customerComm=+(amt*(form.customerRate||0)/100).toFixed(2);
+      const netToCustomer=+(amt-customerComm).toFixed(2);
+      const bankCost=+(amt*bankRate/100).toFixed(2);
+      const profit=+(amt*((form.customerRate||0)-bankRate)/100).toFixed(2);
+      return{customerComm,netToCustomer,bankRate,bankCost,profit};
+    }
+    if(!effectiveBank)return null;
+    return calcCekim(amt,posType==='fiziki'?1:form.installment,form.customerRate,effectiveBank);
+  },[form.amount,form.installment,form.customerRate,form.bank,selCompanyId,posType,effectiveRate]);
+
+  const computeSettlementDate=(date)=>{
+    if(!mc)return null;
+    if(posType==='fiziki')return addCalendarDays(date,1);
+    return addBusinessDays(date,mc.valorDays||1);
+  };
+
+  const buildCekimEntry=(entryBase,amt,bankName,inst,custRate)=>{
+    const br=mc?mc.bankRates.find(b=>b.bankName===bankName):null;
+    let bankRate,bankCost,profit,customerComm,netToCustomer;
+    if(br){
+      bankRate=posType==='fiziki'?(br.fizikiRate||0):(br.sanalRates[(inst||1)-1]||0);
+      customerComm=+(amt*custRate/100).toFixed(2);
+      netToCustomer=+(amt-customerComm).toFixed(2);
+      bankCost=+(amt*bankRate/100).toFixed(2);
+      profit=+(amt*(custRate-bankRate)/100).toFixed(2);
+    }else{
+      const fb=banks.find(b=>b.name===bankName)||banks[0];
+      const c2=calcCekim(amt,inst,custRate,fb);
+      bankRate=c2.bankRate;customerComm=c2.customerComm;netToCustomer=c2.netToCustomer;bankCost=c2.bankCost;profit=c2.profit;
+    }
+    const settlementDate=computeSettlementDate(entryBase.date);
+    return{...entryBase,amount:amt,bank:bankName,installment:posType==='fiziki'?1:parseInt(inst),customerRate:custRate,
+      companyId:selCompanyId,companyName:mc?.name||'',posType,settlementDate:settlementDate||'',
+      bankRate,customerComm,netToCustomer,bankCost,profit};
+  };
+
   const handleSave=()=>{
     if(editingEntry){
       if(type==='cekim'){
         const amt=parseFloat(form.amount)||0;
         if(!amt)return alert('Tutar giriniz.');
-        if(!selBank)return alert('Banka seçiniz.');
-        const effectiveBank=selCompany?{...selBank,rates:selCompany.rates}:selBank;
-        const c=calcCekim(amt,form.installment,form.customerRate,effectiveBank);
-        onUpdate({...editingEntry,date:form.date,description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,companyId:selCompanyId,companyName:selCompany?.name||'',...c});
+        if(!selCompanyId)return alert('Şirket seçiniz.');
+        const entry=buildCekimEntry({...editingEntry,date:form.date,description:form.description||'Kart Çekimi',type:'cekim'},amt,form.bank,form.installment,form.customerRate);
+        onUpdate(entry);
       }else if(type==='bakiye_duzeltme'){
         const amt=parseFloat(nakit.amount)||0;
         if(!amt)return alert('Tutar giriniz.');
@@ -904,10 +976,9 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
     if(type==='cekim'){
       const amt=parseFloat(form.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
-      if(!selBank)return alert('Banka seçiniz.');
-      const effectiveBank=selCompany?{...selBank,rates:selCompany.rates}:selBank;
-      const c=calcCekim(amt,form.installment,form.customerRate,effectiveBank);
-      onSave({id:uid(),date:form.date,type:'cekim',description:form.description||'Kart Çekimi',amount:amt,bank:selBank.name,installment:parseInt(form.installment),customerRate:form.customerRate,companyId:selCompanyId,companyName:selCompany?.name||'',createdAt:new Date().toISOString(),...c});
+      if(!selCompanyId)return alert('Şirket seçiniz.');
+      const entry=buildCekimEntry({id:uid(),date:form.date,type:'cekim',description:form.description||'Kart Çekimi',createdAt:new Date().toISOString()},amt,form.bank,form.installment,form.customerRate);
+      onSave(entry);
     }else if(type==='nakit_odeme'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
@@ -923,19 +994,19 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
     }else{
       const valid=bulkRows.filter(r=>parseFloat(r.amount)>0);
       if(!valid.length)return alert('En az bir satıra tutar giriniz.');
+      if(!selCompanyId)return alert('Şirket seçiniz.');
       const allEntries=valid.map(r=>{
         const amt=parseFloat(r.amount);
-        const bank=banks.find(b=>b.name===r.bank)||banks[0];
         const inst=parseInt(r.installment)||1;
         const rate=parseFloat(r.customerRate)||(customer?.installmentRates?.[inst-1]??3.5);
-        const effectiveBank=selCompany?{...bank,rates:selCompany.rates}:bank;
-        const c=calcCekim(amt,inst,rate,effectiveBank);
-        return{id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',amount:amt,bank:bank.name,installment:inst,customerRate:rate,companyId:selCompanyId,companyName:selCompany?.name||'',createdAt:new Date().toISOString(),...c};
+        const bName=r.bank||form.bank;
+        return buildCekimEntry({id:uid(),date:r.date,type:'cekim',description:'Kart Çekimi',createdAt:new Date().toISOString()},amt,bName,inst,rate);
       });
       onSave(allEntries);
     }
     onClose();
   };
+
   const setBulkRow=(id,k,v)=>setBulkRows(p=>p.map(r=>r.id===id?{...r,[k]:v}:r));
   const setBulkInstallment=(id,val)=>{
     const inst=parseInt(val)||1;
@@ -949,6 +1020,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
     </div>
   );
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'6px 8px',color:'#e2e8f0',fontSize:'12px',width:'100%',boxSizing:'border-box'};
+
   return(
     <Modal open={open} onClose={onClose} title={editingEntry?'Kaydı Düzenle':'Yeni Kayıt Ekle'} width={type==='bulk'?820:520}>
       <div style={{display:'flex',gap:'8px',marginBottom:'20px',flexWrap:'wrap'}}>
@@ -963,20 +1035,39 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
             <Field label="Tarih" required><Input type="date" value={form.date} onChange={e=>set('date',e.target.value)}/></Field>
             <Field label="Açıklama"><Input value={form.description} onChange={e=>set('description',e.target.value)}/></Field>
             <Field label="Çekim Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={form.amount} onChange={e=>set('amount',e.target.value)} placeholder="10000"/></Field>
-            <Field label="Banka" required>
-              <Select value={form.bank} onChange={e=>set('bank',e.target.value)}>
-                {banks.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
-              </Select>
-            </Field>
-            <Field label="Şirket (Opsiyonel)">
-              <Select value={selCompanyId} onChange={e=>setSelCompanyId(e.target.value)}>
-                <option value="">— Şirket Seçilmedi —</option>
+            <Field label="Şirket" required>
+              <Select value={selCompanyId} onChange={e=>{setSelCompanyId(e.target.value);setPosType('sanal');}}>
+                <option value="">— Şirket Seçiniz —</option>
                 {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </Field>
+            {selCompanyId&&(
+              <Field label="Banka" required>
+                <Select value={form.bank} onChange={e=>set('bank',e.target.value)}>
+                  {companyBankList.map(bn=><option key={bn} value={bn}>{bn}</option>)}
+                </Select>
+              </Field>
+            )}
+            {selCompanyId&&(
+              <Field label="POS Tipi">
+                <div style={{display:'flex',gap:'8px',paddingTop:'4px'}}>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='sanal'?'#4f8ef7':'#94a3b8',fontWeight:posType==='sanal'?700:400}}>
+                    <input type="radio" name="posType" checked={posType==='sanal'} onChange={()=>{setPosType('sanal');}} style={{accentColor:'#4f8ef7'}}/>
+                    Sanal POS
+                  </label>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='fiziki'?'#f59e0b':'#94a3b8',fontWeight:posType==='fiziki'?700:400}}>
+                    <input type="radio" name="posType" checked={posType==='fiziki'} onChange={()=>{setPosType('fiziki');setForm(f=>({...f,installment:1}));}} style={{accentColor:'#f59e0b'}}/>
+                    Fiziki POS
+                  </label>
+                </div>
+              </Field>
+            )}
             <Field label="Taksit" required>
-              <Select value={form.installment} onChange={e=>handleInstallmentChange(e.target.value)}>
-                {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i===0?'Peşin':`${i+1} Taksit`}</option>)}
+              <Select value={posType==='fiziki'?1:form.installment} onChange={e=>handleInstallmentChange(e.target.value)} disabled={posType==='fiziki'}>
+                {posType==='fiziki'
+                  ?<option value={1}>Peşin</option>
+                  :Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i===0?'Peşin':`${i+1} Taksit`}</option>)
+                }
               </Select>
             </Field>
             <Field label="Müşteri Oranı (%)">
@@ -988,10 +1079,14 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           {calc&&(
             <div style={{background:'#131929',borderRadius:'10px',padding:'14px',marginTop:'4px',border:'1px solid rgba(255,255,255,0.07)'}}>
               <div style={{color:'#94a3b8',fontSize:'11px',fontWeight:700,letterSpacing:'0.05em',marginBottom:'8px',textTransform:'uppercase'}}>Hesaplama Önizlemesi</div>
-              {previewRow('Müşteri Komisyonu',`${fmtTL(calc.customerComm)} (%${form.customerRate})`,'#a855f7')}
+              {previewRow('Müşteri Komisyonu',fmtTL(calc.customerComm)+' (%'+(form.customerRate||0)+')','#a855f7')}
               {previewRow('Müşteriye Nakit',fmtTL(calc.netToCustomer),'#4f8ef7')}
-              {previewRow(`Banka Maliyeti (%${calc.bankRate})`,fmtTL(calc.bankCost),'#ef4444')}
+              {previewRow('POS Maliyeti (%'+calc.bankRate+')',fmtTL(calc.bankCost),'#ef4444')}
               {previewRow('NET KAR',fmtTL(calc.profit),calc.profit>=0?'#22c55e':'#ef4444')}
+              {mc&&<div style={{color:'#64748b',fontSize:'11px',marginTop:'6px'}}>
+                {posType==='fiziki'?'Fiziki POS — Ertesi gün yatar (haftasonu dahil)':'Sanal POS — '+(mc.valorDays===1?'Ertesi iş günü':'2 iş günü')+' valör'}
+                {form.date&&(' → Tahmini yatma: '+fmtDate(computeSettlementDate(form.date)))}
+              </div>}
             </div>
           )}
         </div>
@@ -1007,7 +1102,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))} placeholder="Nakit tahsilat açıklaması..."/></Field>
           <Field label="Tahsilat Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="5000"/></Field>
           <div style={{background:'rgba(6,182,212,0.08)',border:'1px solid rgba(6,182,212,0.2)',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#67e8f9',marginTop:'8px'}}>
-            Bu kayıt bakiyeyi azaltır ve kasaya nakit giriş olarak yansır. Çekim/POS istatistiklerini etkilemez; ekstrede "Nakit Tahsilat" olarak görünür.
+            Bu kayıt bakiyeyi azaltır ve kasaya nakit giriş olarak yansır.
           </div>
         </div>
       ):type==='bakiye_duzeltme'?(
@@ -1015,18 +1110,26 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
           <Field label="Yön" required>
             <select value={nakit.direction||'artis'} onChange={e=>setNakit(p=>({...p,direction:e.target.value}))} style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'}}>
-              <option value="artis">Artış (Bakiye artar — müşteri borcu artar)</option>
-              <option value="azalis">Azalış (Bakiye azalır — müşteri borcu azalır)</option>
+              <option value="artis">Artış (Bakiye artar)</option>
+              <option value="azalis">Azalış (Bakiye azalır)</option>
             </select>
           </Field>
           <Field label="Tutar (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="1000"/></Field>
           <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))} placeholder="Bakiye düzeltme nedeni..."/></Field>
-          <div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#fcd34d',marginTop:'8px'}}>
-            Bu kayıt yalnızca bakiyeyi etkiler. Çekim/ödeme istatistiklerinde ve kasada görünmez; sadece ekstrede "Bakiye Düzeltme" olarak yer alır.
-          </div>
         </div>
       ):(
         <div>
+          {selCompanyId&&<div style={{marginBottom:'10px',padding:'8px 12px',borderRadius:'8px',background:'rgba(79,142,247,0.08)',border:'1px solid rgba(79,142,247,0.2)',fontSize:'12px',color:'#4f8ef7'}}>
+            Şirket: <b>{mc?.name}</b> | POS: <b>{posType==='fiziki'?'Fiziki':'Sanal'}</b>
+          </div>}
+          <div style={{marginBottom:'10px'}}>
+            <Field label="Şirket" required>
+              <Select value={selCompanyId} onChange={e=>{setSelCompanyId(e.target.value);setPosType('sanal');}}>
+                <option value="">— Şirket Seçiniz —</option>
+                {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </Field>
+          </div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
               <thead>
@@ -1042,13 +1145,13 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
                     <td style={{padding:'4px 4px'}}><input type="date" value={r.date} onChange={e=>setBulkRow(r.id,'date',e.target.value)} style={inS}/></td>
                     <td style={{padding:'4px 4px'}}><input type="number" min="0" step="0.01" value={r.amount} onChange={e=>setBulkRow(r.id,'amount',e.target.value)} placeholder="10000" style={{...inS,width:'100px'}}/></td>
                     <td style={{padding:'4px 4px'}}>
-                      <select value={r.bank} onChange={e=>setBulkRow(r.id,'bank',e.target.value)} style={inS}>
-                        {banks.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
+                      <select value={r.bank||companyBankList[0]||''} onChange={e=>setBulkRow(r.id,'bank',e.target.value)} style={inS}>
+                        {companyBankList.map(bn=><option key={bn} value={bn}>{bn}</option>)}
                       </select>
                     </td>
                     <td style={{padding:'4px 4px'}}>
-                      <select value={r.installment} onChange={e=>setBulkInstallment(r.id,e.target.value)} style={{...inS,width:'90px'}}>
-                        {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i===0?'Peşin':`${i+1} Taksit`}</option>)}
+                      <select value={posType==='fiziki'?1:r.installment} onChange={e=>setBulkInstallment(r.id,e.target.value)} style={{...inS,width:'90px'}} disabled={posType==='fiziki'}>
+                        {posType==='fiziki'?<option value={1}>Peşin</option>:Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i===0?'Peşin':`${i+1} Taksit`}</option>)}
                       </select>
                     </td>
                     <td style={{padding:'4px 4px'}}><input type="number" step="0.1" min="0" max="100" value={r.customerRate} onChange={e=>setBulkRow(r.id,'customerRate',e.target.value)} style={{...inS,width:'70px',color:'#f59e0b'}}/></td>
@@ -1072,7 +1175,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       <div style={{display:'flex',gap:'12px',justifyContent:'flex-end',marginTop:'16px'}}>
         <button onClick={onClose} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
         <button onClick={handleSave}
-          style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>{type==='bulk'?`Tümünü Kaydet (${bulkRows.filter(r=>parseFloat(r.amount)>0).length})`:'Kaydet'}</button>
+          style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>{type==='bulk'?'Tümünü Kaydet':'Kaydet'}</button>
       </div>
     </Modal>
   );
@@ -2167,7 +2270,7 @@ function ProfitPage({customers,companies}){
 
             const withSettlement=companyEntries.map(e=>{
               const valor=getCompanyValor(e.companyId);
-              const settlementDate=addBusinessDays(e.date,valor);
+              const settlementDate=e.settlementDate||(e.posType==='fiziki'?addCalendarDays(e.date,1):addBusinessDays(e.date,valor));
               const netAmount=e.amount-(e.bankCost||0);
               return{...e,settlementDate,netAmount};
             });
@@ -2238,22 +2341,39 @@ function ProfitPage({customers,companies}){
 /* ── ŞİRKETLER PAGE ── */
 function CompaniesPage({companies,onUpdateCompanies}){
   const[editId,setEditId]=useState(null);
-  const[form,setForm]=useState({name:'',valorDays:1,rates:Array(12).fill(0)});
-  const[fillAll,setFillAll]=useState('');
+  const[form,setForm]=useState({name:'',valorDays:1,bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
+  const[openBank,setOpenBank]=useState(null);
+  const[fillAllVal,setFillAllVal]=useState({});
 
-  const resetForm=()=>{setForm({name:'',valorDays:1,rates:Array(12).fill(0)});setFillAll('');setEditId(null);};
+  const resetForm=()=>{
+    setForm({name:'',valorDays:1,bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
+    setEditId(null);setOpenBank(null);setFillAllVal({});
+  };
+
+  const migrateCompany=(c)=>{
+    if(c.bankRates&&c.bankRates.length>0)return c;
+    const oldRates=c.rates||Array(12).fill(0);
+    return{...c,bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:[...oldRates],fizikiRate:parseFloat(oldRates[0])||0}))};
+  };
 
   const openEdit=(c)=>{
+    const mc=migrateCompany(c);
     setEditId(c.id);
-    setForm({name:c.name,valorDays:c.valorDays||1,rates:[...(c.rates||Array(12).fill(0))]});
+    const bankRates=INIT_BANKS.map(b=>{
+      const found=(mc.bankRates||[]).find(br=>br.bankName===b.name);
+      return found?{...found}:{bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0};
+    });
+    setForm({name:mc.name,valorDays:mc.valorDays||1,bankRates});
+    setFillAllVal({});
   };
 
   const handleSave=()=>{
     if(!form.name.trim())return alert('Şirket adı giriniz.');
+    const bankRates=form.bankRates.map(br=>({...br,sanalRates:br.sanalRates.map(r=>parseFloat(r)||0),fizikiRate:parseFloat(br.fizikiRate)||0}));
     if(editId){
-      onUpdateCompanies(companies.map(c=>c.id===editId?{...c,name:form.name.trim(),valorDays:form.valorDays,rates:form.rates.map(r=>parseFloat(r)||0)}:c));
+      onUpdateCompanies(companies.map(c=>c.id===editId?{...c,name:form.name.trim(),valorDays:form.valorDays,bankRates}:c));
     }else{
-      onUpdateCompanies([...companies,{id:uid(),name:form.name.trim(),valorDays:form.valorDays,rates:form.rates.map(r=>parseFloat(r)||0),createdAt:new Date().toISOString()}]);
+      onUpdateCompanies([...companies,{id:uid(),name:form.name.trim(),valorDays:form.valorDays,bankRates,createdAt:new Date().toISOString()}]);
     }
     resetForm();
   };
@@ -2264,20 +2384,39 @@ function CompaniesPage({companies,onUpdateCompanies}){
     if(editId===id)resetForm();
   };
 
-  const handleFillAll=()=>{
-    const v=parseFloat(fillAll)||0;
-    setForm(f=>({...f,rates:Array(12).fill(v)}));
+  const setSanalRate=(bankIdx,rateIdx,val)=>{
+    setForm(f=>{
+      const br=[...f.bankRates];
+      br[bankIdx]={...br[bankIdx],sanalRates:[...br[bankIdx].sanalRates]};
+      br[bankIdx].sanalRates[rateIdx]=val;
+      return{...f,bankRates:br};
+    });
   };
 
-  const setRate=(i,v)=>setForm(f=>{const r=[...f.rates];r[i]=v;return{...f,rates:r};});
+  const setFizikiRate=(bankIdx,val)=>{
+    setForm(f=>{
+      const br=[...f.bankRates];
+      br[bankIdx]={...br[bankIdx],fizikiRate:val};
+      return{...f,bankRates:br};
+    });
+  };
+
+  const handleFillAllForBank=(bankIdx)=>{
+    const v=parseFloat(fillAllVal[bankIdx])||0;
+    setForm(f=>{
+      const br=[...f.bankRates];
+      br[bankIdx]={...br[bankIdx],sanalRates:Array(12).fill(v)};
+      return{...f,bankRates:br};
+    });
+  };
 
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
+  const bankColor=(name)=>{const b=INIT_BANKS.find(x=>x.name===name);return b?b.color:'#94a3b8';};
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
-      <h2 style={{fontWeight:800,fontSize:'20px'}}>Şirketler (Sanal POS)</h2>
+      <h2 style={{fontWeight:800,fontSize:'20px'}}>Şirketler (POS Yönetimi)</h2>
 
-      {/* Form */}
       <Card>
         <div style={{fontWeight:700,fontSize:'15px',marginBottom:'16px'}}>{editId?'Şirket Düzenle':'Yeni Şirket Ekle'}</div>
         <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'16px'}}>
@@ -2285,12 +2424,12 @@ function CompaniesPage({companies,onUpdateCompanies}){
             <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Şirket Adı</label>
             <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Örn: XYZ Ödeme A.Ş." style={inS}/>
           </div>
-          <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'200px'}}>
-            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Valör (Ödeme Süresi)</label>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'240px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Sanal POS Valör (Ödeme Süresi)</label>
             <div style={{display:'flex',gap:'8px',marginTop:'4px'}}>
               <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:form.valorDays===1?'#4f8ef7':'#94a3b8',fontWeight:form.valorDays===1?700:400}}>
                 <input type="radio" name="valor" checked={form.valorDays===1} onChange={()=>setForm(f=>({...f,valorDays:1}))} style={{accentColor:'#4f8ef7'}}/>
-                Ertesi Gün (1 İş Günü)
+                Ertesi İş Günü
               </label>
               <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:form.valorDays===2?'#4f8ef7':'#94a3b8',fontWeight:form.valorDays===2?700:400}}>
                 <input type="radio" name="valor" checked={form.valorDays===2} onChange={()=>setForm(f=>({...f,valorDays:2}))} style={{accentColor:'#4f8ef7'}}/>
@@ -2300,25 +2439,48 @@ function CompaniesPage({companies,onUpdateCompanies}){
           </div>
         </div>
 
-        {/* Taksit Oranları */}
-        <div style={{marginBottom:'12px'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
-            <label style={{fontSize:'12px',color:'#64748b',fontWeight:600}}>POS Komisyon Oranları (%)</label>
-            <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
-              <input type="number" step="0.01" min="0" placeholder="Oran" value={fillAll} onChange={e=>setFillAll(e.target.value)}
-                style={{...inS,width:'80px',padding:'5px 8px',fontSize:'12px'}}/>
-              <button onClick={handleFillAll} style={{padding:'5px 12px',borderRadius:'6px',border:'1px solid rgba(79,142,247,0.3)',background:'rgba(79,142,247,0.1)',color:'#4f8ef7',cursor:'pointer',fontSize:'11px',fontWeight:600}}>Tümüne Uygula</button>
+        <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'12px',fontWeight:600}}>Banka Bazlı POS Komisyon Oranları — Her bankayı genişletip oranları girin</div>
+        <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px'}}>
+          {form.bankRates.map((br,bi)=>(
+            <div key={br.bankName} style={{background:'#131929',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)',overflow:'hidden'}}>
+              <button onClick={()=>setOpenBank(openBank===bi?null:bi)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 16px',background:'none',border:'none',cursor:'pointer',color:'#e2e8f0'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                  <div style={{width:'10px',height:'10px',borderRadius:'50%',background:bankColor(br.bankName)}}/>
+                  <span style={{fontWeight:600,fontSize:'14px'}}>{br.bankName}</span>
+                </div>
+                <span style={{color:'#64748b',transform:openBank===bi?'rotate(180deg)':'none',transition:'transform 0.2s',fontSize:'14px'}}>▾</span>
+              </button>
+              {openBank===bi&&(
+                <div style={{padding:'0 16px 16px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div style={{marginTop:'14px',marginBottom:'12px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                      <label style={{fontSize:'12px',color:'#64748b',fontWeight:600}}>Sanal POS Taksit Oranları (%)</label>
+                      <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                        <input type="number" step="0.01" min="0" placeholder="Oran" value={fillAllVal[bi]||''} onChange={e=>setFillAllVal(p=>({...p,[bi]:e.target.value}))}
+                          style={{...inS,width:'80px',padding:'5px 8px',fontSize:'12px'}}/>
+                        <button onClick={()=>handleFillAllForBank(bi)} style={{padding:'5px 12px',borderRadius:'6px',border:'1px solid rgba(79,142,247,0.3)',background:'rgba(79,142,247,0.1)',color:'#4f8ef7',cursor:'pointer',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}}>Tümüne Uygula</button>
+                      </div>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:'6px'}}>
+                      {br.sanalRates.map((r,ri)=>(
+                        <div key={ri} style={{display:'flex',flexDirection:'column',gap:'2px'}}>
+                          <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textAlign:'center'}}>{ri===0?'Peşin':(ri+1)+' Taksit'}</label>
+                          <input type="number" step="0.01" min="0" value={r} onChange={e=>setSanalRate(bi,ri,e.target.value)}
+                            style={{...inS,textAlign:'center',padding:'5px 4px',fontSize:'12px'}}/>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                    <label style={{fontSize:'12px',color:'#f59e0b',fontWeight:600,whiteSpace:'nowrap'}}>Fiziki POS Oranı (%)</label>
+                    <input type="number" step="0.01" min="0" value={br.fizikiRate} onChange={e=>setFizikiRate(bi,e.target.value)}
+                      style={{...inS,width:'100px',padding:'6px 10px',fontSize:'13px',borderColor:'rgba(245,158,11,0.3)'}}/>
+                    <span style={{fontSize:'11px',color:'#64748b'}}>Her zaman ertesi gün yatar (haftasonu dahil)</span>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:'8px'}}>
-            {form.rates.map((r,i)=>(
-              <div key={i} style={{display:'flex',flexDirection:'column',gap:'2px'}}>
-                <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textAlign:'center'}}>{i===0?'Peşin':`${i+1} Taksit`}</label>
-                <input type="number" step="0.01" min="0" value={r} onChange={e=>setRate(i,e.target.value)}
-                  style={{...inS,textAlign:'center',padding:'6px 4px',fontSize:'12px'}}/>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
 
         <div style={{display:'flex',gap:'8px'}}>
@@ -2333,7 +2495,6 @@ function CompaniesPage({companies,onUpdateCompanies}){
         </div>
       </Card>
 
-      {/* Şirket Listesi */}
       {companies.length>0&&(
         <Card style={{padding:0,overflow:'hidden'}}>
           <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
@@ -2345,36 +2506,36 @@ function CompaniesPage({companies,onUpdateCompanies}){
                 <tr>
                   <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Şirket Adı</th>
                   <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Valör</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Peşin</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>3 Taksit</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>6 Taksit</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>12 Taksit</th>
+                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>POS Tipi</th>
                   <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>İşlem</th>
                 </tr>
               </thead>
               <tbody>
-                {companies.map(c=>(
-                  <tr key={c.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <td style={{padding:'10px 14px',fontWeight:600}}>{c.name}</td>
-                    <td style={{padding:'10px 14px',textAlign:'center'}}>
-                      <span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:700,
-                        background:c.valorDays===1?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',
-                        color:c.valorDays===1?'#22c55e':'#f59e0b'}}>
-                        {c.valorDays===1?'Ertesi Gün':'2 İş Günü'}
-                      </span>
-                    </td>
-                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'center',color:'#94a3b8'}}>%{(c.rates||[])[0]||0}</td>
-                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'center',color:'#94a3b8'}}>%{(c.rates||[])[2]||0}</td>
-                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'center',color:'#94a3b8'}}>%{(c.rates||[])[5]||0}</td>
-                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'center',color:'#94a3b8'}}>%{(c.rates||[])[11]||0}</td>
-                    <td style={{padding:'10px 14px',textAlign:'right'}}>
-                      <div style={{display:'flex',gap:'6px',justifyContent:'flex-end'}}>
-                        <button onClick={()=>openEdit(c)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
-                        <button onClick={()=>handleDelete(c.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {companies.map(c=>{
+                  const mc=migrateCompany(c);
+                  return(
+                    <tr key={c.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                      <td style={{padding:'10px 14px',fontWeight:600}}>{c.name}</td>
+                      <td style={{padding:'10px 14px',textAlign:'center'}}>
+                        <span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:700,
+                          background:c.valorDays===1?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',
+                          color:c.valorDays===1?'#22c55e':'#f59e0b'}}>
+                          {c.valorDays===1?'Ertesi İş Günü':'2 İş Günü'}
+                        </span>
+                      </td>
+                      <td style={{padding:'10px 14px',textAlign:'center'}}>
+                        <span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(79,142,247,0.1)',color:'#4f8ef7',marginRight:'4px'}}>Sanal</span>
+                        <span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(245,158,11,0.1)',color:'#f59e0b'}}>Fiziki</span>
+                      </td>
+                      <td style={{padding:'10px 14px',textAlign:'right'}}>
+                        <div style={{display:'flex',gap:'6px',justifyContent:'flex-end'}}>
+                          <button onClick={()=>openEdit(c)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
+                          <button onClick={()=>handleDelete(c.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -2385,7 +2546,151 @@ function CompaniesPage({companies,onUpdateCompanies}){
         <div style={{textAlign:'center',padding:'60px 20px',color:'#64748b'}}>
           <div style={{fontSize:'40px',marginBottom:'12px'}}>🏢</div>
           <div style={{fontSize:'16px',fontWeight:600,marginBottom:'6px'}}>Henüz şirket eklenmedi</div>
-          <div style={{fontSize:'13px'}}>Sanal POS şirketlerinizi yukarıdan ekleyebilirsiniz</div>
+          <div style={{fontSize:'13px'}}>POS şirketlerinizi yukarıdan ekleyebilirsiniz</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── GİDERLER PAGE ── */
+function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
+  const today=todayStr();
+  const[form,setForm]=useState({date:today,description:'',amount:''});
+  const[editId,setEditId]=useState(null);
+  const[dateFrom,setDateFrom]=useState('');
+  const[dateTo,setDateTo]=useState('');
+
+  const resetForm=()=>{setForm({date:today,description:'',amount:''});setEditId(null);};
+
+  const handleSave=()=>{
+    const amt=parseFloat(form.amount)||0;
+    if(!amt)return alert('Tutar giriniz.');
+    if(!form.description.trim())return alert('Açıklama giriniz.');
+    if(editId){
+      onUpdateExpenses(expenses.map(e=>e.id===editId?{...e,date:form.date,description:form.description.trim(),amount:amt}:e));
+    }else{
+      const expId=uid();
+      onUpdateExpenses([...expenses,{id:expId,date:form.date,description:form.description.trim(),amount:amt,createdAt:new Date().toISOString()}]);
+      // Kasaya çıkış ekle
+      if(onUpdateKasa){
+        const kasaEntry={id:uid(),date:form.date,type:'cikis',amount:amt,description:'Gider: '+form.description.trim(),auto:true,expenseId:expId};
+        onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),kasaEntry]}));
+      }
+    }
+    resetForm();
+  };
+
+  const handleDelete=(id)=>{
+    if(!window.confirm('Bu gideri silmek istediğinize emin misiniz?'))return;
+    onUpdateExpenses(expenses.filter(e=>e.id!==id));
+    // İlgili kasa kaydını da sil
+    if(onUpdateKasa){
+      onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.expenseId!==id)}));
+    }
+    if(editId===id)resetForm();
+  };
+
+  const filtered=expenses.filter(e=>{
+    if(dateFrom&&e.date<dateFrom)return false;
+    if(dateTo&&e.date>dateTo)return false;
+    return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+
+  const totalExpenses=filtered.reduce((s,e)=>s+e.amount,0);
+
+  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
+
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
+      <h2 style={{fontWeight:800,fontSize:'20px'}}>Giderler</h2>
+
+      <Card>
+        <div style={{fontWeight:700,fontSize:'15px',marginBottom:'16px'}}>{editId?'Gider Düzenle':'Yeni Gider Ekle'}</div>
+        <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'140px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Tarih</label>
+            <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} style={inS}/>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',flex:1,minWidth:'200px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Açıklama</label>
+            <input value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Kira, maaş, fatura..." style={inS}/>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'120px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Tutar (₺)</label>
+            <input type="number" step="0.01" min="0" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={inS}/>
+          </div>
+          <div style={{display:'flex',gap:'8px'}}>
+            <button onClick={handleSave} style={{background:'#ef4444',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
+              {editId?'Güncelle':'Ekle'}
+            </button>
+            {editId&&<button onClick={resetForm} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>}
+          </div>
+        </div>
+      </Card>
+
+      <div style={{display:'flex',gap:'14px',flexWrap:'wrap'}}>
+        <div style={{background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)',borderRadius:'12px',padding:'20px 28px',minWidth:'200px'}}>
+          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Gider</div>
+          <div style={{fontSize:'24px',fontWeight:800,color:'#ef4444'}}>{fmtTL(totalExpenses)}</div>
+        </div>
+        <div style={{display:'flex',gap:'10px',alignItems:'flex-end',flexWrap:'wrap'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Başlangıç</label>
+            <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{...inS,width:'auto'}}/>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Bitiş</label>
+            <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{...inS,width:'auto'}}/>
+          </div>
+          {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom('');setDateTo('');}} style={{padding:'8px 14px',borderRadius:'8px',border:'1px solid rgba(239,68,68,.3)',background:'rgba(239,68,68,.1)',color:'#ef4444',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Temizle</button>}
+        </div>
+      </div>
+
+      {filtered.length>0?(
+        <Card style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+            <span style={{fontWeight:700,fontSize:'14px'}}>Gider Kayıtları ({filtered.length})</span>
+          </div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+              <thead>
+                <tr>
+                  {['Tarih','Açıklama','Tutar','İşlem'].map(h=>
+                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(e=>(
+                  <tr key={e.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                    <td className="tabular-nums" style={{padding:'10px 14px',color:'#94a3b8'}}>{fmtDate(e.date)}</td>
+                    <td style={{padding:'10px 14px',fontWeight:600}}>{e.description}</td>
+                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:'#ef4444',fontWeight:700}}>{fmtTL(e.amount)}</td>
+                    <td style={{padding:'10px 14px'}}>
+                      <div style={{display:'flex',gap:'6px'}}>
+                        <button onClick={()=>{setEditId(e.id);setForm({date:e.date,description:e.description,amount:String(e.amount)});}} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
+                        <button onClick={()=>handleDelete(e.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
+                  <td colSpan={2} style={{padding:'10px 14px',fontWeight:700,color:'#94a3b8',fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
+                  <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:'#ef4444',fontWeight:800,fontSize:'15px'}}>{fmtTL(totalExpenses)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </Card>
+      ):(
+        <div style={{textAlign:'center',padding:'60px 20px',color:'#64748b'}}>
+          <div style={{fontSize:'40px',marginBottom:'12px'}}>💸</div>
+          <div style={{fontSize:'16px',fontWeight:600,marginBottom:'6px'}}>Henüz gider kaydı yok</div>
+          <div style={{fontSize:'13px'}}>Yukarıdan gider ekleyebilirsiniz</div>
         </div>
       )}
     </div>
@@ -2393,11 +2698,13 @@ function CompaniesPage({companies,onUpdateCompanies}){
 }
 
 /* ── ORTAKLAR PAGE ── */
-function PartnersPage({partners,onUpdatePartners,customers}){
+function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,kasa,onUpdateKasa}){
   const[form,setForm]=useState({name:'',percent:''});
   const[editId,setEditId]=useState(null);
   const[dateFrom,setDateFrom]=useState('');
   const[dateTo,setDateTo]=useState('');
+  const[payModal,setPayModal]=useState(null);
+  const[payForm,setPayForm]=useState({amount:'',date:todayStr(),note:''});
 
   const totalPercent=partners.reduce((s,p)=>s+(p.percent||0),0);
 
@@ -2422,6 +2729,33 @@ function PartnersPage({partners,onUpdatePartners,customers}){
     if(editId===id)resetForm();
   };
 
+  const handlePay=()=>{
+    const amt=parseFloat(payForm.amount)||0;
+    if(!amt)return alert('Tutar giriniz.');
+    const partner=partners.find(p=>p.id===payModal);
+    if(!partner)return;
+    const payId=uid();
+    const payments=Array.isArray(partnerPayments)?partnerPayments:[];
+    if(onUpdatePayments){
+      onUpdatePayments([...payments,{id:payId,partnerId:payModal,partnerName:partner.name,amount:amt,date:payForm.date,note:payForm.note.trim(),createdAt:new Date().toISOString()}]);
+    }
+    if(onUpdateKasa){
+      const kasaEntry={id:uid(),date:payForm.date,type:'cikis',amount:amt,description:'Ortak Ödeme: '+partner.name+(payForm.note?' — '+payForm.note.trim():''),auto:true,partnerPaymentId:payId};
+      onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),kasaEntry]}));
+    }
+    setPayModal(null);setPayForm({amount:'',date:todayStr(),note:''});
+  };
+
+  const handleDeletePayment=(payId)=>{
+    if(!window.confirm('Bu ödemeyi silmek istediğinize emin misiniz?'))return;
+    if(onUpdatePayments){
+      onUpdatePayments((partnerPayments||[]).filter(p=>p.id!==payId));
+    }
+    if(onUpdateKasa){
+      onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.partnerPaymentId!==payId)}));
+    }
+  };
+
   // Kar hesaplama
   const allCekim=customers.flatMap(c=>
     (c.cariEntries||[]).filter(e=>e.type==='cekim').map(e=>({...e,customerName:c.name}))
@@ -2435,6 +2769,10 @@ function PartnersPage({partners,onUpdatePartners,customers}){
   const totalKom=allCekim.reduce((s,r)=>s+(r.customerComm||0),0);
   const totalBankCost=allCekim.reduce((s,r)=>s+(r.bankCost||0),0);
   const totalProfit=allCekim.reduce((s,r)=>s+(r.profit||0),0);
+
+  const payments=Array.isArray(partnerPayments)?partnerPayments:[];
+  const getPartnerPayments=(pid)=>payments.filter(p=>p.partnerId===pid);
+  const getPartnerTotalPaid=(pid)=>getPartnerPayments(pid).reduce((s,p)=>s+p.amount,0);
 
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
@@ -2509,7 +2847,7 @@ function PartnersPage({partners,onUpdatePartners,customers}){
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
               <thead>
                 <tr>
-                  {['Ortak','Yüzde','Pay (Kar)','Çekim Hacmi Payı','Komisyon Payı'].map(h=>
+                  {['Ortak','Yüzde','Pay (Kar)','Ödenen','Kalan','İşlem'].map(h=>
                     <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
                   )}
                 </tr>
@@ -2517,8 +2855,8 @@ function PartnersPage({partners,onUpdatePartners,customers}){
               <tbody>
                 {partners.map(p=>{
                   const share=totalProfit*(p.percent/100);
-                  const cekimShare=totalCekim*(p.percent/100);
-                  const komShare=totalKom*(p.percent/100);
+                  const paid=getPartnerTotalPaid(p.id);
+                  const remaining=share-paid;
                   return(
                     <tr key={p.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
                       <td style={{padding:'10px 14px',fontWeight:700}}>{p.name}</td>
@@ -2526,8 +2864,15 @@ function PartnersPage({partners,onUpdatePartners,customers}){
                         <span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:'rgba(79,142,247,0.15)',color:'#4f8ef7'}}>%{p.percent}</span>
                       </td>
                       <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:700,fontSize:'15px'}}>{fmtTL(share)}</td>
-                      <td className="tabular-nums" style={{padding:'10px 14px',color:'#4f8ef7'}}>{fmtTL(cekimShare)}</td>
-                      <td className="tabular-nums" style={{padding:'10px 14px',color:'#a855f7'}}>{fmtTL(komShare)}</td>
+                      <td className="tabular-nums" style={{padding:'10px 14px',color:'#f59e0b',fontWeight:600}}>{fmtTL(paid)}</td>
+                      <td className="tabular-nums" style={{padding:'10px 14px',color:remaining>0?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(remaining)}</td>
+                      <td style={{padding:'10px 14px'}}>
+                        <div style={{display:'flex',gap:'6px'}}>
+                          <button onClick={()=>{setPayModal(p.id);setPayForm({amount:'',date:todayStr(),note:''});}} style={{background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#22c55e',fontSize:'11px',fontWeight:600}}>Ödeme Yap</button>
+                          <button onClick={()=>openEdit(p)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
+                          <button onClick={()=>handleDelete(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -2537,8 +2882,8 @@ function PartnersPage({partners,onUpdatePartners,customers}){
                   <td style={{padding:'10px 14px',fontWeight:700,color:'#94a3b8',fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
                   <td style={{padding:'10px 14px'}}><span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:totalPercent===100?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',color:totalPercent===100?'#22c55e':'#f59e0b'}}>%{totalPercent.toFixed(1)}</span></td>
                   <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:800,fontSize:'15px'}}>{fmtTL(totalProfit)}</td>
-                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#4f8ef7',fontWeight:700}}>{fmtTL(totalCekim)}</td>
-                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#a855f7',fontWeight:700}}>{fmtTL(totalKom)}</td>
+                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#f59e0b',fontWeight:700}}>{fmtTL(payments.reduce((s,p)=>s+p.amount,0))}</td>
+                  <td colSpan={2}></td>
                 </tr>
               </tfoot>
             </table>
@@ -2551,6 +2896,63 @@ function PartnersPage({partners,onUpdatePartners,customers}){
           </div>
         )}
       </Card>
+
+      {/* Ödeme Geçmişi */}
+      {payments.length>0&&(
+        <Card style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+            <span style={{fontWeight:700,fontSize:'14px'}}>Ödeme Geçmişi ({payments.length})</span>
+          </div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+              <thead>
+                <tr>
+                  {['Tarih','Ortak','Tutar','Not','İşlem'].map(h=>
+                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {payments.sort((a,b)=>b.date.localeCompare(a.date)).map(p=>(
+                  <tr key={p.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                    <td className="tabular-nums" style={{padding:'10px 14px',color:'#94a3b8'}}>{fmtDate(p.date)}</td>
+                    <td style={{padding:'10px 14px',fontWeight:600}}>{p.partnerName}</td>
+                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:'#22c55e',fontWeight:700}}>{fmtTL(p.amount)}</td>
+                    <td style={{padding:'10px 14px',color:'#94a3b8'}}>{p.note||'—'}</td>
+                    <td style={{padding:'10px 14px'}}>
+                      <button onClick={()=>handleDeletePayment(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* Ödeme Modalı */}
+      {payModal&&(
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
+          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
+            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Ortak Ödeme — {(partners.find(p=>p.id===payModal)||{}).name}</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
+                <input type="date" value={payForm.date} onChange={e=>setPayForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tutar (₺)</label>
+                <input type="number" min="0" step="0.01" value={payForm.amount} onChange={e=>setPayForm(p=>({...p,amount:e.target.value}))} placeholder="0.00" style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Not (Opsiyonel)</label>
+                <input value={payForm.note} onChange={e=>setPayForm(p=>({...p,note:e.target.value}))} placeholder="Ödeme notu..." style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
+              <button onClick={()=>setPayModal(null)} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={handlePay} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Ödeme Yap</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2775,8 +3177,8 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
     {id:'customers',label:'Müşteriler',icon:<IcoUsers/>},
     {id:'kasa',label:'Kasa',icon:<IcoCash/>},
     {group:'reports'},
-    {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
     {id:'companies',label:'Şirketler',icon:<IcoCog/>},
+    {id:'expenses',label:'Giderler',icon:<IcoCash/>},
     ...(role==='admin'?[{id:'waq',label:'WhatsApp',icon:<IcoUpload/>,badge:waqCount}]:[]),
     {id:'partners',label:'Ortaklar',icon:<IcoChart/>},
     {group:'hesabim'},
@@ -3394,7 +3796,7 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
 }
 
 /* ── TOPBAR ── */
-const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',banks:'Banka Ayarları',companies:'Şirketler',partners:'Ortaklar',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
+const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',companies:'Şirketler',expenses:'Giderler',partners:'Ortaklar',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
 function Topbar({page,saved,onMenuToggle}){
   const isMobile=useIsMobile();
   const[installPrompt,setInstallPrompt]=React.useState(null);
@@ -3476,7 +3878,7 @@ function useHashRouter(){
 }
 
 /* ── KASA PAGE ── */
-function KasaPage({kasa,onUpdateKasa,customers}){
+function KasaPage({kasa,onUpdateKasa,customers,companies}){
   const transactions=(kasa&&kasa.transactions)||[];
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
@@ -3496,15 +3898,27 @@ function KasaPage({kasa,onUpdateKasa,customers}){
   // Eski per-transaction auto giris kayıtlarını filtrele (refId var = eski impl)
   const storedTx=transactions.filter(t=>!(t.auto&&t.type==='giris'&&t.refId)&&t.type!=='skipped');
 
-  // Tüm cekimleri transferDate'e göre grupla → dailyCekimMap
+  // Tüm cekimleri settlementDate'e göre grupla
+  const settledIds=new Set(kasa.settledEntryIds||[]);
   const dailyCekimMap={};
-  const today2=new Date().toISOString().slice(0,10);
   (customers||[]).forEach(c=>{
     (c.cariEntries||[]).filter(e=>e.type==='cekim').forEach(e=>{
+      if(settledIds.has(e.id))return;
       const net=e.amount-(e.bankCost||0);
-      const amount=+(net*0.99).toFixed(2);
-      const tDate=getTransferDate(e.date);
-      dailyCekimMap[tDate]=+((dailyCekimMap[tDate]||0)+amount).toFixed(2);
+      const amount=+(net).toFixed(2);
+      let tDate=e.settlementDate;
+      if(!tDate){
+        // Eski kayıtlar için fallback
+        if(e.posType==='fiziki'){tDate=addCalendarDays(e.date,1);}
+        else{
+          const comp=(companies||[]).find(co=>co.id===e.companyId);
+          const valor=comp?comp.valorDays:1;
+          tDate=addBusinessDays(e.date,valor);
+        }
+      }
+      if(!dailyCekimMap[tDate])dailyCekimMap[tDate]={amount:0,entries:[]};
+      dailyCekimMap[tDate].amount=+(dailyCekimMap[tDate].amount+amount).toFixed(2);
+      dailyCekimMap[tDate].entries.push({id:e.id,amount,companyName:e.companyName||'',bank:e.bank||''});
     });
   });
 
@@ -3515,11 +3929,11 @@ function KasaPage({kasa,onUpdateKasa,customers}){
   // Virtual (bekleyen) entry'ler — stored veya atlanmış olmayanlar
   const virtualEntries=Object.entries(dailyCekimMap)
     .filter(([date])=>!storedDates.has(date)&&!skippedDates.has(date))
-    .map(([date,amount])=>{
+    .map(([date,info])=>{
       const d=new Date(date+'T00:00:00');
       const dow=d.getDay();
-      const label=dow===1?date+' Aktarım - Hafta Sonu/Tatil Çekim':date+' Aktarım - Günlük Çekim';
-      return{id:'virtual_'+date,date,type:'giris',amount,description:label,auto:true,virtual:true};
+      const label=date+' Aktarım ('+info.entries.length+' işlem)';
+      return{id:'virtual_'+date,date,type:'giris',amount:info.amount,description:label,auto:true,virtual:true};
     });
 
   const allTransactions=[...storedTx,...virtualEntries].sort((a,b)=>a.date<b.date?-1:1);
@@ -3558,11 +3972,16 @@ function KasaPage({kasa,onUpdateKasa,customers}){
   };
   const handleGunuKapat=()=>{
     if(!kapatDate){setKapatErr('Tarih seçiniz.');return;}
-    const amount=dailyCekimMap[kapatDate]||0;
-    if(!amount){setKapatErr('Bu tarihte çekim kaydı bulunamadı.');return;}
+    const info=dailyCekimMap[kapatDate];
+    if(!info||!info.amount){setKapatErr('Bu tarihte yatacak çekim bulunamadı.');return;}
     if(storedDates.has(kapatDate)){setKapatErr('Bu gün zaten kasaya aktarıldı.');return;}
-    const entry={id:uid(),date:kapatDate,type:'giris',description:kapatDate+' Günlük Çekim Toplamı',amount,auto:true,virtual:false};
-    onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),entry]}));
+    const entry={id:uid(),date:kapatDate,type:'giris',description:kapatDate+' Gün Sonu — '+info.entries.length+' işlem',amount:info.amount,auto:true,virtual:false};
+    const entryIds=info.entries.map(e=>e.id);
+    onUpdateKasa(prev=>({
+      ...prev,
+      transactions:[...(prev.transactions||[]),entry],
+      settledEntryIds:[...(prev.settledEntryIds||[]),...entryIds]
+    }));
     setKapatOpen(false);setKapatErr('');
   };
 
@@ -3646,10 +4065,11 @@ function KasaPage({kasa,onUpdateKasa,customers}){
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
                 <input type="date" value={kapatDate} onChange={e=>{setKapatDate(e.target.value);setKapatErr('');}} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
               </div>
-              {kapatDate&&dailyCekimMap[kapatDate]>0&&!storedDates.has(kapatDate)&&(
+              {kapatDate&&dailyCekimMap[kapatDate]&&dailyCekimMap[kapatDate].amount>0&&!storedDates.has(kapatDate)&&(
                 <div style={{background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.3)',borderRadius:'8px',padding:'12px',fontSize:'13px'}}>
                   <span style={{color:'#94a3b8'}}>Aktarılacak tutar: </span>
-                  <span style={{color:'#22c55e',fontWeight:700}}>{fmt(dailyCekimMap[kapatDate])} ₺</span>
+                  <span style={{color:'#22c55e',fontWeight:700}}>{fmt(dailyCekimMap[kapatDate].amount)} ₺</span>
+                  <div style={{color:'#64748b',fontSize:'11px',marginTop:'4px'}}>{dailyCekimMap[kapatDate].entries.length} adet işlem</div>
                 </div>
               )}
               {kapatErr&&<div style={{color:'#ef4444',fontSize:'12px'}}>{kapatErr}</div>}
@@ -3698,6 +4118,8 @@ function App(){
   const[kasa,setKasa]=useState({transactions:[]});
   const[companies,setCompanies]=useState([]);
   const[partners,setPartners]=useState([]);
+  const[expenses,setExpenses]=useState([]);
+  const[partnerPayments,setPartnerPayments]=useState([]);
   const kasaRef=React.useRef(kasa);
   useEffect(()=>{kasaRef.current=kasa;},[kasa]);
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
@@ -3724,13 +4146,17 @@ function App(){
     const nextKasa=data.kasa?{...data.kasa,transactions:Array.isArray(data.kasa.transactions)?data.kasa.transactions:[]}:{transactions:[]};
     const nextCompanies=Array.isArray(data.companies)?data.companies:[];
     const nextPartners=Array.isArray(data.partners)?data.partners:[];
+    const nextExpenses=Array.isArray(data.expenses)?data.expenses:[];
+    const nextPartnerPayments=Array.isArray(data.partnerPayments)?data.partnerPayments:[];
     setCustomers(nextCustomers);
     setBanks(nextBanks);
     setKasa(nextKasa);
     setCompanies(nextCompanies);
     setPartners(nextPartners);
+    setExpenses(nextExpenses);
+    setPartnerPayments(nextPartnerPayments);
     savedAtRef.current=data.savedAt||'';
-    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners});
+    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners,expenses:nextExpenses,partnerPayments:nextPartnerPayments});
     isDirtyRef.current=false;
     setSaveStatus('idle');
     setSavedTime('');
@@ -3761,7 +4187,7 @@ function App(){
     if(!initialized||!auth)return;
     if(!initRef.current){initRef.current=true;return;}
     if(hydratingRef.current)return;
-    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners});
+    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners,expenses,partnerPayments});
     if(currentSnapshot===lastServerSnapshotRef.current){
       isDirtyRef.current=false;
       if(saveStatus==='saving')setSaveStatus('idle');
@@ -3771,7 +4197,7 @@ function App(){
     clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
-      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
+      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,expenses,partnerPayments,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
         .then(()=>{
           setSaveStatus('saved');setSavedTime(timeStr());
           // Kayıt sonrası güncel veriyi (birleştirilmiş hali) çek
@@ -3784,7 +4210,7 @@ function App(){
         });
     },800);
     return()=>clearTimeout(saveTimerRef.current);
-  },[customers,banks,kasa,companies,partners,initialized]);
+  },[customers,banks,kasa,companies,partners,expenses,partnerPayments,initialized]);
 
   useEffect(()=>{
     if(!auth||auth.role!=='admin')return;
@@ -3870,13 +4296,13 @@ function App(){
               kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}
             />
           )}
-          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers}/>}
+          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers} companies={companies}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
-          {activePage==='banks'&&<BankSettingsPage banks={banks} onUpdateBanks={(updater)=>markDirty(()=>setBanks(updater))}/>}
           {activePage==='companies'&&<CompaniesPage companies={companies} onUpdateCompanies={(updater)=>markDirty(()=>setCompanies(typeof updater==='function'?updater(companies):updater))}/>}
-          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(typeof updater==='function'?updater(partners):updater))} customers={customers}/>}
+          {activePage==='expenses'&&<ExpensesPage expenses={expenses} onUpdateExpenses={(val)=>markDirty(()=>setExpenses(val))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
+          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(typeof updater==='function'?updater(partners):updater))} customers={customers} partnerPayments={partnerPayments} onUpdatePayments={(val)=>markDirty(()=>setPartnerPayments(val))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
           {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>

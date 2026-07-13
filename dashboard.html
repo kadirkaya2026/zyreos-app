@@ -2452,7 +2452,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
         <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'12px',fontWeight:600}}>Banka Bazlı POS Komisyon Oranları — Her bankayı genişletip oranları girin</div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px',maxHeight:'45vh',overflowY:'auto'}}>
           {form.bankRates.map((br,bi)=>(
-            <div key={br.bankName} style={{background:'#131929',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)',overflow:'hidden'}}>
+            <div key={br.bankName} style={{background:'#131929',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)',overflow:'hidden',flexShrink:0}}>
               <button onClick={()=>setOpenBank(openBank===bi?null:bi)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 16px',background:'none',border:'none',cursor:'pointer',color:'#e2e8f0'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                   <div style={{width:'10px',height:'10px',borderRadius:'50%',background:bankColor(br.bankName)}}/>

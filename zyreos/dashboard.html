@@ -848,6 +848,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
 
   const selCompany=selCompanyId?(companies||[]).find(c=>c.id===selCompanyId):null;
   const mc=selCompany?migrateCompany(selCompany):null;
+  const allowedPos=mc?(mc.posTypes||{sanal:true,fiziki:true}):{sanal:true,fiziki:true};
   const companyBankList=mc?mc.bankRates.map(br=>br.bankName):banks.map(b=>b.name);
 
   useEffect(()=>{
@@ -886,6 +887,14 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
     if(mc&&mc.bankRates.length>0&&!mc.bankRates.find(br=>br.bankName===form.bank)){
       setForm(f=>({...f,bank:mc.bankRates[0].bankName}));
     }
+  },[selCompanyId]);
+
+  // Şirketin desteklemediği POS tipi seçiliyse otomatik değiştir
+  useEffect(()=>{
+    if(!mc)return;
+    const ap=mc.posTypes||{sanal:true,fiziki:true};
+    if(posType==='sanal'&&!ap.sanal&&ap.fiziki){setPosType('fiziki');setForm(f=>({...f,installment:1}));setBulkRows(p=>p.map(r=>({...r,installment:1})));}
+    else if(posType==='fiziki'&&!ap.fiziki&&ap.sanal){setPosType('sanal');}
   },[selCompanyId]);
 
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
@@ -1051,14 +1060,14 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
             {selCompanyId&&(
               <Field label="POS Tipi">
                 <div style={{display:'flex',gap:'8px',paddingTop:'4px'}}>
-                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='sanal'?'#4f8ef7':'#94a3b8',fontWeight:posType==='sanal'?700:400}}>
+                  {allowedPos.sanal&&<label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='sanal'?'#4f8ef7':'#94a3b8',fontWeight:posType==='sanal'?700:400}}>
                     <input type="radio" name="posType" checked={posType==='sanal'} onChange={()=>{setPosType('sanal');}} style={{accentColor:'#4f8ef7'}}/>
                     Sanal POS
-                  </label>
-                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='fiziki'?'#f59e0b':'#94a3b8',fontWeight:posType==='fiziki'?700:400}}>
+                  </label>}
+                  {allowedPos.fiziki&&<label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='fiziki'?'#f59e0b':'#94a3b8',fontWeight:posType==='fiziki'?700:400}}>
                     <input type="radio" name="posType" checked={posType==='fiziki'} onChange={()=>{setPosType('fiziki');setForm(f=>({...f,installment:1}));}} style={{accentColor:'#f59e0b'}}/>
                     Fiziki POS
-                  </label>
+                  </label>}
                 </div>
               </Field>
             )}
@@ -1132,14 +1141,14 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
             {selCompanyId&&(
               <Field label="POS Tipi">
                 <div style={{display:'flex',gap:'12px',paddingTop:'4px',paddingBottom:'8px',whiteSpace:'nowrap'}}>
-                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='sanal'?'#4f8ef7':'#94a3b8',fontWeight:posType==='sanal'?700:400}}>
+                  {allowedPos.sanal&&<label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='sanal'?'#4f8ef7':'#94a3b8',fontWeight:posType==='sanal'?700:400}}>
                     <input type="radio" name="posTypeBulk" checked={posType==='sanal'} onChange={()=>{setPosType('sanal');}} style={{accentColor:'#4f8ef7'}}/>
                     Sanal POS
-                  </label>
-                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='fiziki'?'#f59e0b':'#94a3b8',fontWeight:posType==='fiziki'?700:400}}>
+                  </label>}
+                  {allowedPos.fiziki&&<label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='fiziki'?'#f59e0b':'#94a3b8',fontWeight:posType==='fiziki'?700:400}}>
                     <input type="radio" name="posTypeBulk" checked={posType==='fiziki'} onChange={()=>{setPosType('fiziki');setBulkRows(p=>p.map(r=>({...r,installment:1})));}} style={{accentColor:'#f59e0b'}}/>
                     Fiziki POS
-                  </label>
+                  </label>}
                 </div>
               </Field>
             )}
@@ -2356,12 +2365,12 @@ function ProfitPage({customers,companies}){
 function CompaniesPage({companies,onUpdateCompanies}){
   const[editId,setEditId]=useState(null);
   const[modalOpen,setModalOpen]=useState(false);
-  const[form,setForm]=useState({name:'',valorDays:1,bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
+  const[form,setForm]=useState({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
   const[openBank,setOpenBank]=useState(null);
   const[fillAllVal,setFillAllVal]=useState({});
 
   const resetForm=()=>{
-    setForm({name:'',valorDays:1,bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
+    setForm({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
     setEditId(null);setOpenBank(null);setFillAllVal({});
   };
 
@@ -2380,18 +2389,19 @@ function CompaniesPage({companies,onUpdateCompanies}){
       const found=(mc.bankRates||[]).find(br=>br.bankName===b.name);
       return found?{...found}:{bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0};
     });
-    setForm({name:mc.name,valorDays:mc.valorDays||1,bankRates});
+    setForm({name:mc.name,valorDays:mc.valorDays||1,posTypes:mc.posTypes||{sanal:true,fiziki:true},bankRates});
     setFillAllVal({});
     setModalOpen(true);
   };
 
   const handleSave=()=>{
     if(!form.name.trim())return alert('Şirket adı giriniz.');
+    if(!form.posTypes.sanal&&!form.posTypes.fiziki)return alert('En az bir POS tipi seçiniz (Sanal ve/veya Fiziki).');
     const bankRates=form.bankRates.map(br=>({...br,sanalRates:br.sanalRates.map(r=>parseFloat(r)||0),fizikiRate:parseFloat(br.fizikiRate)||0}));
     if(editId){
-      onUpdateCompanies(prev=>prev.map(c=>c.id===editId?{...c,name:form.name.trim(),valorDays:form.valorDays,bankRates}:c));
+      onUpdateCompanies(prev=>prev.map(c=>c.id===editId?{...c,name:form.name.trim(),valorDays:form.valorDays,posTypes:{...form.posTypes},bankRates}:c));
     }else{
-      onUpdateCompanies(prev=>[...prev,{id:uid(),name:form.name.trim(),valorDays:form.valorDays,bankRates,createdAt:new Date().toISOString()}]);
+      onUpdateCompanies(prev=>[...prev,{id:uid(),name:form.name.trim(),valorDays:form.valorDays,posTypes:{...form.posTypes},bankRates,createdAt:new Date().toISOString()}]);
     }
     resetForm();
     setModalOpen(false);
@@ -2448,6 +2458,20 @@ function CompaniesPage({companies,onUpdateCompanies}){
             <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Şirket Adı</label>
             <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Örn: XYZ Ödeme A.Ş." style={inS}/>
           </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'200px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>POS Tipi (birden fazla seçilebilir)</label>
+            <div style={{display:'flex',gap:'12px',marginTop:'4px'}}>
+              <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:form.posTypes.sanal?'#4f8ef7':'#94a3b8',fontWeight:form.posTypes.sanal?700:400}}>
+                <input type="checkbox" checked={form.posTypes.sanal} onChange={e=>setForm(f=>({...f,posTypes:{...f.posTypes,sanal:e.target.checked}}))} style={{accentColor:'#4f8ef7'}}/>
+                Sanal POS
+              </label>
+              <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:form.posTypes.fiziki?'#f59e0b':'#94a3b8',fontWeight:form.posTypes.fiziki?700:400}}>
+                <input type="checkbox" checked={form.posTypes.fiziki} onChange={e=>setForm(f=>({...f,posTypes:{...f.posTypes,fiziki:e.target.checked}}))} style={{accentColor:'#f59e0b'}}/>
+                Fiziki POS
+              </label>
+            </div>
+          </div>
+          {form.posTypes.sanal&&(
           <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'240px'}}>
             <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Sanal POS Valör (Ödeme Süresi)</label>
             <div style={{display:'flex',gap:'8px',marginTop:'4px'}}>
@@ -2461,6 +2485,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
               </label>
             </div>
           </div>
+          )}
         </div>
 
         <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'12px',fontWeight:600}}>Banka Bazlı POS Komisyon Oranları — Her bankayı genişletip oranları girin</div>
@@ -2476,6 +2501,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
               </button>
               {openBank===bi&&(
                 <div style={{padding:'0 16px 16px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                  {form.posTypes.sanal&&(
                   <div style={{marginTop:'14px',marginBottom:'12px'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                       <label style={{fontSize:'12px',color:'#64748b',fontWeight:600}}>Sanal POS Taksit Oranları (%)</label>
@@ -2495,12 +2521,15 @@ function CompaniesPage({companies,onUpdateCompanies}){
                       ))}
                     </div>
                   </div>
-                  <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                  )}
+                  {form.posTypes.fiziki&&(
+                  <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 0',borderTop:form.posTypes.sanal?'1px solid rgba(255,255,255,0.06)':'none',marginTop:form.posTypes.sanal?0:'14px'}}>
                     <label style={{fontSize:'12px',color:'#f59e0b',fontWeight:600,whiteSpace:'nowrap'}}>Fiziki POS Oranı (%)</label>
                     <input type="number" step="0.01" min="0" value={br.fizikiRate} onChange={e=>setFizikiRate(bi,e.target.value)}
                       style={{...inS,width:'100px',padding:'6px 10px',fontSize:'13px',borderColor:'rgba(245,158,11,0.3)'}}/>
                     <span style={{fontSize:'11px',color:'#64748b'}}>Her zaman ertesi gün yatar (haftasonu dahil)</span>
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2548,8 +2577,8 @@ function CompaniesPage({companies,onUpdateCompanies}){
                         </span>
                       </td>
                       <td style={{padding:'10px 14px',textAlign:'center'}}>
-                        <span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(79,142,247,0.1)',color:'#4f8ef7',marginRight:'4px'}}>Sanal</span>
-                        <span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(245,158,11,0.1)',color:'#f59e0b'}}>Fiziki</span>
+                        {(mc.posTypes?mc.posTypes.sanal:true)&&<span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(79,142,247,0.1)',color:'#4f8ef7',marginRight:'4px'}}>Sanal</span>}
+                        {(mc.posTypes?mc.posTypes.fiziki:true)&&<span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(245,158,11,0.1)',color:'#f59e0b'}}>Fiziki</span>}
                       </td>
                       <td style={{padding:'10px 14px',textAlign:'right'}}>
                         <div style={{display:'flex',gap:'6px',justifyContent:'flex-end'}}>
@@ -2722,7 +2751,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
 }
 
 /* ── ORTAKLAR PAGE ── */
-function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,kasa,onUpdateKasa}){
+function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,partnerAdjustments,onUpdateAdjustments,kasa,onUpdateKasa}){
   const[form,setForm]=useState({name:'',percent:''});
   const[editId,setEditId]=useState(null);
   const[dateFrom,setDateFrom]=useState('');
@@ -2730,6 +2759,9 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const[payModal,setPayModal]=useState(null);
   const[editPayId,setEditPayId]=useState(null);
   const[payForm,setPayForm]=useState({amount:'',date:todayStr(),note:''});
+  const[adjModal,setAdjModal]=useState(null);
+  const[editAdjId,setEditAdjId]=useState(null);
+  const[adjForm,setAdjForm]=useState({amount:'',date:todayStr(),note:'',direction:'ekle'});
 
   const totalPercent=partners.reduce((s,p)=>s+(p.percent||0),0);
 
@@ -2799,6 +2831,32 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
     }
   };
 
+  // Hakediş düzeltme işlemleri
+  const handleAdjSave=()=>{
+    const raw=parseFloat(adjForm.amount)||0;
+    if(!raw)return alert('Tutar giriniz.');
+    const partner=partners.find(p=>p.id===adjModal);
+    if(!partner)return;
+    const signed=adjForm.direction==='dus'?-Math.abs(raw):Math.abs(raw);
+    if(editAdjId){
+      onUpdateAdjustments&&onUpdateAdjustments(prev=>(prev||[]).map(a=>a.id===editAdjId?{...a,amount:signed,date:adjForm.date,note:adjForm.note.trim()}:a));
+    }else{
+      onUpdateAdjustments&&onUpdateAdjustments(prev=>[...(prev||[]),{id:uid(),partnerId:adjModal,partnerName:partner.name,amount:signed,date:adjForm.date,note:adjForm.note.trim(),createdAt:new Date().toISOString()}]);
+    }
+    setAdjModal(null);setEditAdjId(null);setAdjForm({amount:'',date:todayStr(),note:'',direction:'ekle'});
+  };
+
+  const openEditAdj=(a)=>{
+    setEditAdjId(a.id);
+    setAdjModal(a.partnerId);
+    setAdjForm({amount:String(Math.abs(a.amount)),date:a.date,note:a.note||'',direction:a.amount<0?'dus':'ekle'});
+  };
+
+  const handleDeleteAdj=(id)=>{
+    if(!window.confirm('Bu hakediş düzeltmesini silmek istediğinize emin misiniz?'))return;
+    onUpdateAdjustments&&onUpdateAdjustments(prev=>(prev||[]).filter(a=>a.id!==id));
+  };
+
   // Kar hesaplama
   const allCekim=customers.flatMap(c=>
     (c.cariEntries||[]).filter(e=>e.type==='cekim').map(e=>({...e,customerName:c.name}))
@@ -2816,6 +2874,9 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const payments=Array.isArray(partnerPayments)?partnerPayments:[];
   const getPartnerPayments=(pid)=>payments.filter(p=>p.partnerId===pid);
   const getPartnerTotalPaid=(pid)=>getPartnerPayments(pid).reduce((s,p)=>s+p.amount,0);
+  const adjustments=Array.isArray(partnerAdjustments)?partnerAdjustments:[];
+  const getPartnerAdjTotal=(pid)=>adjustments.filter(a=>a.partnerId===pid).reduce((s,a)=>s+a.amount,0);
+  const totalAdj=adjustments.reduce((s,a)=>s+a.amount,0);
 
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
@@ -2897,7 +2958,8 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               </thead>
               <tbody>
                 {partners.map(p=>{
-                  const share=totalProfit*(p.percent/100);
+                  const adj=getPartnerAdjTotal(p.id);
+                  const share=totalProfit*(p.percent/100)+adj;
                   const paid=getPartnerTotalPaid(p.id);
                   const remaining=share-paid;
                   return(
@@ -2906,12 +2968,16 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                       <td style={{padding:'10px 14px'}}>
                         <span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:'rgba(79,142,247,0.15)',color:'#4f8ef7'}}>%{p.percent}</span>
                       </td>
-                      <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:700,fontSize:'15px'}}>{fmtTL(share)}</td>
+                      <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:700,fontSize:'15px'}}>
+                        {fmtTL(share)}
+                        {adj!==0&&<div style={{fontSize:'10px',color:adj>0?'#4f8ef7':'#ef4444',fontWeight:600}}>Düzeltme: {adj>0?'+':''}{fmtTL(adj)}</div>}
+                      </td>
                       <td className="tabular-nums" style={{padding:'10px 14px',color:'#f59e0b',fontWeight:600}}>{fmtTL(paid)}</td>
                       <td className="tabular-nums" style={{padding:'10px 14px',color:remaining>0?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(remaining)}</td>
                       <td style={{padding:'10px 14px'}}>
-                        <div style={{display:'flex',gap:'6px'}}>
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                           <button onClick={()=>{setPayModal(p.id);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:''});}} style={{background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#22c55e',fontSize:'11px',fontWeight:600}}>Ödeme Yap</button>
+                          <button onClick={()=>{setAdjModal(p.id);setEditAdjId(null);setAdjForm({amount:'',date:todayStr(),note:'',direction:'ekle'});}} style={{background:'rgba(168,85,247,0.1)',border:'1px solid rgba(168,85,247,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#a855f7',fontSize:'11px',fontWeight:600}}>Hakediş Düzelt</button>
                           <button onClick={()=>openEdit(p)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
                           <button onClick={()=>handleDelete(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
                         </div>
@@ -2924,7 +2990,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                 <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
                   <td style={{padding:'10px 14px',fontWeight:700,color:'#94a3b8',fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
                   <td style={{padding:'10px 14px'}}><span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:totalPercent===100?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',color:totalPercent===100?'#22c55e':'#f59e0b'}}>%{totalPercent.toFixed(1)}</span></td>
-                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:800,fontSize:'15px'}}>{fmtTL(totalProfit)}</td>
+                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:800,fontSize:'15px'}}>{fmtTL(totalProfit+totalAdj)}</td>
                   <td className="tabular-nums" style={{padding:'10px 14px',color:'#f59e0b',fontWeight:700}}>{fmtTL(payments.reduce((s,p)=>s+p.amount,0))}</td>
                   <td colSpan={2}></td>
                 </tr>
@@ -2976,6 +3042,42 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
         </Card>
       )}
 
+      {/* Hakediş Düzeltme Geçmişi */}
+      {adjustments.length>0&&(
+        <Card style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+            <span style={{fontWeight:700,fontSize:'14px'}}>Hakediş Düzeltme Geçmişi ({adjustments.length})</span>
+          </div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+              <thead>
+                <tr>
+                  {['Tarih','Ortak','Tutar','Not','İşlem'].map(h=>
+                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {[...adjustments].sort((a,b)=>b.date.localeCompare(a.date)).map(a=>(
+                  <tr key={a.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                    <td className="tabular-nums" style={{padding:'10px 14px',color:'#94a3b8'}}>{fmtDate(a.date)}</td>
+                    <td style={{padding:'10px 14px',fontWeight:600}}>{a.partnerName}</td>
+                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:a.amount>=0?'#4f8ef7':'#ef4444',fontWeight:700}}>{a.amount>=0?'+':''}{fmtTL(a.amount)}</td>
+                    <td style={{padding:'10px 14px',color:'#94a3b8'}}>{a.note||'—'}</td>
+                    <td style={{padding:'10px 14px'}}>
+                      <div style={{display:'flex',gap:'6px'}}>
+                        <button onClick={()=>openEditAdj(a)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
+                        <button onClick={()=>handleDeleteAdj(a.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       {/* Ödeme Modalı */}
       {payModal&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
@@ -2995,6 +3097,36 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
               <button onClick={()=>{setPayModal(null);setEditPayId(null);}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
               <button onClick={handlePay} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>{editPayId?'Güncelle':'Ödeme Yap'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hakediş Düzeltme Modalı */}
+      {adjModal&&(
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
+          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
+            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>{editAdjId?'Düzeltme Düzenle':'Hakediş Düzeltme'} — {(partners.find(p=>p.id===adjModal)||{}).name}</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
+                <input type="date" value={adjForm.date} onChange={e=>setAdjForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Yön</label>
+                <select value={adjForm.direction} onChange={e=>setAdjForm(p=>({...p,direction:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                  <option value="ekle">Hakediş Ekle (+)</option>
+                  <option value="dus">Hakediş Düş (−)</option>
+                </select>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tutar (₺)</label>
+                <input type="number" min="0" step="0.01" value={adjForm.amount} onChange={e=>setAdjForm(p=>({...p,amount:e.target.value}))} placeholder="0.00" style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Not (Opsiyonel)</label>
+                <input value={adjForm.note} onChange={e=>setAdjForm(p=>({...p,note:e.target.value}))} placeholder="Düzeltme nedeni..." style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
+              <button onClick={()=>{setAdjModal(null);setEditAdjId(null);}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={handleAdjSave} style={{background:'#a855f7',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>{editAdjId?'Güncelle':'Kaydet'}</button>
             </div>
           </div>
         </div>
@@ -4166,6 +4298,7 @@ function App(){
   const[partners,setPartners]=useState([]);
   const[expenses,setExpenses]=useState([]);
   const[partnerPayments,setPartnerPayments]=useState([]);
+  const[partnerAdjustments,setPartnerAdjustments]=useState([]);
   const kasaRef=React.useRef(kasa);
   useEffect(()=>{kasaRef.current=kasa;},[kasa]);
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
@@ -4194,6 +4327,7 @@ function App(){
     const nextPartners=Array.isArray(data.partners)?data.partners:[];
     const nextExpenses=Array.isArray(data.expenses)?data.expenses:[];
     const nextPartnerPayments=Array.isArray(data.partnerPayments)?data.partnerPayments:[];
+    const nextPartnerAdjustments=Array.isArray(data.partnerAdjustments)?data.partnerAdjustments:[];
     setCustomers(nextCustomers);
     setBanks(nextBanks);
     setKasa(nextKasa);
@@ -4201,8 +4335,9 @@ function App(){
     setPartners(nextPartners);
     setExpenses(nextExpenses);
     setPartnerPayments(nextPartnerPayments);
+    setPartnerAdjustments(nextPartnerAdjustments);
     savedAtRef.current=data.savedAt||'';
-    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners,expenses:nextExpenses,partnerPayments:nextPartnerPayments});
+    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners,expenses:nextExpenses,partnerPayments:nextPartnerPayments,partnerAdjustments:nextPartnerAdjustments});
     isDirtyRef.current=false;
     setSaveStatus('idle');
     setSavedTime('');
@@ -4235,7 +4370,7 @@ function App(){
     if(!initialized||!auth)return;
     if(!initRef.current){initRef.current=true;return;}
     if(hydratingRef.current)return;
-    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners,expenses,partnerPayments});
+    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments});
     if(currentSnapshot===lastServerSnapshotRef.current){
       isDirtyRef.current=false;
       if(saveStatus==='saving')setSaveStatus('idle');
@@ -4246,7 +4381,7 @@ function App(){
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
       const versionAtSave=dirtyVersionRef.current;
-      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,expenses,partnerPayments,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
+      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
         .then(()=>{
           setSaveStatus('saved');setSavedTime(timeStr());
           // Kayıt sonrası güncel veriyi çek — ancak bu sırada yeni değişiklik yapıldıysa üzerine YAZMA
@@ -4262,7 +4397,7 @@ function App(){
         });
     },800);
     return()=>clearTimeout(saveTimerRef.current);
-  },[customers,banks,kasa,companies,partners,expenses,partnerPayments,initialized]);
+  },[customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,initialized]);
 
   useEffect(()=>{
     if(!auth||auth.role!=='admin')return;
@@ -4354,7 +4489,7 @@ function App(){
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
           {activePage==='companies'&&<CompaniesPage companies={companies} onUpdateCompanies={(updater)=>markDirty(()=>setCompanies(updater))}/>}
           {activePage==='expenses'&&<ExpensesPage expenses={expenses} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
-          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(updater))} customers={customers} partnerPayments={partnerPayments} onUpdatePayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
+          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(updater))} customers={customers} partnerPayments={partnerPayments} onUpdatePayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} partnerAdjustments={partnerAdjustments} onUpdateAdjustments={(updater)=>markDirty(()=>setPartnerAdjustments(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
           {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>

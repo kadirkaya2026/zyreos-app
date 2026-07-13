@@ -2365,12 +2365,12 @@ function ProfitPage({customers,companies}){
 function CompaniesPage({companies,onUpdateCompanies}){
   const[editId,setEditId]=useState(null);
   const[modalOpen,setModalOpen]=useState(false);
-  const[form,setForm]=useState({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
+  const[form,setForm]=useState({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},fizikiRate:'',bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
   const[openBank,setOpenBank]=useState(null);
   const[fillAllVal,setFillAllVal]=useState({});
 
   const resetForm=()=>{
-    setForm({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
+    setForm({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},fizikiRate:'',bankRates:INIT_BANKS.map(b=>({bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0}))});
     setEditId(null);setOpenBank(null);setFillAllVal({});
   };
 
@@ -2389,7 +2389,9 @@ function CompaniesPage({companies,onUpdateCompanies}){
       const found=(mc.bankRates||[]).find(br=>br.bankName===b.name);
       return found?{...found}:{bankName:b.name,sanalRates:Array(12).fill(0),fizikiRate:0};
     });
-    setForm({name:mc.name,valorDays:mc.valorDays||1,posTypes:mc.posTypes||{sanal:true,fiziki:true},bankRates});
+    const frFound=bankRates.find(b=>parseFloat(b.fizikiRate)>0);
+    const fr=frFound?frFound.fizikiRate:(bankRates[0]?bankRates[0].fizikiRate:0);
+    setForm({name:mc.name,valorDays:mc.valorDays||1,posTypes:mc.posTypes||{sanal:true,fiziki:true},fizikiRate:fr?String(fr):'',bankRates});
     setFillAllVal({});
     setModalOpen(true);
   };
@@ -2397,7 +2399,9 @@ function CompaniesPage({companies,onUpdateCompanies}){
   const handleSave=()=>{
     if(!form.name.trim())return alert('Şirket adı giriniz.');
     if(!form.posTypes.sanal&&!form.posTypes.fiziki)return alert('En az bir POS tipi seçiniz (Sanal ve/veya Fiziki).');
-    const bankRates=form.bankRates.map(br=>({...br,sanalRates:br.sanalRates.map(r=>parseFloat(r)||0),fizikiRate:parseFloat(br.fizikiRate)||0}));
+    const fizikiVal=parseFloat(form.fizikiRate)||0;
+    if(form.posTypes.fiziki&&!fizikiVal)return alert('Fiziki POS çekim oranı giriniz.');
+    const bankRates=form.bankRates.map(br=>({...br,sanalRates:br.sanalRates.map(r=>parseFloat(r)||0),fizikiRate:fizikiVal}));
     if(editId){
       onUpdateCompanies(prev=>prev.map(c=>c.id===editId?{...c,name:form.name.trim(),valorDays:form.valorDays,posTypes:{...form.posTypes},bankRates}:c));
     }else{
@@ -2418,14 +2422,6 @@ function CompaniesPage({companies,onUpdateCompanies}){
       const br=[...f.bankRates];
       br[bankIdx]={...br[bankIdx],sanalRates:[...br[bankIdx].sanalRates]};
       br[bankIdx].sanalRates[rateIdx]=val;
-      return{...f,bankRates:br};
-    });
-  };
-
-  const setFizikiRate=(bankIdx,val)=>{
-    setForm(f=>{
-      const br=[...f.bankRates];
-      br[bankIdx]={...br[bankIdx],fizikiRate:val};
       return{...f,bankRates:br};
     });
   };
@@ -2488,7 +2484,17 @@ function CompaniesPage({companies,onUpdateCompanies}){
           )}
         </div>
 
-        <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'12px',fontWeight:600}}>Banka Bazlı POS Komisyon Oranları — Her bankayı genişletip oranları girin</div>
+        {form.posTypes.fiziki&&(
+        <div style={{background:'#131929',borderRadius:'10px',border:'1px solid rgba(245,158,11,0.25)',padding:'14px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+          <label style={{fontSize:'13px',color:'#f59e0b',fontWeight:700,whiteSpace:'nowrap'}}>Fiziki POS Çekim Oranı (%)</label>
+          <input type="number" step="0.01" min="0" value={form.fizikiRate} onChange={e=>setForm(f=>({...f,fizikiRate:e.target.value}))} placeholder="Örn: 1.49"
+            style={{...inS,width:'110px',padding:'7px 10px',fontSize:'13px',borderColor:'rgba(245,158,11,0.35)'}}/>
+          <span style={{fontSize:'11px',color:'#64748b'}}>Tüm bankalar için geçerli tek oran — her zaman ertesi gün yatar (haftasonu dahil)</span>
+        </div>
+        )}
+
+        {form.posTypes.sanal&&(<>
+        <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'12px',fontWeight:600}}>Banka Bazlı Sanal POS Komisyon Oranları — Her bankayı genişletip oranları girin</div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px',maxHeight:'45vh',overflowY:'auto'}}>
           {form.bankRates.map((br,bi)=>(
             <div key={br.bankName} style={{background:'#131929',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)',overflow:'hidden',flexShrink:0}}>
@@ -2501,7 +2507,6 @@ function CompaniesPage({companies,onUpdateCompanies}){
               </button>
               {openBank===bi&&(
                 <div style={{padding:'0 16px 16px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
-                  {form.posTypes.sanal&&(
                   <div style={{marginTop:'14px',marginBottom:'12px'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
                       <label style={{fontSize:'12px',color:'#64748b',fontWeight:600}}>Sanal POS Taksit Oranları (%)</label>
@@ -2521,20 +2526,12 @@ function CompaniesPage({companies,onUpdateCompanies}){
                       ))}
                     </div>
                   </div>
-                  )}
-                  {form.posTypes.fiziki&&(
-                  <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 0',borderTop:form.posTypes.sanal?'1px solid rgba(255,255,255,0.06)':'none',marginTop:form.posTypes.sanal?0:'14px'}}>
-                    <label style={{fontSize:'12px',color:'#f59e0b',fontWeight:600,whiteSpace:'nowrap'}}>Fiziki POS Oranı (%)</label>
-                    <input type="number" step="0.01" min="0" value={br.fizikiRate} onChange={e=>setFizikiRate(bi,e.target.value)}
-                      style={{...inS,width:'100px',padding:'6px 10px',fontSize:'13px',borderColor:'rgba(245,158,11,0.3)'}}/>
-                    <span style={{fontSize:'11px',color:'#64748b'}}>Her zaman ertesi gün yatar (haftasonu dahil)</span>
-                  </div>
-                  )}
                 </div>
               )}
             </div>
           ))}
         </div>
+        </>)}
 
         <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
           <button onClick={()=>{setModalOpen(false);resetForm();}}

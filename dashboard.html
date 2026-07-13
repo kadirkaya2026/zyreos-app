@@ -15,7 +15,6 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.9/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:#0a0d14;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
@@ -2102,291 +2101,6 @@ function ProfitPage({customers}){
   );
 }
 
-/* ── DEKONT YUKLE PAGE ── */
-function DekontPage({customers,banks,onUpdateCustomers}){
-  const[selCustomerId,setSelCustomerId]=useState('');
-  const[queue,setQueue]=useState([]);
-  const[dragging,setDragging]=useState(false);
-
-  const BANK_NAMES=banks.map(b=>b.name);
-  const selCustomer=customers.find(c=>c.id===selCustomerId)||null;
-
-  /* ── Tesseract OCR ── */
-  const parseReceiptText=(text)=>{
-    const t=text.toUpperCase().replace(/İ/g,'I').replace(/Ş/g,'S').replace(/Ğ/g,'G').replace(/Ü/g,'U').replace(/Ö/g,'O').replace(/Ç/g,'C').replace(/\s+/g,' ');
-    // Tutar
-    let amount=0;
-    const amtPatterns=[
-      /(?:ISLEM TUTARI|TUTAR|CEKIM|AMOUNT|TOPLAM)[^0-9]*([0-9]{1,3}(?:[.,][0-9]{3})*[.,][0-9]{2})/i,
-      /([0-9]{1,3}(?:\.[0-9]{3})+,[0-9]{2})/,
-      /([0-9]+,[0-9]{2})\s*(?:TL|TRY)/i,
-    ];
-    for(const p of amtPatterns){const m=t.match(p);if(m){const s=m[1].replace(/\./g,'').replace(',','.');amount=parseFloat(s)||0;if(amount>0)break;}}
-    // Taksit — genişletilmiş
-    let installment=1;
-    // Peşin kontrolü
-    if(/PESIN|PESIN|TEK CEKIM|TEK CEKIS|PERAKENDE/.test(t)){installment=1;}
-    else{
-      const instPatterns=[
-        /TAKSIT\s*SAYISI\s*[:\-]?\s*([0-9]+)/,   // TAKSİT SAYISI: 6
-        /TAKSIT\s*ADEDI\s*[:\-]?\s*([0-9]+)/,    // TAKSİT ADEDİ: 6
-        /TAKSIT\s*NO\s*[:\-]?\s*[0-9]+\s*\/\s*([0-9]+)/,  // TAKSİT NO: 1/6 → toplam
-        /([0-9]+)\s*\/\s*[0-9]+\s*TAKSIT/,       // 1/6 TAKSİT
-        /TAKSIT\s*[:\-]?\s*([0-9]+)/,            // TAKSİT: 6
-        /([0-9]+)\s*TAKSIT/,                      // 6 TAKSİT
-        /INST(?:ALLMENT)?\s*[:\-]?\s*([0-9]+)/,  // INST: 6
-        /([0-9]+)\s*INST(?:ALLMENT)?/,
-        /TAKSIT[^0-9]*([0-9]+)/,
-        /([0-9]+)[^0-9]*TAKSIT/,
-      ];
-      for(const p of instPatterns){
-        const m=t.match(p);
-        if(m){const v=parseInt(m[1]);if(v>=1&&v<=12){installment=v;break;}}
-      }
-    }
-    // Banka
-    let bank=banks[0]?.name||'';
-    const bankAliases=[
-      ['AKBANK','Akbank'],['QNB','QNB'],['GARANTI','Garanti'],['KUVEYT','Kuveyt'],
-      ['ZIRAAT','Ziraat'],['HALK','Halk'],['IS BANKASI','İş Bankası'],['ISBANKASI','İş Bankası'],
-      ['VAKIF','Vakıf'],['YAPI KREDI','YKB'],['YAPIKREDI','YKB'],['YKB','YKB'],
-    ];
-    for(const[k,v] of bankAliases){if(t.includes(k)){bank=v;break;}}
-    return{amount,installment,bank};
-  };
-
-  const runOCR=async(id)=>{
-    setQueue(q=>q.map(item=>item.id===id?{...item,status:'processing',progress:0}:item));
-    try{
-      const item=queue.find(x=>x.id===id)||(await new Promise(r=>{setQueue(q=>{const found=q.find(x=>x.id===id);r(found);return q;})}));
-      const result=await Tesseract.recognize(item.file,'tur+eng',{
-        logger:m=>{if(m.status==='recognizing text')setQueue(q=>q.map(x=>x.id===id?{...x,progress:Math.round(m.progress*100)}:x));}
-      });
-      const parsed=parseReceiptText(result.data.text);
-      const custRate=selCustomer?.installmentRates?.[parsed.installment-1]??selCustomer?.commissionRate??0;
-      setQueue(q=>q.map(x=>x.id===id?{...x,status:'done',progress:100,rawText:result.data.text,
-        form:{date:todayStr(),amount:parsed.amount||'',bank:parsed.bank,installment:parsed.installment,customerRate:custRate,description:'Kart Çekimi'}
-      }:x));
-    }catch(e){
-      setQueue(q=>q.map(x=>x.id===id?{...x,status:'error',errorMsg:String(e)}:x));
-    }
-  };
-
-  const addFiles=(files)=>{
-    if(!selCustomerId){alert('Önce müşteri seçiniz.');return;}
-    const items=Array.from(files).filter(f=>f.type.startsWith('image/')||f.type==='application/pdf').map(f=>{
-      const custRate=selCustomer?.commissionRate??0;
-      return{id:uid(),file:f,previewUrl:f.type.startsWith('image/')?URL.createObjectURL(f):null,status:'waiting',progress:0,rawText:'',
-        form:{date:todayStr(),amount:'',bank:banks[0]?.name||'',installment:1,customerRate:custRate,description:'Kart Çekimi'}};
-    });
-    if(!items.length){alert('Sadece resim (PNG/JPG) ve PDF dosyaları kabul edilir.');return;}
-    setQueue(q=>[...q,  ...items]);
-  };
-
-  const setForm=(id,k,v)=>setQueue(q=>q.map(x=>x.id===id?{...x,form:{...x.form,[k]:v}}:x));
-
-  const confirmItem=(id)=>{
-    if(!selCustomer)return alert('Müşteri seçili değil.');
-    const item=queue.find(x=>x.id===id);
-    if(!item)return;
-    const f=item.form;
-    const amt=parseFloat(f.amount)||0;
-    if(!amt)return alert('Tutar boş olamaz.');
-    const selBank=banks.find(b=>b.name===f.bank)||banks[0];
-    if(!selBank)return alert('Banka bulunamadı.');
-    const c=calcCekim(amt,parseInt(f.installment),parseFloat(f.customerRate)||0,selBank);
-    const entry={id:uid(),date:f.date,type:'cekim',description:f.description||'Kart Çekimi',
-      amount:amt,bank:selBank.name,installment:parseInt(f.installment),customerRate:parseFloat(f.customerRate)||0,...c};
-    onUpdateCustomers(customers.map(cu=>cu.id===selCustomer.id?{...cu,cariEntries:[...(cu.cariEntries||[]),entry]}:cu));
-    setQueue(q=>q.map(x=>x.id===id?{...x,status:'confirmed'}:x));
-  };
-
-  const confirmAll=()=>{
-    const ready=queue.filter(x=>(x.status==='done'||x.status==='waiting')&&parseFloat(x.form.amount)>0);
-    if(!ready.length)return alert('Cariye eklenecek hazır dekont yok. Tutar girilmemiş olabilir.');
-    ready.forEach(x=>confirmItem(x.id));
-  };
-
-
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
-  const waiting=queue.filter(x=>x.status==='waiting');
-  const confirmed=queue.filter(x=>x.status==='confirmed').length;
-
-  return(
-    <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
-      {/* Müşteri Seçimi */}
-      <Card>
-        <div style={{fontWeight:700,fontSize:'15px',marginBottom:'14px'}}>Dekont Yükle & İşleme Al</div>
-        <div style={{display:'flex',gap:'12px',alignItems:'flex-end',flexWrap:'wrap'}}>
-          <div style={{display:'flex',flexDirection:'column',gap:'4px',flex:1,minWidth:'220px'}}>
-            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Müşteri Seç <span style={{color:'#ef4444'}}>*</span></label>
-            <select value={selCustomerId} onChange={e=>setSelCustomerId(e.target.value)} style={{...inS}}>
-              <option value="">— Müşteri Seçiniz —</option>
-              {customers.map(c=><option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-            </select>
-          </div>
-          {selCustomerId&&<div style={{padding:'8px 14px',background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'8px',color:'#22c55e',fontSize:'13px',fontWeight:600}}>
-            ✓ {selCustomer?.name}
-          </div>}
-        </div>
-      </Card>
-
-      {/* Yükleme Alanı */}
-      <Card style={{textAlign:'center',padding:'36px 32px',borderStyle:dragging?'solid':'dashed',borderWidth:'2px',
-        borderColor:dragging?'#4f8ef7':'rgba(255,255,255,0.12)',background:dragging?'rgba(79,142,247,0.05)':'#0f1320',transition:'all 0.15s',
-        opacity:selCustomerId?1:0.5,pointerEvents:selCustomerId?'all':'none'}}
-        onDragOver={e=>{e.preventDefault();setDragging(true);}}
-        onDragLeave={()=>setDragging(false)}
-        onDrop={e=>{e.preventDefault();setDragging(false);addFiles(e.dataTransfer.files);}}>
-        <div style={{marginBottom:'12px',color:'#4f8ef7'}}>
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-        </div>
-        <div style={{fontWeight:700,fontSize:'15px',marginBottom:'6px'}}>
-          {selCustomerId?'Dekont Yükleyin':'Önce müşteri seçin'}
-        </div>
-        <div style={{color:'#64748b',fontSize:'13px',marginBottom:'16px'}}>PNG, JPG sürükleyip bırakın veya seçin (çoklu seçim yapılabilir)</div>
-        <label style={{display:'inline-block',padding:'9px 22px',borderRadius:'8px',background:'#4f8ef7',color:'#fff',cursor:selCustomerId?'pointer':'not-allowed',fontWeight:700,fontSize:'13px'}}>
-          Dosya Seç
-          <input type="file" multiple style={{display:'none'}} accept="image/*,.pdf"
-            onChange={e=>addFiles(e.target.files)} disabled={!selCustomerId}/>
-        </label>
-        {confirmed>0&&<div style={{marginTop:'12px',color:'#22c55e',fontSize:'12px',fontWeight:600}}>✓ {confirmed} dekont cariye eklendi</div>}
-      </Card>
-
-      {/* Kuyruk */}
-      {queue.length>0&&(
-        <div style={{display:'flex',flexDirection:'column',gap:'14px'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontWeight:700,fontSize:'14px',color:'#94a3b8'}}>Yüklenen Dekontlar ({queue.length})</span>
-            <div style={{display:'flex',gap:'8px'}}>
-              {waiting.length>0&&(
-                <button onClick={()=>waiting.forEach(x=>runOCR(x.id))}
-                  style={{display:'flex',alignItems:'center',gap:'6px',background:'linear-gradient(135deg,#a855f7,#9333ea)',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px'}}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  Tümünü OCR ile Tara ({waiting.length})
-                </button>
-              )}
-              {queue.some(x=>(x.status==='done'||x.status==='waiting')&&parseFloat(x.form.amount)>0)&&(
-                <button onClick={confirmAll}
-                  style={{display:'flex',alignItems:'center',gap:'6px',background:'linear-gradient(135deg,#22c55e,#16a34a)',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px'}}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  Tümünü Cariye Ekle
-                </button>
-              )}
-            </div>
-          </div>
-
-          {queue.map(item=>(
-            <Card key={item.id} style={{padding:0,overflow:'hidden',border:item.status==='confirmed'?'1px solid rgba(34,197,94,0.3)':item.status==='error'?'1px solid rgba(239,68,68,0.3)':'1px solid rgba(255,255,255,0.07)'}}>
-              <div style={{display:'flex',gap:'0',minHeight:'200px'}}>
-                {/* Sol: Görsel önizleme */}
-                <div style={{width:'180px',flexShrink:0,background:'#080c18',display:'flex',alignItems:'center',justifyContent:'center',borderRight:'1px solid rgba(255,255,255,0.07)'}}>
-                  {item.previewUrl
-                    ?<img src={item.previewUrl} alt="dekont" style={{maxWidth:'100%',maxHeight:'180px',objectFit:'contain',padding:'8px'}}/>
-                    :<div style={{color:'#64748b',fontSize:'12px',textAlign:'center',padding:'16px'}}>
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{marginBottom:'6px'}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 2 14 9 21 9"/></svg>
-                      <div>{item.file.name}</div>
-                    </div>
-                  }
-                </div>
-
-                {/* Sağ: Form */}
-                <div style={{flex:1,padding:'16px'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px'}}>
-                    <div>
-                      <div style={{fontWeight:600,fontSize:'13px',color:'#e2e8f0'}}>{item.file.name}</div>
-                      <div style={{fontSize:'11px',color:'#64748b',marginTop:'2px'}}>{(item.file.size/1024).toFixed(0)} KB</div>
-                    </div>
-                    <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
-                      {item.status==='waiting'&&(
-                        <button onClick={()=>runOCR(item.id)}
-                          style={{fontSize:'11px',padding:'5px 12px',borderRadius:'6px',border:'1px solid rgba(168,85,247,0.4)',background:'rgba(168,85,247,0.1)',color:'#a855f7',cursor:'pointer',fontWeight:600}}>
-                          OCR Tara
-                        </button>
-                      )}
-                      {item.status==='processing'&&(
-                        <div style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'#a855f7'}}>
-                          <div style={{width:'12px',height:'12px',borderRadius:'50%',border:'2px solid #a855f7',borderTopColor:'transparent',animation:'spin 0.8s linear infinite'}}/>
-                          Taranıyor %{item.progress}
-                        </div>
-                      )}
-                      {item.status==='done'&&<Badge color="#f59e0b">OCR Tamamlandı</Badge>}
-                      {item.status==='confirmed'&&<Badge color="#22c55e">✓ Cariye Eklendi</Badge>}
-                      {item.status==='error'&&<Badge color="#ef4444">Hata</Badge>}
-                      <button onClick={()=>removeItem(item.id)}
-                        style={{padding:'4px 8px',borderRadius:'6px',border:'1px solid rgba(239,68,68,0.3)',background:'rgba(239,68,68,0.08)',color:'#ef4444',cursor:'pointer',fontSize:'12px'}}>✕</button>
-                    </div>
-                  </div>
-
-                  {item.status==='error'&&(
-                    <div style={{color:'#ef4444',fontSize:'12px',marginBottom:'8px'}}>OCR hatası: {item.errorMsg}</div>
-                  )}
-
-                  {(item.status==='done'||item.status==='waiting')&&(
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr) auto',gap:'10px',alignItems:'flex-end'}}>
-                      <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
-                        <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textTransform:'uppercase'}}>Tarih</label>
-                        <input type="date" value={item.form.date} onChange={e=>setForm(item.id,'date',e.target.value)}
-                          style={{...inS,fontSize:'12px',padding:'6px 10px'}}/>
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
-                        <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textTransform:'uppercase'}}>Çekim Tutarı (₺)</label>
-                        <input type="number" step="0.01" min="0" value={item.form.amount} onChange={e=>setForm(item.id,'amount',e.target.value)}
-                          placeholder="10000" style={{...inS,fontSize:'12px',padding:'6px 10px',color:'#4f8ef7',fontWeight:700}}/>
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
-                        <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textTransform:'uppercase'}}>Banka</label>
-                        <select value={item.form.bank} onChange={e=>setForm(item.id,'bank',e.target.value)}
-                          style={{...inS,fontSize:'12px',padding:'6px 10px'}}>
-                          {banks.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
-                        </select>
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
-                        <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textTransform:'uppercase'}}>Taksit</label>
-                        <select value={item.form.installment} onChange={e=>{
-                          const inst=parseInt(e.target.value);
-                          const autoRate=selCustomer?.installmentRates?.[inst-1]??selCustomer?.commissionRate??0;
-                          setForm(item.id,'installment',inst);setForm(item.id,'customerRate',autoRate);
-                        }} style={{...inS,fontSize:'12px',padding:'6px 10px'}}>
-                          {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i===0?'Peşin':`${i+1} Taksit`}</option>)}
-                        </select>
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
-                        <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textTransform:'uppercase'}}>Müşteri Oranı (%)</label>
-                        <input type="number" step="0.1" min="0" max="100" value={item.form.customerRate} onChange={e=>setForm(item.id,'customerRate',parseFloat(e.target.value)||0)}
-                          style={{...inS,fontSize:'12px',padding:'6px 10px',color:'#f59e0b',fontWeight:700}}/>
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
-                        <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textTransform:'uppercase'}}>Açıklama</label>
-                        <input type="text" value={item.form.description} onChange={e=>setForm(item.id,'description',e.target.value)}
-                          style={{...inS,fontSize:'12px',padding:'6px 10px'}}/>
-                      </div>
-                      <button onClick={()=>confirmItem(item.id)}
-                        style={{gridColumn:'4',padding:'8px 16px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#22c55e,#16a34a)',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px',alignSelf:'flex-end'}}>
-                        ✓ Cariye Ekle
-                      </button>
-                    </div>
-                  )}
-
-                  {item.status==='confirmed'&&(
-                    <div style={{color:'#22c55e',fontSize:'13px',fontWeight:600}}>
-                      ✓ {item.form.amount} ₺ — {item.form.bank} — {item.form.installment===1?'Peşin':`${item.form.installment} Taksit`} — {selCustomer?.name} carisine eklendi
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-}
-
 /* ── HESABIM PAGE ── */
 function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
   const[form,setForm]=useState({newUsername:username,currentPassword:'',newPassword:'',confirmPassword:''});
@@ -2590,15 +2304,12 @@ function BankSettingsPage({banks,onUpdateBanks}){
 ════════════════════════════════════ */
 function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExport,onImport,onLogout,role,username,mobileOpen,onMobileClose,waqCount}){
   const isMobile=useIsMobile();
-  const[expanded,setExpanded]=useState({reports:false,dekont:false,hesabim:false});
+  const[expanded,setExpanded]=useState({reports:false,hesabim:false});
 
   const GROUPS={
     reports:{label:'Raporlamalar',icon:<IcoPDF/>,page:'reports',children:[
       {id:'pos',label:'POS Hesap',icon:<IcoChart/>},
       {id:'profit',label:'Kar Analizi',icon:<IcoChart/>},
-    ]},
-    dekont:{label:'Dekont Yükle',icon:<IcoUpload/>,page:'dekont',children:[
-      ...(role==='admin'?[{id:'waq',label:'WhatsApp',icon:<IcoUpload/>,badge:waqCount}]:[]),
     ]},
     hesabim:{label:'Hesabım',icon:<IcoCog/>,page:'hesabim',children:[
       ...(role==='admin'?[{id:'admin',label:'Kullanıcı Yönetimi',icon:<IcoUsers/>}]:[]),
@@ -2611,7 +2322,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
     {id:'kasa',label:'Kasa',icon:<IcoCash/>},
     {group:'reports'},
     {id:'banks',label:'Banka Ayarları',icon:<IcoCog/>},
-    {group:'dekont'},
+    ...(role==='admin'?[{id:'waq',label:'WhatsApp',icon:<IcoUpload/>,badge:waqCount}]:[]),
     {group:'hesabim'},
   ];
 
@@ -2717,6 +2428,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
               style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:collapsed?'10px 0':'10px 14px',justifyContent:collapsed?'center':'flex-start',borderRadius:'10px',border:'none',background:active?'rgba(79,142,247,0.15)':'transparent',color:active?'#4f8ef7':'#64748b',cursor:'pointer',fontWeight:active?700:500,fontSize:'13px',transition:'all 0.15s',marginBottom:'2px',boxSizing:'border-box'}}>
               <span style={{flexShrink:0}}>{item.icon}</span>
               {!collapsed&&<span style={{flex:1}}>{item.label}</span>}
+              {!collapsed&&item.badge>0&&<span style={{background:'#ef4444',color:'#fff',borderRadius:'10px',padding:'1px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}}>{item.badge}</span>}
             </button>
           );
         })}
@@ -3226,7 +2938,7 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
 }
 
 /* ── TOPBAR ── */
-const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',dekont:'Dekont Yükle',banks:'Banka Ayarları',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
+const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',banks:'Banka Ayarları',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
 function Topbar({page,saved,onMenuToggle}){
   const isMobile=useIsMobile();
   const[installPrompt,setInstallPrompt]=React.useState(null);
@@ -3700,7 +3412,6 @@ function App(){
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
-          {activePage==='dekont'&&<DekontPage customers={customers} banks={banks} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))}/>}
           {activePage==='banks'&&<BankSettingsPage banks={banks} onUpdateBanks={(updater)=>markDirty(()=>setBanks(updater))}/>}
           {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(

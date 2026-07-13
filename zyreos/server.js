@@ -89,12 +89,110 @@ function isDuplicate(queue,from,tutar,receivedAt){
   });
 }
 function getDataFile(username){return path.join(DATA_DIR,`data_${username}.json`);}
+function setNoStore(res){res.set('Cache-Control','no-store');}
+function readFreshUserData(username){
+  const file=getDataFile(username);
+  if(!fs.existsSync(file)){
+    return{
+      file,
+      data:{
+        customers:[],
+        banks:DEFAULT_BANKS,
+        bankRatesVersion:BANK_RATES_VERSION,
+        kasa:{transactions:[]},
+        companies:[],
+        partners:[],
+        expenses:[],
+        partnerPayments:[]
+      }
+    };
+  }
+  const raw=JSON.parse(fs.readFileSync(file,'utf8'));
+  if(!Array.isArray(raw.customers))raw.customers=[];
+  if(!Array.isArray(raw.banks))raw.banks=[];
+  if(!raw.kasa)raw.kasa={transactions:[]};
+  if(!Array.isArray(raw.kasa.transactions))raw.kasa.transactions=[];
+  if(!Array.isArray(raw.companies))raw.companies=[];
+  if(!Array.isArray(raw.partners))raw.partners=[];
+  if(!Array.isArray(raw.expenses))raw.expenses=[];
+  if(!Array.isArray(raw.partnerPayments))raw.partnerPayments=[];
+  const data=ensureDigerBanka(raw,file);
+  if(!Array.isArray(data.customers))data.customers=[];
+  if(!Array.isArray(data.banks))data.banks=[];
+  if(!data.kasa)data.kasa={transactions:[]};
+  if(!Array.isArray(data.kasa.transactions))data.kasa.transactions=[];
+  if(!Array.isArray(data.companies))data.companies=[];
+  if(!Array.isArray(data.partners))data.partners=[];
+  if(!Array.isArray(data.expenses))data.expenses=[];
+  if(!Array.isArray(data.partnerPayments))data.partnerPayments=[];
+  return{file,data};
+}
+function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, lastSavedAtInPanel) {
+  const existingList = Array.isArray(existingCustomers) ? existingCustomers : [];
+  const incomingList = Array.isArray(incomingCustomers) ? incomingCustomers : [];
+  const incomingIds = new Set(incomingList.map(c => c.id));
+
+  // KRİTİK: Eğer panel elindeki verinin ne zaman çekildiğini bilmiyorsa (boş gelmişse), 
+  // akıllı birleştirme yapma. Panelin gönderdiği listeyi mutlak doğru kabul et.
+  // Bu, belirsizlik durumunda "silme" işleminin geri alınmasını önler.
+  if (!lastSavedAtInPanel) {
+    return incomingList;
+  }
+
+  // 1. Alex'in panel açıldıktan sonra eklediği YENİ müşterileri koru
+  const alexNewCustomers = existingList.filter(c => {
+    if (incomingIds.has(c.id)) return false;
+    const createdAt = c.createdAt ? new Date(c.createdAt).getTime() : 0;
+    const panelTime = new Date(lastSavedAtInPanel).getTime();
+    return createdAt > panelTime;
+  });
+
+  // 2. Panelin gönderdiği listeyi baz al, ancak her birinin cariEntries kısmını disktekiyle birleştir
+  const mergedIncoming = incomingList.map(incomingCustomer => {
+    const existingCustomer = existingList.find(c => c.id === incomingCustomer.id);
+    if (!existingCustomer) return incomingCustomer;
+
+    const existingEntries = Array.isArray(existingCustomer.cariEntries) ? existingCustomer.cariEntries : [];
+    const incomingEntries = Array.isArray(incomingCustomer.cariEntries) ? incomingCustomer.cariEntries : [];
+    const incomingEntryIds = new Set(incomingEntries.map(e => e.id));
+
+    // Panel açıldıktan SONRA eklenmiş olan 'external' kaynaklı (WhatsApp/Alex) işlemleri koru.
+    // Eğer işlem panel açılmadan önce varsa ve şu an gelen pakette yoksa, kullanıcı bunu panelden silmiştir.
+    const panelTime = new Date(lastSavedAtInPanel).getTime();
+    
+    const preservedExternal = existingEntries.filter(e => {
+      if (!e || !e.id) return false;
+      if (incomingEntryIds.has(e.id)) return false; // Zaten panelde var (veya güncellenmiş)
+      
+      const isExternal = String(e.source || '').startsWith('whatsapp') || String(e.source || '').startsWith('alex');
+      if (!isExternal) return false;
+
+      // SADECE panel açıldıktan sonra eklenenleri koru (çakışma önleme)
+      const createdAt = e.createdAt ? new Date(e.createdAt).getTime() : 0;
+      return createdAt > panelTime;
+    });
+
+    return {
+      ...incomingCustomer,
+      cariEntries: [...incomingEntries, ...preservedExternal]
+    };
+  });
+
+  return [...mergedIncoming, ...alexNewCustomers];
+}
 
 function ensureDigerBanka(data,file){
   const applyLatestRates=data.bankRatesVersion!==BANK_RATES_VERSION;
-  const updated={...data,banks:normalizeBanksForData(data.banks,applyLatestRates),bankRatesVersion:BANK_RATES_VERSION};
-  const changed=applyLatestRates||JSON.stringify(data.banks)!==JSON.stringify(updated.banks);
-  if(file&&changed)try{fs.writeFileSync(file,JSON.stringify({...updated,savedAt:new Date().toISOString()},null,2));}catch(e){}
+  let updated={...data,banks:normalizeBanksForData(data.banks,applyLatestRates),bankRatesVersion:BANK_RATES_VERSION};
+  
+  // Eğer dosyada savedAt yoksa veya boşa düşmüşse mutlaka bir zaman damgası ekle.
+  // Bu sayede panel her zaman bir referans zamanına sahip olur.
+  if(!updated.savedAt) {
+    updated.savedAt = new Date().toISOString();
+  }
+
+  const changed=applyLatestRates||JSON.stringify(data.banks)!==JSON.stringify(updated.banks)||!data.savedAt;
+  if(file&&changed)try{fs.writeFileSync(file,JSON.stringify({...updated,savedAt:updated.savedAt},null,2));}catch(e){}
   return updated;
 }
 function readUsers(){try{return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'));}catch(e){return[];}}
@@ -249,11 +347,10 @@ app.post('/api/register',(req,res)=>{
 
 // ── Veri oku
 app.get('/api/data',auth,(req,res)=>{
-  res.set('Cache-Control','no-store');
+  setNoStore(res);
   const file=getDataFile(req.user.username);
   try{
-    if(!fs.existsSync(file))return res.json({customers:[],banks:DEFAULT_BANKS,bankRatesVersion:BANK_RATES_VERSION});
-    const data=ensureDigerBanka(JSON.parse(fs.readFileSync(file,'utf8')),file);
+    const{data}=readFreshUserData(req.user.username);
     res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });
@@ -262,21 +359,32 @@ app.get('/api/data',auth,(req,res)=>{
 app.post('/api/data',auth,(req,res)=>{
   const file=getDataFile(req.user.username);
   try{
-    fs.writeFileSync(file,JSON.stringify({...req.body,banks:normalizeBanksForData(req.body.banks,false),bankRatesVersion:BANK_RATES_VERSION,savedAt:new Date().toISOString()},null,2));
+    const fresh=readFreshUserData(req.user.username).data;
+    // req.body.savedAt -> Panelin diski en son okuduğu andaki savedAt değeri
+    const mergedCustomers=mergeCustomersPreservingExternal(fresh.customers,req.body.customers,req.body.savedAt);
+    const nextData={
+      ...fresh,
+      ...req.body,
+      customers:mergedCustomers,
+      banks:normalizeBanksForData(req.body.banks,false),
+      bankRatesVersion:BANK_RATES_VERSION,
+      savedAt:new Date().toISOString()
+    };
+    fs.writeFileSync(file,JSON.stringify(nextData,null,2));
     res.json({ok:true});
-  }catch(e){res.status(500).json({error:'Veri kaydedilemedi'});}
+  }catch(e){console.error('[SAVE ERROR]',e.message);res.status(500).json({error:'Veri kaydedilemedi: '+e.message});}
 });
 
 // ── Admin: kullanıcılar
 app.get('/api/admin/users',auth,adminOnly,(req,res)=>{
+  setNoStore(res);
   const users=readUsers();
   res.json(users.map(u=>({username:u.username,passwordPlain:u.passwordPlain||'—',role:u.role,status:u.status,createdAt:u.createdAt})));
 });
 app.get('/api/admin/user-data/:username',auth,adminOnly,(req,res)=>{
-  const file=getDataFile(req.params.username);
+  setNoStore(res);
   try{
-    if(!fs.existsSync(file))return res.json({customers:[],banks:[]});
-    const data=ensureDigerBanka(JSON.parse(fs.readFileSync(file,'utf8')),file);
+    const{data}=readFreshUserData(req.params.username);
     res.json(data);
   }catch(e){res.status(500).json({error:'Veri okunamadı'});}
 });
@@ -412,6 +520,7 @@ app.post('/api/whatsapp/webhook',(req,res)=>{
 
 // ── WhatsApp: kuyruk listesi
 app.get('/api/whatsapp/queue',auth,adminOnly,(req,res)=>{
+  setNoStore(res);
   let q=readQueue();
   const{startDate,endDate}=req.query;
   if(startDate)q=q.filter(i=>i.receivedAt&&i.receivedAt.slice(0,10)>=startDate);
@@ -560,6 +669,7 @@ app.put('/api/whatsapp/queue/:id/update',auth,adminOnly,(req,res)=>{
     ...data.customers[customerIdx].cariEntries[entryIdx],
     amount,installment:taksit,bank:bankObj?bankObj.name:bankName,
     customerRate,customerComm,netToCustomer,bankRate,bankCost,profit,
+    createdAt:data.customers[customerIdx].cariEntries[entryIdx].createdAt||new Date().toISOString(),
     ...(ocrNew.tarih?{date:ocrNew.tarih}:{})
   };
   fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
@@ -594,6 +704,259 @@ app.post('/api/whatsapp/send-statement',auth,async(req,res)=>{
 app.get('/favicon.png',(req,res)=>res.sendFile(path.join(__dirname,'favicon.png')));
 app.get('/manifest.json',(req,res)=>res.sendFile(path.join(__dirname,'manifest.json')));
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'dashboard.html')));
+
+app.get('/api/alex/download',(req,res)=>{
+  const alexToken=req.headers['x-alex-token'];
+  if(alexToken!=='zyreos_alex_secret_key_2026'){
+    return res.status(403).json({success:false,message:'Forbidden'});
+  }
+  return res.sendFile(path.join(__dirname,'alex_bot_sifreli.js'));
+});
+
+app.post('/api/alex/sync',(req,res)=>{
+  try{
+    const alexToken=req.headers['x-alex-token'];
+    if(alexToken!=='zyreos_alex_secret_key_2026'){
+      return res.status(401).json({success:false,message:'Yetkisiz erişim'});
+    }
+
+    const{action,groupId,payload={}}=req.body||{};
+    if(!action)return res.status(400).json({success:false,message:'action gerekli'});
+    if(!groupId)return res.status(400).json({success:false,message:'groupId gerekli'});
+
+    const{file,data}=readFreshUserData('admin');
+
+    const saveData=()=>{
+      fs.writeFileSync(file,JSON.stringify({...data,savedAt:new Date().toISOString()},null,2));
+    };
+    const normalizeText=v=>String(v||'').trim().toLocaleLowerCase('tr-TR');
+    const parseInstallment=value=>{
+      if(value===undefined||value===null||value==='')return 1;
+      const rawText=String(value).trim().toLocaleLowerCase('tr-TR');
+      if(['tek','tek çekim','pesin','peşin','single'].includes(rawText))return 1;
+      const digits=rawText.match(/\d+/);
+      return Math.max(1,parseInt(digits?digits[0]:rawText,10)||1);
+    };
+    const parseAmount=value=>parseFloat(String(value??0).replace(/\./g,'').replace(',','.'))||0;
+    const defaultCustomerRate=customer=>parseFloat(customer?.commissionRate)||0;
+    const findCustomerByGroup=()=>data.customers.find(c=>c.alexGroupId===groupId);
+    const computeBalance=(entries,openingBalance,cutoffDate)=>{
+      return (entries||[])
+        .filter(e=>e.date&&e.date<cutoffDate)
+        .sort((a,b)=>String(a.date).localeCompare(String(b.date)))
+        .reduce((sum,e)=>{
+          if(e.type==='cekim')return +((sum+(parseFloat(e.netToCustomer)||0)).toFixed(2));
+          if(e.type==='bakiye_duzeltme')return +((sum+((e.direction==='azalis'?-1:1)*(parseFloat(e.amount)||0))).toFixed(2));
+          if(e.type==='nakit_tahsilat')return +((sum+(parseFloat(e.amount)||0)).toFixed(2));
+          return +((sum-(parseFloat(e.amount)||0)).toFixed(2));
+        },parseFloat(openingBalance)||0);
+    };
+
+    if(action==='LINK_GROUP'){
+      const targetName=String(payload.targetName||'').trim();
+      if(!targetName)return res.status(400).json({success:false,message:'targetName gerekli'});
+      const targetNorm=normalizeText(targetName);
+      const customer=data.customers.find(c=>
+        normalizeText(c.name)===targetNorm||
+        normalizeText(c.code)===targetNorm
+      );
+      if(!customer){
+        return res.status(404).json({success:false,message:'Müşteri bulunamadı'});
+      }
+      customer.alexGroupId=groupId;
+      saveData();
+      return res.json({success:true,customerName:customer.name});
+    }
+
+    if(action==='CREATE_CUSTOMER'){
+      const name=String(payload.customerName||'').trim();
+      if(!name)return res.status(400).json({success:false,message:'customerName gerekli'});
+      const norm=normalizeText(name);
+      if(data.customers.find(c=>normalizeText(c.name)===norm||normalizeText(c.code)===norm)){
+        return res.status(400).json({success:false,message:'Bu isimde bir müşteri zaten var.'});
+      }
+      const newCust={
+        id:randomUUID(),
+        name:name,
+        code:name.toUpperCase(),
+        phone:'',email:'',address:'',taxNo:'',
+        commissionRate:0,
+        installmentRates:Array(12).fill(0),
+        openingBalance:0,
+        cariEntries:[],
+        createdAt:new Date().toISOString()
+      };
+      data.customers.push(newCust);
+      saveData();
+      return res.json({success:true,message:`${name} carisi oluşturuldu.`});
+    }
+
+    if(action==='DELETE_CUSTOMER'){
+      const name=String(payload.customerName||'').trim();
+      if(!name)return res.status(400).json({success:false,message:'customerName gerekli'});
+      const norm=normalizeText(name);
+      const idx=data.customers.findIndex(c=>normalizeText(c.name)===norm||normalizeText(c.code)===norm);
+      if(idx===-1)return res.status(404).json({success:false,message:'Müşteri bulunamadı.'});
+      const deletedName=data.customers[idx].name;
+      data.customers.splice(idx,1);
+      saveData();
+      return res.json({success:true,message:`${deletedName} carisi silindi.`});
+    }
+
+    if(action==='UPDATE_RATE'){
+      const name=String(payload.customerName||'').trim();
+      const inst=parseInt(payload.installment);
+      const rate=parseFloat(payload.newRate);
+      if(!name||!inst||isNaN(rate))return res.status(400).json({success:false,message:'customerName, installment ve newRate gerekli'});
+      if(inst<1||inst>12)return res.status(400).json({success:false,message:'Taksit 1-12 arasında olmalı.'});
+      const norm=normalizeText(name);
+      const customer=data.customers.find(c=>normalizeText(c.name)===norm||normalizeText(c.code)===norm);
+      if(!customer)return res.status(404).json({success:false,message:'Müşteri bulunamadı.'});
+      if(!Array.isArray(customer.installmentRates))customer.installmentRates=Array(12).fill(customer.commissionRate||0);
+      customer.installmentRates[inst-1]=rate;
+      saveData();
+      return res.json({success:true,message:`${customer.name} için ${inst} taksit oranı %${rate} olarak güncellendi.`});
+    }
+
+    if(action==='DELETE_LAST_CARD'){
+      const customer=findCustomerByGroup();
+      if(!customer)return res.status(400).json({success:false,message:'Bu grup henüz bir müşteriye bağlanmamış.'});
+      const entries=customer.cariEntries||[];
+      let lastIdx=-1;
+      for(let i=entries.length-1;i>=0;i--){
+        if(entries[i].type==='cekim'){lastIdx=i;break;}
+      }
+      if(lastIdx===-1)return res.status(404).json({success:false,message:'Silinecek kart çekimi bulunamadı.'});
+      const deleted=entries[lastIdx];
+      entries.splice(lastIdx,1);
+      saveData();
+      return res.json({success:true,message:'Son kart çekimi silindi.',deletedAmount:deleted.amount,deletedDate:deleted.date});
+    }
+
+    const customer=findCustomerByGroup();
+    if(!customer){
+      return res.status(400).json({success:false,message:'Bu grup henüz bir müşteriye bağlanmamış. Önce LINK_GROUP ile bağlayın.'});
+    }
+    if(!Array.isArray(customer.cariEntries))customer.cariEntries=[];
+
+    if(action==='ADD_CARD'){
+      const amount=parseAmount(payload.grossAmount);
+      const installment=parseInstallment(payload.installments);
+      const date=String(payload.date||'').trim()||new Date().toISOString().slice(0,10);
+      const bankaName=String(payload.bankaName||'').trim();
+      const gonderen=String(payload.gonderen||'').trim();
+      if(!amount||!bankaName){
+        return res.status(400).json({success:false,message:'grossAmount ve bankaName gerekli'});
+      }
+
+      const customerRateRaw=customer.installmentRates&&customer.installmentRates[installment-1]!=null
+        ? customer.installmentRates[installment-1]
+        : defaultCustomerRate(customer);
+      const customerRate=parseFloat(customerRateRaw)||0;
+      const bankObj=findBank(bankaName,data.banks||[]);
+      const bankRateRaw=bankObj&&Array.isArray(bankObj.rates)?bankObj.rates[installment-1]:0;
+      const bankRate=parseFloat(bankRateRaw)||0;
+      const customerComm=parseFloat((amount*customerRate/100).toFixed(2));
+      const netToCustomer=parseFloat((amount-customerComm).toFixed(2));
+      const bankCost=parseFloat((amount*bankRate/100).toFixed(2));
+      const profit=parseFloat((netToCustomer-bankCost).toFixed(2));
+
+      customer.cariEntries.push({
+        id:randomUUID(),
+        type:'cekim',
+        source:'whatsapp_alex',
+        amount,
+        date,
+        installment,
+        bank:bankObj?bankObj.name:bankaName,
+        bankRate,
+        customerRate,
+        customerComm,
+        netToCustomer,
+        bankCost,
+        profit,
+        description:`${gonderen||'Alex'} - ${installment===1?'1 taksit':installment+' taksit'}`,
+        createdAt:new Date().toISOString()
+      });
+      saveData();
+      return res.json({success:true,netToCustomer,customerRate});
+    }
+
+    if(action==='ADD_PAYMENT'){
+      const amount=parseAmount(payload.amount);
+      const date=String(payload.date||'').trim()||new Date().toISOString().slice(0,10);
+      const gonderen=String(payload.gonderen||'').trim();
+      if(!amount){
+        return res.status(400).json({success:false,message:'amount gerekli'});
+      }
+      customer.cariEntries.push({
+        id:randomUUID(),
+        type:'nakit_odeme',
+        source:'whatsapp_alex',
+        amount,
+        date,
+        description:`${gonderen||'Alex'} - Nakit Ödeme`,
+        createdAt:new Date().toISOString()
+      });
+      saveData();
+      return res.json({success:true});
+    }
+
+    if(action==='REPORT'){
+      const reportDate=String(payload.date||'').trim();
+      if(!reportDate){
+        return res.status(400).json({success:false,message:'date gerekli'});
+      }
+      const previousBalance=computeBalance(customer.cariEntries,customer.openingBalance||0,reportDate);
+      const todayCards=(customer.cariEntries||[])
+        .filter(e=>e.type==='cekim'&&e.date===reportDate)
+        .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+      const todayCardsNet=+todayCards.reduce((s,e)=>s+(parseFloat(e.netToCustomer)||0),0).toFixed(2);
+      const todayCardsCount=todayCards.length;
+      const todayCustomerCommTotal=+todayCards.reduce((s,e)=>s+(parseFloat(e.customerComm)||0),0).toFixed(2);
+      const todayBankCostTotal=+todayCards.reduce((s,e)=>s+(parseFloat(e.bankCost)||0),0).toFixed(2);
+      const todayProfitTotal=+todayCards.reduce((s,e)=>s+(parseFloat(e.profit)||0),0).toFixed(2);
+      const todayPayments=+((customer.cariEntries||[])
+        .filter(e=>e.type==='nakit_odeme'&&e.date===reportDate)
+        .reduce((s,e)=>s+(parseFloat(e.amount)||0),0)).toFixed(2);
+      const totalBalance=+(previousBalance+todayCardsNet-todayPayments).toFixed(2);
+      const todayCardDetails=todayCards.map(e=>({
+        id:e.id,
+        date:e.date,
+        createdAt:e.createdAt||null,
+        description:e.description||'Kart Çekimi',
+        grossAmount:+(parseFloat(e.amount)||0).toFixed(2),
+        installment:parseInt(e.installment,10)||1,
+        bank:e.bank||'',
+        customerRate:+(parseFloat(e.customerRate)||0).toFixed(2),
+        customerComm:+(parseFloat(e.customerComm)||0).toFixed(2),
+        netToCustomer:+(parseFloat(e.netToCustomer)||0).toFixed(2),
+        bankRate:+(parseFloat(e.bankRate)||0).toFixed(2),
+        bankCost:+(parseFloat(e.bankCost)||0).toFixed(2),
+        profit:+(parseFloat(e.profit)||0).toFixed(2)
+      }));
+      const latestCard=todayCardDetails[0]||null;
+      return res.json({
+        success:true,
+        previousBalance,
+        todayCardsNet,
+        todayCardsCount,
+        todayPayments,
+        totalBalance,
+        todayCustomerCommTotal,
+        todayBankCostTotal,
+        todayProfitTotal,
+        todayCards:todayCardDetails,
+        latestCard
+      });
+    }
+
+    return res.status(400).json({success:false,message:'Desteklenmeyen action'});
+  }catch(err){
+    console.error('[alex-sync]',err);
+    return res.status(500).json({success:false,message:'Alex senkronizasyon hatası'});
+  }
+});
 
 const PORT=process.env.PORT||3000;
 app.listen(PORT,()=>{

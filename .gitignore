@@ -6,3 +6,19 @@ veri/
 site/
 .DS_Store
 *.zip
+
+# zyreos disindaki diger projeler (bu depoda takip edilmiyor)
+ChecKafe/
+bahis-platform/
+kuron-metal/
+admin-panel/
+prompter-menu/
+vocal-splitter/
+yt-downloader/
+clear_checkins.js
+fix.py
+sync_fixes.py
+Podfile
+firebase.json
+.firebaserc
+.firebase/

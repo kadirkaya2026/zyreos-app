@@ -882,7 +882,7 @@ app.post('/api/alex/sync',(req,res)=>{
         createdAt:new Date().toISOString()
       });
       saveData();
-      return res.json({success:true,netToCustomer,customerRate});
+      return res.json({success:true,netToCustomer,customerRate,customerName:customer.name});
     }
 
     if(action==='ADD_PAYMENT'){
@@ -902,7 +902,7 @@ app.post('/api/alex/sync',(req,res)=>{
         createdAt:new Date().toISOString()
       });
       saveData();
-      return res.json({success:true});
+      return res.json({success:true,customerName:customer.name});
     }
 
     if(action==='REPORT'){
@@ -941,6 +941,7 @@ app.post('/api/alex/sync',(req,res)=>{
       const latestCard=todayCardDetails[0]||null;
       return res.json({
         success:true,
+        customerName:customer.name,
         previousBalance,
         todayCardsNet,
         todayCardsCount,

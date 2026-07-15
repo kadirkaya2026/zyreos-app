@@ -32,6 +32,19 @@ async function sendMsg(sock, to, content, options = {}) {
 
 function formatTr(num) { return (num || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// Gemini'den sayı yerine "12.500,00" gibi Türk formatlı string gelirse doğru çevir
+function parseTrAmount(v) {
+    if (typeof v === 'number') return v;
+    const s = String(v ?? '').trim();
+    if (!s) return 0;
+    if (s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) return parseFloat(s.replace(/\./g, '')) || 0;
+    return parseFloat(s) || 0;
+}
+
+// Sunucudaki parseAmount Türk formatı bekler (nokta=binlik); tutarları virgüllü metin olarak gönder
+function toTrAmountString(n) { return Number(n || 0).toFixed(2).replace('.', ','); }
+
 async function callZyreos(action, groupId, payload) {
     try {
         console.log(`[🚀 ZYREOS'A İSTEK GİDİYOR] Aksiyon: ${action}`);
@@ -72,12 +85,8 @@ async function commitCard(sock, from, quotedMsg, card) {
     const uniqueKey = `${card.grossAmount}_${txId}`;
     const isMukerrer = txId !== "YOK" && !!processedDeconts[uniqueKey];
 
-    // Sunucudaki parseAmount Türk formatı bekliyor (nokta=binlik, virgül=ondalık).
-    // Küsuratlı sayıyı olduğu gibi gönderirsek nokta binlik sanılır; virgüllü metin gönderiyoruz.
-    const amountStr = Number(card.grossAmount).toFixed(2).replace('.', ',');
-
     const syncRes = await callZyreos('ADD_CARD', from, {
-        grossAmount: amountStr,
+        grossAmount: toTrAmountString(card.grossAmount),
         installments: card.installments,
         bankaName: card.bankaName,
         gonderen: card.gonderen,
@@ -186,7 +195,7 @@ Format: {"isReceipt": true/false, "grossAmount": 10000, "installments": 1, "bank
                         if (parts.length === 3) finalDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
                     }
 
-                    const grossAmount = parseFloat(resJson.grossAmount);
+                    const grossAmount = parseTrAmount(resJson.grossAmount);
                     const installments = parseInt(resJson.installments, 10) || 1;
                     const confidence = typeof resJson.confidence === 'number' ? resJson.confidence : 0;
                     const txId = resJson.transactionId ? String(resJson.transactionId).trim() : "YOK";
@@ -208,8 +217,11 @@ Format: {"isReceipt": true/false, "grossAmount": 10000, "installments": 1, "bank
                     if (confidence < 0.8) sorunlar.push("okuma güveni düşük");
 
                     if (sorunlar.length) {
+                        const oncekiPending = pendingReceipts[from];
                         pendingReceipts[from] = card;
+                        const oncekiUyari = oncekiPending ? `⚠️ Önceki bekleyen dekont (${formatTr(oncekiPending.grossAmount)} TL) iptal edildi, yerine bu geçti.\n\n` : '';
                         await sendMsg(sock, from, { text:
+                            oncekiUyari +
                             `🔍 *Dekontu tam net okuyamadım abi* (${sorunlar.join(', ')}).\n\n` +
                             `Okuduğum değerler:\n` +
                             `• Tutar: ${formatTr(grossAmount)} TL\n` +
@@ -230,13 +242,15 @@ Format: {"isReceipt": true/false, "grossAmount": 10000, "installments": 1, "bank
         }
 
         if (pendingReceipts[from] && txt) {
-            if (lTxt.includes('onayla')) {
+            // Yanlışlıkla tetiklenmesin diye tam komut eşleşmesi: "onaylandı mı?" gibi mesajlar sayılmaz
+            const cmd = lTxt.replace(/[.!?🫡\s]+$/, '').trim();
+            if (cmd === 'alex onayla' || cmd === 'onayla') {
                 const card = pendingReceipts[from];
                 delete pendingReceipts[from];
                 await commitCard(sock, from, msg, card);
                 return;
             }
-            if (lTxt.includes('iptal') && !lTxt.includes('son işlemi') && !lTxt.includes('son dekontu')) {
+            if (cmd === 'alex iptal' || cmd === 'iptal') {
                 delete pendingReceipts[from];
                 await sendMsg(sock, from, { text: "Tamamdır abi, bekleyen dekont kaydını sildim. Daha net bir fotoğraf gönderirsen tekrar okurum. 🫡" }, { quoted: msg });
                 return;
@@ -295,14 +309,15 @@ Metin: "${txt}"`;
                 }
 
                 if (intent === 'PAYMENT' && resJson.amount) {
-                    const syncRes = await callZyreos('ADD_PAYMENT', from, { amount: resJson.amount, date: todayStr, gonderen: gonderenKisi });
-                    
+                    const payAmount = parseTrAmount(resJson.amount);
+                    const syncRes = await callZyreos('ADD_PAYMENT', from, { amount: toTrAmountString(payAmount), date: todayStr, gonderen: gonderenKisi });
+
                     if (!syncRes.success) {
                         return await sendMsg(sock, from, { text: syncRes.message || "Ödeme işlenirken bir hata oluştu abi." }, { quoted: msg });
                     }
-                    
+
                     const repRes = await callZyreos('REPORT', from, { date: todayStr });
-                    await sendMsg(sock, from, { text: `🏢 *Cari Hesap:* ${syncRes.customerName || 'DİĞER'}\n💸 *Ödeme Zyreos'a İşlendi!*\n\n• Alacaktan Düşülen: -${formatTr(resJson.amount)} TL\n• Güncel Kalan Cari Bakiye: *${formatTr(repRes.totalBalance)} TL*` }, { quoted: msg });
+                    await sendMsg(sock, from, { text: `🏢 *Cari Hesap:* ${syncRes.customerName || 'DİĞER'}\n💸 *Ödeme Zyreos'a İşlendi!*\n\n• Alacaktan Düşülen: -${formatTr(payAmount)} TL\n• Güncel Kalan Cari Bakiye: *${formatTr(repRes.totalBalance)} TL*` }, { quoted: msg });
                     return;
                 }
 

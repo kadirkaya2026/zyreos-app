@@ -1263,6 +1263,11 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
     if(!window.confirm(customer.name+' carisindeki '+count+' kaydın TAMAMI silinecek. Bu işlem geri alınamaz. Emin misin?'))return;
     if(!window.confirm('SON ONAY — '+customer.name+': tüm cari hareketler kalıcı olarak silinsin mi?'))return;
     const ids=new Set(entries.map(e=>e.id));
+    entries.forEach(e=>{
+      if(e.queueId&&e.source==='whatsapp'){
+        fetch(`/api/whatsapp/queue/${e.queueId}/unassign`,{method:'PATCH',headers:{Authorization:'Bearer '+(localStorage.getItem('zyreos_token')||'')}}).catch(()=>{});
+      }
+    });
     onUpdateCustomer({...customer,cariEntries:[]});
     if(onUpdateKasa)onUpdateKasa(prev=>({
       ...prev,
@@ -2762,18 +2767,19 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
 }
 
 /* ── ORTAKLAR PAGE ── */
-function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack}){
+function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack,from,to}){
   const pct=(partner.percent||0)/100;
+  const inRange=d=>!!d&&(!from||d>=from)&&(!to||d<=to);
   const profitByDate={};
   (customers||[]).forEach(c=>(c.cariEntries||[]).forEach(e=>{
-    if(e.type!=='cekim'||!e.date)return;
+    if(e.type!=='cekim'||!inRange(e.date))return;
     if(!profitByDate[e.date])profitByDate[e.date]={profit:0,count:0};
     profitByDate[e.date].profit+=(e.profit||0);
     profitByDate[e.date].count++;
   }));
   const expenseByDate={};
   (expenses||[]).forEach(e=>{
-    if(!e.date)return;
+    if(!inRange(e.date))return;
     expenseByDate[e.date]=(expenseByDate[e.date]||0)+(e.amount||0);
   });
   const rows=[];
@@ -2785,10 +2791,10 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack})
     if(!share)return;
     rows.push({date:d,kind:'hakedis',desc:'Günlük Hakediş — '+cnt+' işlem, kâr '+fmt(prof)+(exp?', gider '+fmt(exp):'')+' (%'+partner.percent+')',amount:share});
   });
-  (adjustments||[]).filter(a=>a.partnerId===partner.id).forEach(a=>{
+  (adjustments||[]).filter(a=>a.partnerId===partner.id&&inRange(a.date)).forEach(a=>{
     rows.push({date:a.date,kind:'duzeltme',desc:'Hakediş Düzeltme'+(a.note?': '+a.note:''),amount:a.amount||0});
   });
-  (payments||[]).filter(p=>p.partnerId===partner.id).forEach(p=>{
+  (payments||[]).filter(p=>p.partnerId===partner.id&&inRange(p.date)).forEach(p=>{
     rows.push({date:p.date,kind:'odeme',desc:'Ödeme Alındı'+(p.note?': '+p.note:''),amount:-(p.amount||0)});
   });
   rows.sort((a,b)=>a.date===b.date?(a.kind==='odeme'?1:b.kind==='odeme'?-1:0):(a.date<b.date?-1:1));
@@ -2804,7 +2810,7 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack})
         <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
         <div>
           <h2 style={{fontWeight:800,fontSize:'20px',margin:0}}>{partner.name}</h2>
-          <div style={{fontSize:'12px',color:'#64748b'}}>Ortaklık Payı: %{partner.percent}</div>
+          <div style={{fontSize:'12px',color:'#64748b'}}>Ortaklık Payı: %{partner.percent}{(from||to)&&<span style={{marginLeft:'10px',color:'#f59e0b'}}>Filtre: {from?fmtDate(from):'başlangıç'} — {to?fmtDate(to):'bugün'}</span>}</div>
         </div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'12px',marginBottom:'20px'}}>
@@ -2981,7 +2987,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
   const detailPartner=detailId?partners.find(p=>p.id===detailId):null;
-  if(detailPartner)return <PartnerDetail partner={detailPartner} customers={customers} expenses={allExpenses} payments={payments} adjustments={adjustments} onBack={()=>setDetailId(null)}/>;
+  if(detailPartner)return <PartnerDetail partner={detailPartner} customers={customers} expenses={allExpenses} payments={payments} adjustments={adjustments} from={dateFrom} to={dateTo} onBack={()=>setDetailId(null)}/>;
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
@@ -4282,8 +4288,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       if(!window.confirm(fmtDate(date)+' bekleyen aktarımı silinecek. Bu güne ait '+entryIds.length+' kart çekimi CARİLERDEN DE silinecek ve müşteri bakiyeleri değişecek. Emin misin?'))return;
       const idSet=new Set(entryIds);
       removeCariEntries(idSet);
-      const marker={id:'skip_'+date,date,type:'skipped',auto:true};
-      onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),marker],settledEntryIds:(prev.settledEntryIds||[]).filter(eid=>!idSet.has(eid))}));
+      // Çekimler carilerden silindiği için 'skipped' işareti gereksiz; işaret kalırsa
+      // aynı valör gününe düşecek YENİ çekimler kasada sonsuza dek görünmezdi.
+      onUpdateKasa(prev=>({...prev,settledEntryIds:(prev.settledEntryIds||[]).filter(eid=>!idSet.has(eid))}));
       return;
     }
     const tx=(kasa.transactions||[]).find(t=>t.id===id);

@@ -2762,6 +2762,85 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
 }
 
 /* ── ORTAKLAR PAGE ── */
+function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack}){
+  const pct=(partner.percent||0)/100;
+  const profitByDate={};
+  (customers||[]).forEach(c=>(c.cariEntries||[]).forEach(e=>{
+    if(e.type!=='cekim'||!e.date)return;
+    if(!profitByDate[e.date])profitByDate[e.date]={profit:0,count:0};
+    profitByDate[e.date].profit+=(e.profit||0);
+    profitByDate[e.date].count++;
+  }));
+  const expenseByDate={};
+  (expenses||[]).forEach(e=>{
+    if(!e.date)return;
+    expenseByDate[e.date]=(expenseByDate[e.date]||0)+(e.amount||0);
+  });
+  const rows=[];
+  new Set([...Object.keys(profitByDate),...Object.keys(expenseByDate)]).forEach(d=>{
+    const prof=profitByDate[d]?profitByDate[d].profit:0;
+    const cnt=profitByDate[d]?profitByDate[d].count:0;
+    const exp=expenseByDate[d]||0;
+    const share=+((prof-exp)*pct).toFixed(2);
+    if(!share)return;
+    rows.push({date:d,kind:'hakedis',desc:'Günlük Hakediş — '+cnt+' işlem, kâr '+fmt(prof)+(exp?', gider '+fmt(exp):'')+' (%'+partner.percent+')',amount:share});
+  });
+  (adjustments||[]).filter(a=>a.partnerId===partner.id).forEach(a=>{
+    rows.push({date:a.date,kind:'duzeltme',desc:'Hakediş Düzeltme'+(a.note?': '+a.note:''),amount:a.amount||0});
+  });
+  (payments||[]).filter(p=>p.partnerId===partner.id).forEach(p=>{
+    rows.push({date:p.date,kind:'odeme',desc:'Ödeme Alındı'+(p.note?': '+p.note:''),amount:-(p.amount||0)});
+  });
+  rows.sort((a,b)=>a.date===b.date?(a.kind==='odeme'?1:b.kind==='odeme'?-1:0):(a.date<b.date?-1:1));
+  let run=0;
+  rows.forEach(r=>{run=+(run+r.amount).toFixed(2);r.running=run;});
+  const totalHak=rows.filter(r=>r.kind!=='odeme').reduce((s,r)=>s+r.amount,0);
+  const totalPaid=rows.filter(r=>r.kind==='odeme').reduce((s,r)=>s-r.amount,0);
+  const kalan=+(totalHak-totalPaid).toFixed(2);
+  const rowColor=k=>k==='odeme'?'#f59e0b':k==='duzeltme'?'#a855f7':'#22c55e';
+  return(
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
+        <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
+        <div>
+          <h2 style={{fontWeight:800,fontSize:'20px',margin:0}}>{partner.name}</h2>
+          <div style={{fontSize:'12px',color:'#64748b'}}>Ortaklık Payı: %{partner.percent}</div>
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'12px',marginBottom:'20px'}}>
+        <MetricCard label="Toplam Hakediş" value={fmtTL(totalHak)} color="#22c55e"/>
+        <MetricCard label="Toplam Ödenen" value={fmtTL(totalPaid)} color="#f59e0b"/>
+        <MetricCard label={kalan>=0?'Kalan (Borçluyum)':'Kalan (Fazla Ödendi)'} value={fmtTL(Math.abs(kalan))} color={kalan>=0?'#ef4444':'#22c55e'}/>
+      </div>
+      <Card style={{padding:0,overflow:'hidden'}}>
+        <div style={{padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',fontWeight:700}}>Hakediş / Ödeme Dökümü</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+            <thead>
+              <tr style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+                {['Tarih','Açıklama','Hakediş','Ödeme','Bakiye'].map(h=>(
+                  <th key={h} style={{padding:'10px 12px',textAlign:h==='Tarih'||h==='Açıklama'?'left':'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length===0&&<tr><td colSpan={5} style={{padding:'30px',textAlign:'center',color:'#64748b'}}>Kayıt bulunamadı</td></tr>}
+              {rows.map((r,i)=>(
+                <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.04)',borderLeft:'3px solid '+rowColor(r.kind)}}>
+                  <td style={{padding:'10px 12px',whiteSpace:'nowrap'}}>{fmtDate(r.date)}</td>
+                  <td style={{padding:'10px 12px',color:rowColor(r.kind)}}>{r.desc}</td>
+                  <td className="tabular-nums" style={{padding:'10px 12px',textAlign:'right',color:'#22c55e',fontWeight:600}}>{r.kind!=='odeme'?fmt(r.amount):''}</td>
+                  <td className="tabular-nums" style={{padding:'10px 12px',textAlign:'right',color:'#f59e0b',fontWeight:600}}>{r.kind==='odeme'?fmt(-r.amount):''}</td>
+                  <td className="tabular-nums" style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:r.running>=0?'#e2e8f0':'#22c55e'}}>{fmt(r.running)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
 function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,partnerAdjustments,onUpdateAdjustments,kasa,onUpdateKasa,expenses:allExpenses}){
   const[form,setForm]=useState({name:'',percent:''});
   const[editId,setEditId]=useState(null);
@@ -2773,6 +2852,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const[adjModal,setAdjModal]=useState(null);
   const[editAdjId,setEditAdjId]=useState(null);
   const[adjForm,setAdjForm]=useState({amount:'',date:todayStr(),note:'',direction:'ekle'});
+  const[detailId,setDetailId]=useState(null);
 
   const totalPercent=partners.reduce((s,p)=>s+(p.percent||0),0);
 
@@ -2900,6 +2980,9 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
 
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
+  const detailPartner=detailId?partners.find(p=>p.id===detailId):null;
+  if(detailPartner)return <PartnerDetail partner={detailPartner} customers={customers} expenses={allExpenses} payments={payments} adjustments={adjustments} onBack={()=>setDetailId(null)}/>;
+
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
       <h2 style={{fontWeight:800,fontSize:'20px'}}>Ortaklar</h2>
@@ -2986,7 +3069,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                   const remaining=share-paid;
                   return(
                     <tr key={p.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                      <td style={{padding:'10px 14px',fontWeight:700}}>{p.name}</td>
+                      <td style={{padding:'10px 14px',fontWeight:700}}><span onClick={()=>setDetailId(p.id)} title="Detay: günlük hakediş ve ödeme dökümü" style={{cursor:'pointer',color:'#4f8ef7',textDecoration:'underline'}}>{p.name}</span></td>
                       <td style={{padding:'10px 14px'}}>
                         <span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:'rgba(79,142,247,0.15)',color:'#4f8ef7'}}>%{p.percent}</span>
                       </td>

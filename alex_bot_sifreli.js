@@ -44,23 +44,72 @@ async function callZyreos(action, groupId, payload) {
     }
 }
 
-async function askGemini(prompt, sysInstr = null, base64Image = null) {
+async function askGemini(prompt, sysInstr = null, base64Image = null, jsonMode = false) {
     console.log("   [🧠 Gemini API Çağrısı Yapılıyor...]");
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
     const parts = [];
     if (base64Image) parts.push({ inline_data: { mime_type: "image/jpeg", data: base64Image } });
     parts.push({ text: prompt });
-    const payload = { contents: [{ role: "user", parts }] };
+    const payload = { contents: [{ role: "user", parts }], generationConfig: { temperature: 0 } };
+    if (jsonMode) payload.generationConfig.response_mime_type = "application/json";
     if (sysInstr) payload.system_instruction = { parts: [{ text: sysInstr }] };
-    
-    try {
-        const res = await axios.post(url, payload, { timeout: 15000 });
-        console.log("   [✅ Gemini Cevap Verdi]");
-        return res.data.candidates[0].content.parts[0].text;
-    } catch (e) {
-        console.error("   ❌ Gemini API Hatası:", e.response?.data || e.message);
-        return null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const res = await axios.post(url, payload, { timeout: 30000 });
+            console.log("   [✅ Gemini Cevap Verdi]");
+            return res.data.candidates[0].content.parts[0].text;
+        } catch (e) {
+            console.error(`   ❌ Gemini API Hatası (deneme ${attempt}/2):`, e.response?.data || e.message);
+            if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+        }
     }
+    return null;
+}
+
+async function commitCard(sock, from, quotedMsg, card) {
+    const txId = card.transactionId || "YOK";
+    const uniqueKey = `${card.grossAmount}_${txId}`;
+    const isMukerrer = txId !== "YOK" && !!processedDeconts[uniqueKey];
+
+    // Sunucudaki parseAmount Türk formatı bekliyor (nokta=binlik, virgül=ondalık).
+    // Küsuratlı sayıyı olduğu gibi gönderirsek nokta binlik sanılır; virgüllü metin gönderiyoruz.
+    const amountStr = Number(card.grossAmount).toFixed(2).replace('.', ',');
+
+    const syncRes = await callZyreos('ADD_CARD', from, {
+        grossAmount: amountStr,
+        installments: card.installments,
+        bankaName: card.bankaName,
+        gonderen: card.gonderen,
+        date: card.date,
+        transactionId: txId
+    });
+
+    if (!syncRes.success) {
+        await sendMsg(sock, from, { text: syncRes.message || "Kart kaydı işlenemedi abi." }, { quoted: quotedMsg });
+        return;
+    }
+
+    if (txId !== "YOK") {
+        processedDeconts[uniqueKey] = { date: card.date, amount: card.grossAmount };
+        saveProcessedDeconts();
+    }
+
+    let warningPrefix = "";
+    if (isMukerrer) {
+        warningPrefix = `⚠️ *MÜKERRER İŞLEM UYARISI!*\nBu işlem numarası (${txId}) daha önce kaydedilmişti! Kontrol edin, talimatınız gereği yine de işlendi.\n\n`;
+    }
+
+    const responseMsg = `${warningPrefix}🏢 *Cari Hesap:* ${syncRes.customerName || 'DİĞER'}\n` +
+                        `Alex Kart Çekimi Zyreos'a İşlendi!\n` +
+                        `Çekilen Tutar: ${formatTr(card.grossAmount)} TL\n` +
+                        `Taksit : ${card.installments}\n` +
+                        `Taksit Oranı : %${syncRes.customerRate || 0}\n` +
+                        `Net Kalan Tutar : ${formatTr(syncRes.netToCustomer)} TL\n\n` +
+                        `_İşlem Tarihi: ${card.receiptDate || card.date}_\n` +
+                        `_İşlem No: ${txId}_ 🫡`;
+
+    await sendMsg(sock, from, { text: responseMsg }, { quoted: quotedMsg });
 }
 
 async function connectToWhatsApp () {
@@ -97,9 +146,14 @@ async function connectToWhatsApp () {
                 const buffer = await downloadMediaMessage(msg, 'buffer', {});
                 const b64 = buffer.toString('base64');
                 
-                const imagePrompt = `Sen banka dekontu ve slip uzmanısın. Başarılı bir pos çekim tutarı içeriyorsa geçerli say.
+                const imagePrompt = `Sen banka dekontu ve POS slibi okuma uzmanısın. Görseli dikkatle incele. Başarılı bir pos çekim tutarı içeriyorsa geçerli say; başarısız/iptal işlem, reklam veya ekran görüntüsü sohbetiyse isReceipt: false döndür.
 GÖREVLER:
-1. Dekont üzerindeki brüt tutarı, taksit sayısını bul.
+1. TUTAR KURALI (EN ÖNEMLİ):
+   - "İşlem Tutarı", "Satış Tutarı", "Toplam Tutar" gibi BRÜT TOPLAM tutarı al.
+   - Aylık "Taksit Tutarı"nı ASLA toplam tutar sanma. Taksitli işlemde toplam = taksit tutarı x taksit sayısı olur, tutarlılığı kontrol et.
+   - "Bakiye", "Kalan Borç", "Kullanılabilir Limit", "Komisyon" gibi alanları tutar olarak ALMA.
+   - Türk sayı formatı: nokta binlik ayracı, virgül ondalıktır. "12.500,00" = 12500. grossAmount alanına SADECE sayı yaz (ör. 12500 veya 12500.5), metin yazma.
+   - Taksit sayısını bul; "Tek Çekim"/"Peşin" ise 1 döndür.
 2. BANKA TESPİT KURALI: Geçen kart markasını veya banka adını şuna çevir:
    - Axess, Akbank, Ak Bank -> Akbank
    - Bonus, Garanti, Garanti BBVA -> Garanti
@@ -113,11 +167,12 @@ GÖREVLER:
    Uymuyorsa veya bulunamadıysa kesinlikle "Diğer" döndür.
 3. İŞLEM TARİHİ: Dekontun/slibin üzerindeki gerçek işlem tarihini GG.AA.YYYY formatında bul ve ayıkla. Bulamazsan boş bırak.
 4. İŞLEM NUMARASI: Dekont üzerindeki işlem numarasını, referans numarasını (RRN), provizyon kodunu veya onay kodunu bul ve ayıkla. Bulamazsan boş bırak.
+5. GÜVEN PUANI: Okuduğun tutar ve taksit sayısından ne kadar eminsen "confidence" alanına 0 ile 1 arası puan ver. Görsel bulanıksa, tutar alanı kesilmişse veya birden fazla tutar adayı varsa 0.7'nin altında ver.
 
 SADECE JSON DÖNDÜR. Markdown (\`\`\`json) kullanma.
-Format: {"isReceipt": true/false, "grossAmount": 10000, "installments": 1, "banka": "İş Bankası", "receiptDate": "18.05.2026", "transactionId": "12345678"}`;
-                
-                const resText = await askGemini(imagePrompt, null, b64);
+Format: {"isReceipt": true/false, "grossAmount": 10000, "installments": 1, "banka": "İş Bankası", "receiptDate": "18.05.2026", "transactionId": "12345678", "confidence": 0.95}`;
+
+                const resText = await askGemini(imagePrompt, null, b64, true);
                 if (!resText) return;
                 
                 let cleanJson = resText.trim().replace(/^```json/, '').replace(/```$/, '').trim();
@@ -131,52 +186,61 @@ Format: {"isReceipt": true/false, "grossAmount": 10000, "installments": 1, "bank
                         if (parts.length === 3) finalDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
                     }
 
-                    let isMukerrer = false;
-                    const txId = resJson.transactionId ? resJson.transactionId.trim() : "YOK";
-                    const uniqueKey = `${resJson.grossAmount}_${txId}`;
+                    const grossAmount = parseFloat(resJson.grossAmount);
+                    const installments = parseInt(resJson.installments, 10) || 1;
+                    const confidence = typeof resJson.confidence === 'number' ? resJson.confidence : 0;
+                    const txId = resJson.transactionId ? String(resJson.transactionId).trim() : "YOK";
 
-                    if (txId !== "YOK" && processedDeconts[uniqueKey]) {
-                        isMukerrer = true;
-                    }
-
-                    const syncRes = await callZyreos('ADD_CARD', from, { 
-                        grossAmount: resJson.grossAmount, 
-                        installments: resJson.installments, 
-                        bankaName: resJson.banka, 
-                        gonderen: gonderenKisi, 
+                    const card = {
+                        grossAmount,
+                        installments,
+                        bankaName: resJson.banka,
+                        gonderen: gonderenKisi,
                         date: finalDate,
-                        transactionId: txId
-                    });
+                        transactionId: txId,
+                        receiptDate: resJson.receiptDate
+                    };
 
-                    if (syncRes.success) {
-                        if (txId !== "YOK") {
-                            processedDeconts[uniqueKey] = { date: todayStr, amount: resJson.grossAmount };
-                            saveProcessedDeconts();
-                        }
+                    const sorunlar = [];
+                    if (!(grossAmount > 0)) sorunlar.push("tutar okunamadı");
+                    if (grossAmount > 5000000) sorunlar.push("tutar anormal yüksek görünüyor");
+                    if (installments < 1 || installments > 12) sorunlar.push("taksit sayısı mantıksız");
+                    if (confidence < 0.8) sorunlar.push("okuma güveni düşük");
 
-                        let warningPrefix = "";
-                        if (isMukerrer) {
-                            warningPrefix = `⚠️ *MÜKERRER İŞLEM UYARISI!*\nBu işlem numarası (${txId}) daha önce kaydedilmişti! Kontrol edin, talimatınız gereği yine de işlendi.\n\n`;
-                        }
-
-                        const responseMsg = `${warningPrefix}🏢 *Cari Hesap:* ${syncRes.customerName || 'DİĞER'}\n` +
-                                            `Alex Kart Çekimi Zyreos'a İşlendi!\n` +
-                                            `Çekilen Tutar: ${formatTr(resJson.grossAmount)} TL\n` +
-                                            `Taksit : ${resJson.installments}\n` +
-                                            `Taksit Oranı : %${syncRes.customerRate || 0}\n` +
-                                            `Net Kalan Tutar : ${formatTr(syncRes.netToCustomer)} TL\n\n` +
-                                            `_İşlem Tarihi: ${resJson.receiptDate || finalDate}_\n` +
-                                            `_İşlem No: ${txId}_ 🫡`;
-
-                        await sendMsg(sock, from, { text: responseMsg }, { quoted: msg });
-                    } else { 
-                        await sendMsg(sock, from, { text: syncRes.message || "Kart kaydı işlenemedi abi." }, { quoted: msg }); 
+                    if (sorunlar.length) {
+                        pendingReceipts[from] = card;
+                        await sendMsg(sock, from, { text:
+                            `🔍 *Dekontu tam net okuyamadım abi* (${sorunlar.join(', ')}).\n\n` +
+                            `Okuduğum değerler:\n` +
+                            `• Tutar: ${formatTr(grossAmount)} TL\n` +
+                            `• Taksit: ${installments}\n` +
+                            `• Banka: ${card.bankaName || '?'}\n` +
+                            `• İşlem No: ${txId}\n\n` +
+                            `Doğruysa *"alex onayla"* yaz, hemen işleyeyim.\n` +
+                            `Yanlışsa *"alex iptal"* yazıp dekontu daha net bir fotoğrafla tekrar gönder. 🫡` }, { quoted: msg });
+                        return;
                     }
+
+                    await commitCard(sock, from, msg, card);
                 } else {
                     console.log(`[ℹ️ OCR Pas Geçildi] Gelen görsel dekont olarak doğrulanamadı.`);
                 }
             } catch (err) { console.error("❌ OCR İşlem Hatası:", err); }
             return;
+        }
+
+        if (pendingReceipts[from] && txt) {
+            if (lTxt.includes('onayla')) {
+                const card = pendingReceipts[from];
+                delete pendingReceipts[from];
+                await commitCard(sock, from, msg, card);
+                return;
+            }
+            if (lTxt.includes('iptal') && !lTxt.includes('son işlemi') && !lTxt.includes('son dekontu')) {
+                delete pendingReceipts[from];
+                await sendMsg(sock, from, { text: "Tamamdır abi, bekleyen dekont kaydını sildim. Daha net bir fotoğraf gönderirsen tekrar okurum. 🫡" }, { quoted: msg });
+                return;
+            }
         }
 
         const isAlex = lTxt.includes('alex');
@@ -207,7 +271,7 @@ Niyetler (intent):
 
 Metin: "${txt}"`;
 
-                const resText = await askGemini(niyetPrompt);
+                const resText = await askGemini(niyetPrompt, null, null, true);
                 if (!resText) return;
 
                 let cleanJson = resText.trim().replace(/^```json/, '').replace(/```$/, '').trim();

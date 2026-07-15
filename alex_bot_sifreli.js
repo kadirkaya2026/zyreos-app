@@ -7,7 +7,8 @@ const path = require('path');
 const GEMINI_KEY = "GEMINI_KEY_PLACEHOLDER";
 const ZYREOS_API = "https://zyreos-app-production.up.railway.app/api/alex/sync";
 const ALEX_TOKEN = "zyreos_alex_secret_key_2026";
-const botSentIds = new Set(); 
+const botSentIds = new Set();
+const pendingReceipts = {}; // Düşük güvenle okunan dekontlar: grup onayı bekler
 
 const PROCESSED_DECONTS_FILE = path.join(__dirname, 'processed_deconts.json');
 let processedDeconts = {};

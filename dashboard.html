@@ -4085,7 +4085,16 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
   const storedTx=transactions.filter(t=>!(t.auto&&t.type==='giris'&&t.refId)&&t.type!=='skipped');
 
   // Tüm cekimleri settlementDate'e göre grupla
-  const settledIds=new Set(kasa.settledEntryIds||[]);
+  // Settled ID'leri transaction'larla reconcile et
+  const txRelatedIds=new Set();
+  (kasa.transactions||[]).forEach(t=>{
+    if(t.relatedEntryIds)t.relatedEntryIds.forEach(id=>txRelatedIds.add(id));
+  });
+  const hasLegacyAutoGiris=(kasa.transactions||[]).some(t=>t.auto&&t.type==='giris'&&!t.relatedEntryIds);
+  const settledIds=new Set([
+    ...txRelatedIds,
+    ...(hasLegacyAutoGiris?(kasa.settledEntryIds||[]):[])
+  ]);
   const dailyCekimMap={};
   (customers||[]).forEach(c=>{
     (c.cariEntries||[]).filter(e=>e.type==='cekim').forEach(e=>{
@@ -4136,7 +4145,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
       return{id:'virtual_'+date,date,type:'giris',amount:info.amount,description:label,auto:true,virtual:true};
     });
 
-  const allTransactions=[...storedTx,...virtualEntries].sort((a,b)=>a.date<b.date?-1:1);
+  const allTransactions=[...storedTx.filter(t=>t.type!=='skipped'),...virtualEntries].sort((a,b)=>a.date<b.date?-1:1);
 
   const filtered=allTransactions.filter(t=>{
     if(dateFrom&&t.date<dateFrom)return false;
@@ -4167,7 +4176,15 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
       const marker={id:'skip_'+date,date,type:'skipped',auto:true};
       onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),marker]}));
     }else{
-      onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.id!==id)}));
+      onUpdateKasa(prev=>{
+        const tx=(prev.transactions||[]).find(t=>t.id===id);
+        const idsToUnsettle=tx&&tx.relatedEntryIds?new Set(tx.relatedEntryIds):new Set();
+        return{
+          ...prev,
+          transactions:(prev.transactions||[]).filter(t=>t.id!==id),
+          settledEntryIds:idsToUnsettle.size>0?(prev.settledEntryIds||[]).filter(eid=>!idsToUnsettle.has(eid)):(prev.settledEntryIds||[])
+        };
+      });
     }
   };
   const handleGunuKapat=(key)=>{
@@ -4175,8 +4192,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
     if(!info||!info.amount)return;
     const posLabel=info.posType==='fiziki'?'Fiziki POS':'Sanal POS';
     const desc=info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)';
-    const entry={id:uid(),date:info.date,type:'giris',description:desc,amount:info.amount,auto:true,virtual:false};
-    const entryIds=info.entries.map(e=>e.id);
+    const entry={id:uid(),date:info.date,type:'giris',description:desc,amount:info.amount,auto:true,virtual:false,relatedEntryIds:entryIds};
     onUpdateKasa(prev=>({
       ...prev,
       transactions:[...(prev.transactions||[]),entry],
@@ -4189,8 +4205,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
     let newTx=[];let newIds=[];
     available.forEach(([key,info])=>{
       const posLabel=info.posType==='fiziki'?'Fiziki POS':'Sanal POS';
-      newTx.push({id:uid(),date:info.date,type:'giris',description:info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)',amount:info.amount,auto:true,virtual:false});
-      newIds.push(...info.entries.map(e=>e.id));
+      const eIds=info.entries.map(e=>e.id);
+      newTx.push({id:uid(),date:info.date,type:'giris',description:info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)',amount:info.amount,auto:true,virtual:false,relatedEntryIds:eIds});
+      newIds.push(...eIds);
     });
     onUpdateKasa(prev=>({
       ...prev,

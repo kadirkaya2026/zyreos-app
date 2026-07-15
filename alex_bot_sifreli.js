@@ -148,8 +148,8 @@ async function connectToWhatsApp () {
         }
         if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
             // Hızlı yeniden bağlanma döngüsü WhatsApp'ın geçici engeline takılıyor; bekleyerek dene
-            console.log('Bağlantı koptu, 20 sn sonra tekrar denenecek...');
-            setTimeout(connectToWhatsApp, 20000);
+            console.log('Bağlantı koptu, 60 sn sonra tekrar denenecek...');
+            setTimeout(connectToWhatsApp, 60000);
         } else if (connection === 'open') {
             console.log('\n✅✅✅ ALEX CANLI PANEL ENTEGRE MODUYLA AKTİF! ✅✅✅\n');
         }

@@ -128,24 +128,31 @@ async function connectToWhatsApp () {
     const sock = makeWASocket({ auth: state });
     sock.ev.on('creds.update', saveCreds);
 
-    // Sunucuda QR okutmak pratik değil: PAIRING_NUMBER tanımlıysa eşleştirme kodu üret
-    if (!state.creds.registered && process.env.PAIRING_NUMBER) {
-        setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(process.env.PAIRING_NUMBER.replace(/\D/g, ''));
-                console.log(`\n==============================================`);
-                console.log(`📱 WHATSAPP ESLESTIRME KODU: ${code}`);
-                console.log(`WhatsApp > Bagli Cihazlar > Cihaz Bagla > "Bunun yerine telefon numarasiyla bagla" yolundan bu kodu gir.`);
-                console.log(`==============================================\n`);
-            } catch (e) { console.error('Eslestirme kodu hatasi:', e); }
-        }, 4000);
-    }
-
-    sock.ev.on('connection.update', (update) => {
+    let pairingRequested = false;
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
-        if (qr) qrcode.generate(qr, { small: true });
-        if(connection === 'close' && lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) connectToWhatsApp();
-        else if(connection === 'open') console.log('\n✅✅✅ ALEX CANLI PANEL ENTEGRE MODUYLA AKTİF! ✅✅✅\n');
+        if (qr) {
+            // Kayıt aşaması hazır: PAIRING_NUMBER varsa QR yerine tek seferlik eşleştirme kodu iste
+            if (process.env.PAIRING_NUMBER && !pairingRequested && !state.creds.registered) {
+                pairingRequested = true;
+                try {
+                    const code = await sock.requestPairingCode(process.env.PAIRING_NUMBER.replace(/\D/g, ''));
+                    console.log(`\n==============================================`);
+                    console.log(`📱 WHATSAPP ESLESTIRME KODU: ${code}`);
+                    console.log(`WhatsApp > Bagli Cihazlar > Cihaz Bagla > "Bunun yerine telefon numarasiyla bagla" yolundan bu kodu gir.`);
+                    console.log(`==============================================\n`);
+                } catch (e) { console.error('Eslestirme kodu hatasi:', e.message || e); }
+            } else if (!process.env.PAIRING_NUMBER) {
+                qrcode.generate(qr, { small: true });
+            }
+        }
+        if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+            // Hızlı yeniden bağlanma döngüsü WhatsApp'ın geçici engeline takılıyor; bekleyerek dene
+            console.log('Bağlantı koptu, 20 sn sonra tekrar denenecek...');
+            setTimeout(connectToWhatsApp, 20000);
+        } else if (connection === 'open') {
+            console.log('\n✅✅✅ ALEX CANLI PANEL ENTEGRE MODUYLA AKTİF! ✅✅✅\n');
+        }
     });
 
     sock.ev.on('messages.upsert', async m => {

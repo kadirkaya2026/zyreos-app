@@ -4078,7 +4078,7 @@ function useHashRouter(){
 }
 
 /* ── KASA PAGE ── */
-function KasaPage({kasa,onUpdateKasa,customers,companies}){
+function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpdateExpenses,onUpdatePartnerPayments}){
   const transactions=(kasa&&kasa.transactions)||[];
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
@@ -4188,22 +4188,46 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
     setAddOpen(false);
     setAddForm({date:today,type:'giris',amount:'',description:''});
   };
+  const removeCariEntries=idSet=>{
+    if(onUpdateCustomers&&idSet.size>0)onUpdateCustomers(prev=>(prev||[]).map(c=>({...c,cariEntries:(c.cariEntries||[]).filter(e=>!idSet.has(e.id))})));
+  };
   const handleDelete=id=>{
     if(id.startsWith('virtual_')){
       const date=id.replace('virtual_','');
+      const info=dailyCekimMap[date];
+      const entryIds=info?info.entries.map(e=>e.id):[];
+      if(!window.confirm(fmtDate(date)+' bekleyen aktarımı silinecek. Bu güne ait '+entryIds.length+' kart çekimi CARİLERDEN DE silinecek ve müşteri bakiyeleri değişecek. Emin misin?'))return;
+      const idSet=new Set(entryIds);
+      removeCariEntries(idSet);
       const marker={id:'skip_'+date,date,type:'skipped',auto:true};
-      onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),marker]}));
-    }else{
-      onUpdateKasa(prev=>{
-        const tx=(prev.transactions||[]).find(t=>t.id===id);
-        const idsToUnsettle=tx&&tx.relatedEntryIds?new Set(tx.relatedEntryIds):new Set();
-        return{
-          ...prev,
-          transactions:(prev.transactions||[]).filter(t=>t.id!==id),
-          settledEntryIds:idsToUnsettle.size>0?(prev.settledEntryIds||[]).filter(eid=>!idsToUnsettle.has(eid)):(prev.settledEntryIds||[])
-        };
-      });
+      onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),marker],settledEntryIds:(prev.settledEntryIds||[]).filter(eid=>!idSet.has(eid))}));
+      return;
     }
+    const tx=(kasa.transactions||[]).find(t=>t.id===id);
+    if(!tx)return;
+    if(tx.relatedEntryIds&&tx.relatedEntryIds.length){
+      if(!window.confirm('Bu gün sonu kaydı silinecek. Bağlı '+tx.relatedEntryIds.length+' kart çekimi CARİLERDEN DE silinecek ve müşteri bakiyeleri değişecek. Emin misin?'))return;
+      removeCariEntries(new Set(tx.relatedEntryIds));
+    }else if(tx.refId){
+      if(!window.confirm('Bu hareket bir cari kaydına bağlı ('+(tx.description||'')+'). Silersen CARİDEKİ kayıt da silinecek. Emin misin?'))return;
+      removeCariEntries(new Set([tx.refId]));
+    }else if(tx.expenseId){
+      if(!window.confirm('Bu hareket bir gidere bağlı ('+(tx.description||'')+'). Silersen GİDERLERDEKİ kayıt da silinecek. Emin misin?'))return;
+      if(onUpdateExpenses)onUpdateExpenses(prev=>(prev||[]).filter(x=>x.id!==tx.expenseId));
+    }else if(tx.partnerPaymentId){
+      if(!window.confirm('Bu hareket bir ortak ödemesine bağlı ('+(tx.description||'')+'). Silersen ORTAKLARDAKİ ödeme kaydı da silinecek. Emin misin?'))return;
+      if(onUpdatePartnerPayments)onUpdatePartnerPayments(prev=>(prev||[]).filter(p=>p.id!==tx.partnerPaymentId));
+    }else{
+      if(!window.confirm('Bu hareket silinsin mi?'))return;
+    }
+    onUpdateKasa(prev=>{
+      const idsToUnsettle=tx.relatedEntryIds?new Set(tx.relatedEntryIds):new Set();
+      return{
+        ...prev,
+        transactions:(prev.transactions||[]).filter(t=>t.id!==id),
+        settledEntryIds:idsToUnsettle.size>0?(prev.settledEntryIds||[]).filter(eid=>!idsToUnsettle.has(eid)):(prev.settledEntryIds||[])
+      };
+    });
   };
   const handleGunuKapat=(key)=>{
     const info=posAccountMap[key];
@@ -4580,7 +4604,7 @@ function App(){
               kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}
             />
           )}
-          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies}/>}
+          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers} companies={companies}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}

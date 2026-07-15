@@ -2748,7 +2748,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
 }
 
 /* ── ORTAKLAR PAGE ── */
-function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,partnerAdjustments,onUpdateAdjustments,kasa,onUpdateKasa}){
+function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,partnerAdjustments,onUpdateAdjustments,kasa,onUpdateKasa,expenses:allExpenses}){
   const[form,setForm]=useState({name:'',percent:''});
   const[editId,setEditId]=useState(null);
   const[dateFrom,setDateFrom]=useState('');
@@ -2868,6 +2868,15 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const totalBankCost=allCekim.reduce((s,r)=>s+(r.bankCost||0),0);
   const totalProfit=allCekim.reduce((s,r)=>s+(r.profit||0),0);
 
+  // Giderleri tarih aralığına göre filtrele
+  const filteredExpenses=(allExpenses||[]).filter(e=>{
+    if(dateFrom&&e.date<dateFrom)return false;
+    if(dateTo&&e.date>dateTo)return false;
+    return true;
+  });
+  const totalExpenses=filteredExpenses.reduce((s,e)=>s+(e.amount||0),0);
+  const netProfit=totalProfit-totalExpenses;
+
   const payments=Array.isArray(partnerPayments)?partnerPayments:[];
   const getPartnerPayments=(pid)=>payments.filter(p=>p.partnerId===pid);
   const getPartnerTotalPaid=(pid)=>getPartnerPayments(pid).reduce((s,p)=>s+p.amount,0);
@@ -2939,7 +2948,9 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
           <MetricCard label="Toplam Çekim" value={fmtTL(totalCekim)} color="#4f8ef7"/>
           <MetricCard label="Müşteri Komisyonu" value={fmtTL(totalKom)} color="#a855f7"/>
           <MetricCard label="POS Maliyeti" value={fmtTL(totalBankCost)} color="#ef4444"/>
-          <MetricCard label="Net Kar" value={fmtTL(totalProfit)} color="#22c55e" large/>
+          <MetricCard label="Brüt Kar" value={fmtTL(totalProfit)} color="#22c55e"/>
+          <MetricCard label="Giderler" value={fmtTL(totalExpenses)} color="#f59e0b"/>
+          <MetricCard label="Net Kar (Dağıtılacak)" value={fmtTL(netProfit)} color={netProfit>=0?'#22c55e':'#ef4444'} large/>
         </div>
 
         {/* Ortak Dağılım Tablosu */}
@@ -2956,7 +2967,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               <tbody>
                 {partners.map(p=>{
                   const adj=getPartnerAdjTotal(p.id);
-                  const share=totalProfit*(p.percent/100)+adj;
+                  const share=netProfit*(p.percent/100)+adj;
                   const paid=getPartnerTotalPaid(p.id);
                   const remaining=share-paid;
                   return(
@@ -2987,7 +2998,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                 <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
                   <td style={{padding:'10px 14px',fontWeight:700,color:'#94a3b8',fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
                   <td style={{padding:'10px 14px'}}><span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:totalPercent===100?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',color:totalPercent===100?'#22c55e':'#f59e0b'}}>%{totalPercent.toFixed(1)}</span></td>
-                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:800,fontSize:'15px'}}>{fmtTL(totalProfit+totalAdj)}</td>
+                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:800,fontSize:'15px'}}>{fmtTL(netProfit+totalAdj)}</td>
                   <td className="tabular-nums" style={{padding:'10px 14px',color:'#f59e0b',fontWeight:700}}>{fmtTL(payments.reduce((s,p)=>s+p.amount,0))}</td>
                   <td colSpan={2}></td>
                 </tr>
@@ -4093,7 +4104,21 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
       }
       if(!dailyCekimMap[tDate])dailyCekimMap[tDate]={amount:0,entries:[]};
       dailyCekimMap[tDate].amount=+(dailyCekimMap[tDate].amount+amount).toFixed(2);
-      dailyCekimMap[tDate].entries.push({id:e.id,amount,companyName:e.companyName||'',bank:e.bank||''});
+      dailyCekimMap[tDate].entries.push({id:e.id,amount,companyName:e.companyName||'',bank:e.bank||'',posType:e.posType||'sanal',profit:e.profit||0});
+    });
+  });
+
+  // POS hesap bazlı gruplama (Gün Sonu modal için)
+  const posAccountMap={};
+  Object.entries(dailyCekimMap).forEach(([date,info])=>{
+    info.entries.forEach(e=>{
+      const cn=e.companyName||'Bilinmiyor';
+      const pt=e.posType||'sanal';
+      const key=date+'|'+cn+'|'+pt;
+      if(!posAccountMap[key])posAccountMap[key]={date,companyName:cn,posType:pt,amount:0,profit:0,entries:[]};
+      posAccountMap[key].amount=+(posAccountMap[key].amount+e.amount).toFixed(2);
+      posAccountMap[key].profit=+(posAccountMap[key].profit+e.profit).toFixed(2);
+      posAccountMap[key].entries.push(e);
     });
   });
 
@@ -4145,17 +4170,32 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
       onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).filter(t=>t.id!==id)}));
     }
   };
-  const handleGunuKapat=()=>{
-    if(!kapatDate){setKapatErr('Tarih seçiniz.');return;}
-    const info=dailyCekimMap[kapatDate];
-    if(!info||!info.amount){setKapatErr('Bu tarihte yatacak çekim bulunamadı.');return;}
-    if(storedDates.has(kapatDate)){setKapatErr('Bu gün zaten kasaya aktarıldı.');return;}
-    const entry={id:uid(),date:kapatDate,type:'giris',description:kapatDate+' Gün Sonu — '+info.entries.length+' işlem',amount:info.amount,auto:true,virtual:false};
+  const handleGunuKapat=(key)=>{
+    const info=posAccountMap[key];
+    if(!info||!info.amount)return;
+    const posLabel=info.posType==='fiziki'?'Fiziki POS':'Sanal POS';
+    const desc=info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)';
+    const entry={id:uid(),date:info.date,type:'giris',description:desc,amount:info.amount,auto:true,virtual:false};
     const entryIds=info.entries.map(e=>e.id);
     onUpdateKasa(prev=>({
       ...prev,
       transactions:[...(prev.transactions||[]),entry],
       settledEntryIds:[...(prev.settledEntryIds||[]),...entryIds]
+    }));
+  };
+  const handleKapatAll=(date)=>{
+    const available=Object.entries(posAccountMap).filter(([k,v])=>v.date===date);
+    if(!available.length)return;
+    let newTx=[];let newIds=[];
+    available.forEach(([key,info])=>{
+      const posLabel=info.posType==='fiziki'?'Fiziki POS':'Sanal POS';
+      newTx.push({id:uid(),date:info.date,type:'giris',description:info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)',amount:info.amount,auto:true,virtual:false});
+      newIds.push(...info.entries.map(e=>e.id));
+    });
+    onUpdateKasa(prev=>({
+      ...prev,
+      transactions:[...(prev.transactions||[]),...newTx],
+      settledEntryIds:[...(prev.settledEntryIds||[]),...newIds]
     }));
     setKapatOpen(false);setKapatErr('');
   };
@@ -4234,24 +4274,47 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
       </div>
       {kapatOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
-            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Günü Kapat / Kasaya Aktar</h3>
-            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
-                <input type="date" value={kapatDate} onChange={e=>{setKapatDate(e.target.value);setKapatErr('');}} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
-              </div>
-              {kapatDate&&dailyCekimMap[kapatDate]&&dailyCekimMap[kapatDate].amount>0&&!storedDates.has(kapatDate)&&(
-                <div style={{background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.3)',borderRadius:'8px',padding:'12px',fontSize:'13px'}}>
-                  <span style={{color:'#94a3b8'}}>Aktarılacak tutar: </span>
-                  <span style={{color:'#22c55e',fontWeight:700}}>{fmt(dailyCekimMap[kapatDate].amount)} ₺</span>
-                  <div style={{color:'#64748b',fontSize:'11px',marginTop:'4px'}}>{dailyCekimMap[kapatDate].entries.length} adet işlem</div>
-                </div>
-              )}
-              {kapatErr&&<div style={{color:'#ef4444',fontSize:'12px'}}>{kapatErr}</div>}
+          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'500px',maxWidth:'95vw',maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>POS Gün Sonu Kapatma</h3>
+            <div style={{marginBottom:'16px'}}>
+              <label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
+              <input type="date" value={kapatDate} onChange={e=>{setKapatDate(e.target.value);setKapatErr('');}} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
             </div>
+            {(()=>{
+              const available=Object.entries(posAccountMap).filter(([k,v])=>v.date===kapatDate);
+              if(!available.length)return <div style={{color:'#64748b',fontSize:'13px',padding:'20px 0',textAlign:'center'}}>Bu tarihte bekleyen POS hesabı bulunamadı.</div>;
+              return(
+                <div style={{display:'flex',flexDirection:'column',gap:'8px',overflowY:'auto',flex:1}}>
+                  <div style={{fontSize:'12px',color:'#94a3b8',fontWeight:600,marginBottom:'4px'}}>Bekleyen POS Hesapları</div>
+                  {available.map(([key,info])=>(
+                    <div key={key} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'14px 16px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                        <div>
+                          <span style={{fontWeight:700,fontSize:'14px'}}>{info.companyName}</span>
+                          <span style={{marginLeft:'8px',padding:'2px 8px',borderRadius:'10px',fontSize:'11px',fontWeight:600,
+                            background:info.posType==='fiziki'?'rgba(245,158,11,0.15)':'rgba(79,142,247,0.15)',
+                            color:info.posType==='fiziki'?'#f59e0b':'#4f8ef7'}}>
+                            {info.posType==='fiziki'?'Fiziki POS':'Sanal POS'}
+                          </span>
+                        </div>
+                        <button onClick={()=>handleGunuKapat(key)} style={{background:'#22c55e',border:'none',borderRadius:'6px',padding:'6px 14px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px',whiteSpace:'nowrap'}}>Kasaya Aktar</button>
+                      </div>
+                      <div style={{display:'flex',gap:'16px',fontSize:'12px',color:'#94a3b8'}}>
+                        <span>{info.entries.length} işlem</span>
+                        <span>Tutar: <span style={{color:'#22c55e',fontWeight:600}}>{fmt(info.amount)} ₺</span></span>
+                        <span>Kar: <span style={{color:'#4f8ef7',fontWeight:600}}>{fmt(info.profit)} ₺</span></span>
+                      </div>
+                    </div>
+                  ))}
+                  {available.length>1&&(
+                    <button onClick={()=>handleKapatAll(kapatDate)} style={{background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px',marginTop:'8px',alignSelf:'center'}}>Tümünü Kasaya Aktar</button>
+                  )}
+                </div>
+              );
+            })()}
+            {kapatErr&&<div style={{color:'#ef4444',fontSize:'12px',marginTop:'8px'}}>{kapatErr}</div>}
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
-              <button onClick={()=>{setKapatOpen(false);setKapatErr('');}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
-              <button onClick={handleGunuKapat} style={{background:'#f59e0b',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Kasaya Aktar</button>
+              <button onClick={()=>{setKapatOpen(false);setKapatErr('');}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>Kapat</button>
             </div>
           </div>
         </div>
@@ -4486,7 +4549,7 @@ function App(){
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
           {activePage==='companies'&&<CompaniesPage companies={companies} onUpdateCompanies={(updater)=>markDirty(()=>setCompanies(updater))}/>}
           {activePage==='expenses'&&<ExpensesPage expenses={expenses} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
-          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(updater))} customers={customers} partnerPayments={partnerPayments} onUpdatePayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} partnerAdjustments={partnerAdjustments} onUpdateAdjustments={(updater)=>markDirty(()=>setPartnerAdjustments(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
+          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(updater))} customers={customers} expenses={expenses} partnerPayments={partnerPayments} onUpdatePayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} partnerAdjustments={partnerAdjustments} onUpdateAdjustments={(updater)=>markDirty(()=>setPartnerAdjustments(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
           {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>

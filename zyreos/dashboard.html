@@ -4095,10 +4095,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
   (kasa.transactions||[]).forEach(t=>{
     if(t.relatedEntryIds)t.relatedEntryIds.forEach(id=>txRelatedIds.add(id));
   });
-  const hasLegacyAutoGiris=(kasa.transactions||[]).some(t=>t.auto&&t.type==='giris'&&!t.relatedEntryIds&&!isTahsilatGiris(t));
   const settledIds=new Set([
     ...txRelatedIds,
-    ...(hasLegacyAutoGiris?(kasa.settledEntryIds||[]):[])
+    ...(kasa.settledEntryIds||[])
   ]);
   const dailyCekimMap={};
   (customers||[]).forEach(c=>{

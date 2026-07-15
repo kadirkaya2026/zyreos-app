@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node alex_bot_sifreli.js"
   },
-  "engines": { "node": ">=18.0.0" },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.0",
     "qrcode-terminal": "^0.12.0",

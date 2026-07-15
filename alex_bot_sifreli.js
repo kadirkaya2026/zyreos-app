@@ -128,6 +128,19 @@ async function connectToWhatsApp () {
     const sock = makeWASocket({ auth: state });
     sock.ev.on('creds.update', saveCreds);
 
+    // Sunucuda QR okutmak pratik değil: PAIRING_NUMBER tanımlıysa eşleştirme kodu üret
+    if (!state.creds.registered && process.env.PAIRING_NUMBER) {
+        setTimeout(async () => {
+            try {
+                const code = await sock.requestPairingCode(process.env.PAIRING_NUMBER.replace(/\D/g, ''));
+                console.log(`\n==============================================`);
+                console.log(`📱 WHATSAPP ESLESTIRME KODU: ${code}`);
+                console.log(`WhatsApp > Bagli Cihazlar > Cihaz Bagla > "Bunun yerine telefon numarasiyla bagla" yolundan bu kodu gir.`);
+                console.log(`==============================================\n`);
+            } catch (e) { console.error('Eslestirme kodu hatasi:', e); }
+        }, 4000);
+    }
+
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) qrcode.generate(qr, { small: true });

@@ -1257,6 +1257,19 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
     }).filter(Boolean);
     onUpdateCustomer({...customer,cariEntries:entries.map(e=>{const u=arr.find(a=>a.id===e.id);return u||e;})},null,kasaUpdates.length?'update':null,null,kasaUpdates);
   };
+  const handleDeleteAllEntries=()=>{
+    const count=entries.length;
+    if(!count)return;
+    if(!window.confirm(customer.name+' carisindeki '+count+' kaydın TAMAMI silinecek. Bu işlem geri alınamaz. Emin misin?'))return;
+    if(!window.confirm('SON ONAY — '+customer.name+': tüm cari hareketler kalıcı olarak silinsin mi?'))return;
+    const ids=new Set(entries.map(e=>e.id));
+    onUpdateCustomer({...customer,cariEntries:[]});
+    if(onUpdateKasa)onUpdateKasa(prev=>({
+      ...prev,
+      transactions:(prev.transactions||[]).filter(t=>!(t.refId&&ids.has(t.refId))),
+      settledEntryIds:(prev.settledEntryIds||[]).filter(id=>!ids.has(id))
+    }));
+  };
   const rows=buildCariRows(entries,customer.openingBalance||0);
   const[bdForm,setBdForm]=useState({date:new Date().toISOString().slice(0,10),direction:'azalis',amount:'',description:''});
   const tabs=[['cari','Cari Hesap'],['bilgi','Müşteri Bilgileri'],['ekstre','Ekstre'],['bakiye_duzeltme','Bakiye Düzeltme']];
@@ -1296,6 +1309,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
               <span style={{fontWeight:700}}>Cari Hareketler</span>
               <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={14}/>Kayıt Ekle</button>
               <button onClick={()=>{setWaDate(yesterday);setWaOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',marginLeft:'8px'}}>📤 WA Ekstre</button>
+              <button onClick={handleDeleteAllEntries} disabled={!entries.length} style={{display:'flex',alignItems:'center',gap:'6px',background:entries.length?'#ef4444':'rgba(239,68,68,.35)',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:entries.length?'pointer':'not-allowed',fontWeight:700,fontSize:'13px',marginLeft:'8px'}}>🗑️ Tüm Kayıtları Sil</button>
             </div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>

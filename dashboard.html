@@ -4081,8 +4081,13 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
   const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
+  // Nakit tahsilat girişleri de auto+refId taşıdığı için legacy filtresinden muaf tutulmalı;
+  // refId'si bir nakit_tahsilat cari kaydına işaret eden girişler gerçek tahsilattır.
+  const tahsilatIds=new Set();
+  (customers||[]).forEach(c=>{(c.cariEntries||[]).forEach(e=>{if(e.type==='nakit_tahsilat')tahsilatIds.add(e.id);});});
+  const isTahsilatGiris=t=>!!(t.auto&&t.type==='giris'&&t.refId&&tahsilatIds.has(t.refId));
   // Eski per-transaction auto giris kayıtlarını filtrele (refId var = eski impl)
-  const storedTx=transactions.filter(t=>!(t.auto&&t.type==='giris'&&t.refId)&&t.type!=='skipped');
+  const storedTx=transactions.filter(t=>(isTahsilatGiris(t)||!(t.auto&&t.type==='giris'&&t.refId))&&t.type!=='skipped');
 
   // Tüm cekimleri settlementDate'e göre grupla
   // Settled ID'leri transaction'larla reconcile et
@@ -4090,7 +4095,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
   (kasa.transactions||[]).forEach(t=>{
     if(t.relatedEntryIds)t.relatedEntryIds.forEach(id=>txRelatedIds.add(id));
   });
-  const hasLegacyAutoGiris=(kasa.transactions||[]).some(t=>t.auto&&t.type==='giris'&&!t.relatedEntryIds);
+  const hasLegacyAutoGiris=(kasa.transactions||[]).some(t=>t.auto&&t.type==='giris'&&!t.relatedEntryIds&&!isTahsilatGiris(t));
   const settledIds=new Set([
     ...txRelatedIds,
     ...(hasLegacyAutoGiris?(kasa.settledEntryIds||[]):[])
@@ -4132,7 +4137,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
   });
 
   // Hangi günler zaten stored veya atlandı?
-  const storedDates=new Set(storedTx.filter(t=>t.auto&&t.type==='giris').map(t=>t.date));
+  const storedDates=new Set(storedTx.filter(t=>t.auto&&t.type==='giris'&&!t.refId).map(t=>t.date));
   const skippedDates=new Set(transactions.filter(t=>t.type==='skipped').map(t=>t.date));
 
   // Virtual (bekleyen) entry'ler — stored veya atlanmış olmayanlar
@@ -4192,6 +4197,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
     if(!info||!info.amount)return;
     const posLabel=info.posType==='fiziki'?'Fiziki POS':'Sanal POS';
     const desc=info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)';
+    const entryIds=info.entries.map(e=>e.id);
     const entry={id:uid(),date:info.date,type:'giris',description:desc,amount:info.amount,auto:true,virtual:false,relatedEntryIds:entryIds};
     onUpdateKasa(prev=>({
       ...prev,
@@ -4271,7 +4277,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies}){
                 <td style={{padding:'9px 12px'}}>{t.description}</td>
                 <td style={{padding:'9px 12px'}}>
                   {t.virtual&&<span style={{background:'rgba(245,158,11,.2)',color:'#fcd34d',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Bekliyor</span>}
-                  {!t.virtual&&t.auto&&t.type==='giris'&&<span style={{background:'rgba(34,197,94,.15)',color:'#22c55e',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Aktarıldı</span>}
+                  {!t.virtual&&t.auto&&t.type==='giris'&&!t.refId&&<span style={{background:'rgba(34,197,94,.15)',color:'#22c55e',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Aktarıldı</span>}
+                  {!t.virtual&&t.auto&&t.type==='giris'&&t.refId&&<span style={{background:'rgba(79,142,247,.15)',color:'#4f8ef7',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Tahsilat</span>}
                   {!t.auto&&<span style={{background:'rgba(139,92,246,.2)',color:'#c4b5fd',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Manuel</span>}
                   {t.auto&&t.type==='cikis'&&<span style={{background:'rgba(239,68,68,.15)',color:'#ef4444',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Ödeme</span>}
                 </td>

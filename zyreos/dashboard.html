@@ -220,6 +220,14 @@ const INIT_CUSTOMERS=[
 
 /* ── UTILS ── */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function computeKasaBalances(transactions){
+  const map={};
+  (transactions||[]).forEach(t=>{
+    const kid=t.kasaId||'nakit';
+    map[kid]=+((map[kid]||0)+(t.type==='giris'?t.amount:-t.amount)).toFixed(2);
+  });
+  return map;
+}
 function localDateStr(d){
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,'0');
@@ -2622,15 +2630,154 @@ function CompaniesPage({companies,onUpdateCompanies}){
   );
 }
 
+/* ── KASALAR PAGE ── */
+function KasalarPage({bankAccounts,onUpdateBankAccounts,companies,kasa}){
+  const[modalOpen,setModalOpen]=useState(false);
+  const[editId,setEditId]=useState(null);
+  const[form,setForm]=useState({name:'',companyId:'',bankName:INIT_BANKS[0]?.name||''});
+
+  const balances=computeKasaBalances((kasa&&kasa.transactions)||[]);
+  const nakitBalance=balances['nakit']||0;
+  const totalBalance=Object.values(balances).reduce((s,v)=>s+v,0);
+  const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const bankColor=(name)=>{const b=INIT_BANKS.find(x=>x.name===name);return b?b.color:'#94a3b8';};
+  const companyName=(id)=>{const c=(companies||[]).find(co=>co.id===id);return c?c.name:'—';};
+
+  const resetForm=()=>{setForm({name:'',companyId:(companies&&companies[0])?companies[0].id:'',bankName:INIT_BANKS[0]?.name||''});setEditId(null);};
+  const openNew=()=>{resetForm();setModalOpen(true);};
+  const openEdit=(a)=>{setEditId(a.id);setForm({name:a.name,companyId:a.companyId||'',bankName:a.bankName||INIT_BANKS[0]?.name||''});setModalOpen(true);};
+
+  const handleSave=()=>{
+    if(!form.name.trim())return alert('Hesap adı giriniz.');
+    if(!form.companyId)return alert('Firma seçiniz.');
+    if(editId){
+      onUpdateBankAccounts(prev=>(prev||[]).map(a=>a.id===editId?{...a,name:form.name.trim(),companyId:form.companyId,bankName:form.bankName}:a));
+    }else{
+      onUpdateBankAccounts(prev=>[...(prev||[]),{id:uid(),name:form.name.trim(),companyId:form.companyId,bankName:form.bankName,createdAt:new Date().toISOString()}]);
+    }
+    setModalOpen(false);
+    resetForm();
+  };
+
+  const handleDelete=(id)=>{
+    if(!window.confirm('Bu banka kasasını silmek istediğinizden emin misiniz? Bu kasaya ait geçmiş kasa hareketleri silinmez, sadece kasa listesinden kaldırılır.'))return;
+    onUpdateBankAccounts(prev=>(prev||[]).filter(a=>a.id!==id));
+  };
+
+  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
+
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px'}}>
+        <h2 style={{fontWeight:800,fontSize:'20px'}}>Kasalar</h2>
+        <button onClick={openNew}
+          style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
+          <IcoPlus size={15}/> Yeni Banka Kasası Ekle
+        </button>
+      </div>
+
+      <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
+        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'180px'}}>
+          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Kasa Bakiyesi</div>
+          <div style={{fontSize:'26px',fontWeight:800,color:totalBalance>=0?'#22c55e':'#ef4444'}}>{fmt(totalBalance)} ₺</div>
+        </div>
+      </div>
+
+      <Modal open={modalOpen} onClose={()=>{setModalOpen(false);resetForm();}} title={editId?'Banka Kasasını Düzenle':'Yeni Banka Kasası Ekle'} width={480}>
+        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Hesap Adı</label>
+            <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Örn: Akbank - Ana Hesap" style={inS}/>
+          </div>
+          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Firma</label>
+            <select value={form.companyId} onChange={e=>setForm(f=>({...f,companyId:e.target.value}))} style={inS}>
+              <option value="">Firma seçiniz</option>
+              {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Banka</label>
+            <select value={form.bankName} onChange={e=>setForm(f=>({...f,bankName:e.target.value}))} style={inS}>
+              {INIT_BANKS.map(b=><option key={b.name} value={b.name}>{b.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'20px'}}>
+          <button onClick={()=>{setModalOpen(false);resetForm();}}
+            style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+            İptal
+          </button>
+          <button onClick={handleSave}
+            style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
+            {editId?'Güncelle':'Kaydet'}
+          </button>
+        </div>
+      </Modal>
+
+      <Card style={{padding:0,overflow:'hidden'}}>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+          <span style={{fontWeight:700,fontSize:'14px'}}>Kayıtlı Kasalar ({(bankAccounts||[]).length+1})</span>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+            <thead>
+              <tr>
+                <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Kasa Adı</th>
+                <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Firma</th>
+                <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Bakiye</th>
+                <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                <td style={{padding:'10px 14px',fontWeight:600,display:'flex',alignItems:'center',gap:'8px'}}>
+                  <div style={{width:'10px',height:'10px',borderRadius:'50%',background:'#22c55e'}}/> Nakit Kasa
+                </td>
+                <td style={{padding:'10px 14px',color:'#64748b'}}>—</td>
+                <td style={{padding:'10px 14px',textAlign:'right',fontWeight:700,color:nakitBalance>=0?'#22c55e':'#ef4444'}}>{fmt(nakitBalance)} ₺</td>
+                <td style={{padding:'10px 14px',textAlign:'right',color:'#475569',fontSize:'11px'}}>Sabit</td>
+              </tr>
+              {(bankAccounts||[]).map(a=>{
+                const bal=balances[a.id]||0;
+                return(
+                  <tr key={a.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                    <td style={{padding:'10px 14px',fontWeight:600,display:'flex',alignItems:'center',gap:'8px'}}>
+                      <div style={{width:'10px',height:'10px',borderRadius:'50%',background:bankColor(a.bankName)}}/> {a.name}
+                    </td>
+                    <td style={{padding:'10px 14px',color:'#94a3b8'}}>{companyName(a.companyId)}</td>
+                    <td style={{padding:'10px 14px',textAlign:'right',fontWeight:700,color:bal>=0?'#22c55e':'#ef4444'}}>{fmt(bal)} ₺</td>
+                    <td style={{padding:'10px 14px',textAlign:'right'}}>
+                      <div style={{display:'flex',gap:'6px',justifyContent:'flex-end'}}>
+                        <button onClick={()=>openEdit(a)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
+                        <button onClick={()=>handleDelete(a.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {(bankAccounts||[]).length===0&&(
+        <div style={{textAlign:'center',padding:'40px 20px',color:'#64748b'}}>
+          <div style={{fontSize:'13px'}}>Henüz banka kasası eklenmedi. Nakit Kasa dışında bir kasa eklemek için "+ Yeni Banka Kasası Ekle" butonunu kullanın.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── GİDERLER PAGE ── */
-function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
+function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}){
   const today=todayStr();
-  const[form,setForm]=useState({date:today,description:'',amount:''});
+  const[form,setForm]=useState({date:today,description:'',amount:'',kasaId:'nakit'});
   const[editId,setEditId]=useState(null);
   const[dateFrom,setDateFrom]=useState('');
   const[dateTo,setDateTo]=useState('');
 
-  const resetForm=()=>{setForm({date:today,description:'',amount:''});setEditId(null);};
+  const kasaLabelFor=(id)=>id==='nakit'||!id?'Nakit Kasa':(((bankAccounts||[]).find(a=>a.id===id)||{}).name||'Nakit Kasa');
+
+  const resetForm=()=>{setForm({date:today,description:'',amount:'',kasaId:'nakit'});setEditId(null);};
 
   const handleSave=()=>{
     const amt=parseFloat(form.amount)||0;
@@ -2643,7 +2790,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
       onUpdateExpenses(prev=>[...prev,{id:expId,date:form.date,description:form.description.trim(),amount:amt,createdAt:new Date().toISOString()}]);
       // Kasaya çıkış ekle
       if(onUpdateKasa){
-        const kasaEntry={id:uid(),date:form.date,type:'cikis',amount:amt,description:'Gider: '+form.description.trim(),auto:true,expenseId:expId};
+        const kasaEntry={id:uid(),date:form.date,type:'cikis',amount:amt,description:'Gider: '+form.description.trim(),auto:true,expenseId:expId,kasaId:form.kasaId||'nakit',kasaLabel:kasaLabelFor(form.kasaId)};
         onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),kasaEntry]}));
       }
     }
@@ -2689,6 +2836,15 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa}){
             <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Tutar (₺)</label>
             <input type="number" step="0.01" min="0" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0.00" style={inS}/>
           </div>
+          {!editId&&(
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'160px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Hangi Kasadan</label>
+            <select value={form.kasaId} onChange={e=>setForm(f=>({...f,kasaId:e.target.value}))} style={inS}>
+              <option value="nakit">Nakit Kasa</option>
+              {(bankAccounts||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+          )}
           <div style={{display:'flex',gap:'8px'}}>
             <button onClick={handleSave} style={{background:'#ef4444',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
               {editId?'Güncelle':'Ekle'}
@@ -2847,14 +3003,15 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack,f
     </div>
   );
 }
-function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,partnerAdjustments,onUpdateAdjustments,kasa,onUpdateKasa,expenses:allExpenses}){
+function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpdatePayments,partnerAdjustments,onUpdateAdjustments,kasa,onUpdateKasa,expenses:allExpenses,bankAccounts}){
   const[form,setForm]=useState({name:'',percent:''});
   const[editId,setEditId]=useState(null);
   const[dateFrom,setDateFrom]=useState('');
   const[dateTo,setDateTo]=useState('');
   const[payModal,setPayModal]=useState(null);
   const[editPayId,setEditPayId]=useState(null);
-  const[payForm,setPayForm]=useState({amount:'',date:todayStr(),note:''});
+  const[payForm,setPayForm]=useState({amount:'',date:todayStr(),note:'',kasaId:'nakit'});
+  const kasaLabelFor=(id)=>id==='nakit'||!id?'Nakit Kasa':(((bankAccounts||[]).find(a=>a.id===id)||{}).name||'Nakit Kasa');
   const[adjModal,setAdjModal]=useState(null);
   const[editAdjId,setEditAdjId]=useState(null);
   const[adjForm,setAdjForm]=useState({amount:'',date:todayStr(),note:'',direction:'ekle'});
@@ -2894,10 +3051,10 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       }
       if(onUpdateKasa){
         onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).map(t=>t.partnerPaymentId===editPayId
-          ?{...t,date:payForm.date,amount:amt,description:'Ortak Ödeme: '+partner.name+(payForm.note?' — '+payForm.note.trim():'')}
+          ?{...t,date:payForm.date,amount:amt,description:'Ortak Ödeme: '+partner.name+(payForm.note?' — '+payForm.note.trim():''),kasaId:payForm.kasaId||'nakit',kasaLabel:kasaLabelFor(payForm.kasaId)}
           :t)}));
       }
-      setPayModal(null);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:''});
+      setPayModal(null);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:'',kasaId:'nakit'});
       return;
     }
     const payId=uid();
@@ -2906,16 +3063,17 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       onUpdatePayments(prev=>[...(prev||[]),{id:payId,partnerId:payModal,partnerName:partner.name,amount:amt,date:payForm.date,note:payForm.note.trim(),createdAt:new Date().toISOString()}]);
     }
     if(onUpdateKasa){
-      const kasaEntry={id:uid(),date:payForm.date,type:'cikis',amount:amt,description:'Ortak Ödeme: '+partner.name+(payForm.note?' — '+payForm.note.trim():''),auto:true,partnerPaymentId:payId};
+      const kasaEntry={id:uid(),date:payForm.date,type:'cikis',amount:amt,description:'Ortak Ödeme: '+partner.name+(payForm.note?' — '+payForm.note.trim():''),auto:true,partnerPaymentId:payId,kasaId:payForm.kasaId||'nakit',kasaLabel:kasaLabelFor(payForm.kasaId)};
       onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),kasaEntry]}));
     }
-    setPayModal(null);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:''});
+    setPayModal(null);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:'',kasaId:'nakit'});
   };
 
   const openEditPayment=(p)=>{
     setEditPayId(p.id);
     setPayModal(p.partnerId);
-    setPayForm({amount:String(p.amount),date:p.date,note:p.note||''});
+    const existingTx=(kasa&&kasa.transactions||[]).find(t=>t.partnerPaymentId===p.id);
+    setPayForm({amount:String(p.amount),date:p.date,note:p.note||'',kasaId:(existingTx&&existingTx.kasaId)||'nakit'});
   };
 
   const handleDeletePayment=(payId)=>{
@@ -3087,7 +3245,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                       <td className="tabular-nums" style={{padding:'10px 14px',color:remaining>0?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(remaining)}</td>
                       <td style={{padding:'10px 14px'}}>
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          <button onClick={()=>{setPayModal(p.id);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:''});}} style={{background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#22c55e',fontSize:'11px',fontWeight:600}}>Ödeme Yap</button>
+                          <button onClick={()=>{setPayModal(p.id);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:'',kasaId:'nakit'});}} style={{background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#22c55e',fontSize:'11px',fontWeight:600}}>Ödeme Yap</button>
                           <button onClick={()=>{setAdjModal(p.id);setEditAdjId(null);setAdjForm({amount:'',date:todayStr(),note:'',direction:'ekle'});}} style={{background:'rgba(168,85,247,0.1)',border:'1px solid rgba(168,85,247,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#a855f7',fontSize:'11px',fontWeight:600}}>Hakediş Düzelt</button>
                           <button onClick={()=>openEdit(p)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
                           <button onClick={()=>handleDelete(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
@@ -3203,6 +3361,12 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               </div>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Not (Opsiyonel)</label>
                 <input value={payForm.note} onChange={e=>setPayForm(p=>({...p,note:e.target.value}))} placeholder="Ödeme notu..." style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Hangi Kasadan</label>
+                <select value={payForm.kasaId} onChange={e=>setPayForm(p=>({...p,kasaId:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                  <option value="nakit">Nakit Kasa</option>
+                  {(bankAccounts||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
               </div>
             </div>
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
@@ -3465,6 +3629,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
     {id:'dashboard',label:'Dashboard',icon:<IcoHome/>},
     {id:'customers',label:'Müşteriler',icon:<IcoUsers/>},
     {id:'kasa',label:'Kasa',icon:<IcoCash/>},
+    {id:'kasalar',label:'Kasalar',icon:<IcoCash/>},
     {group:'reports'},
     {id:'companies',label:'Şirketler',icon:<IcoCog/>},
     {id:'expenses',label:'Giderler',icon:<IcoCash/>},
@@ -4167,22 +4332,26 @@ function useHashRouter(){
 }
 
 /* ── KASA PAGE ── */
-function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpdateExpenses,onUpdatePartnerPayments}){
+function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpdateExpenses,onUpdatePartnerPayments,bankAccounts}){
   const transactions=(kasa&&kasa.transactions)||[];
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
   const[dateFrom,setDateFrom]=useState(firstDay);
   const[dateTo,setDateTo]=useState(today);
   const[typeFilter,setTypeFilter]=useState('all');
+  const[kasaFilter,setKasaFilter]=useState('all');
   const[addOpen,setAddOpen]=useState(false);
-  const[addForm,setAddForm]=useState({date:today,type:'giris',amount:'',description:''});
+  const[addForm,setAddForm]=useState({date:today,type:'giris',amount:'',description:'',kasaId:'nakit'});
   const[kapatOpen,setKapatOpen]=useState(false);
   const[kapatDate,setKapatDate]=useState(today);
   const[kapatErr,setKapatErr]=useState('');
+  const[kapatKasaSel,setKapatKasaSel]=useState({});
 
   const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
+  const kasaLabelFor=(id)=>id==='nakit'||!id?'Nakit Kasa':(((bankAccounts||[]).find(a=>a.id===id)||{}).name||'Nakit Kasa');
+  const kasaOptionsFor=(companyId)=>(bankAccounts||[]).filter(a=>a.companyId===companyId);
 
   // Nakit tahsilat girişleri de auto+refId taşıdığı için legacy filtresinden muaf tutulmalı;
   // refId'si bir nakit_tahsilat cari kaydına işaret eden girişler gerçek tahsilattır.
@@ -4220,7 +4389,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       }
       if(!dailyCekimMap[tDate])dailyCekimMap[tDate]={amount:0,entries:[]};
       dailyCekimMap[tDate].amount=+(dailyCekimMap[tDate].amount+amount).toFixed(2);
-      dailyCekimMap[tDate].entries.push({id:e.id,amount,companyName:e.companyName||'',bank:e.bank||'',posType:e.posType||'sanal',profit:e.profit||0});
+      dailyCekimMap[tDate].entries.push({id:e.id,amount,companyId:e.companyId||'',companyName:e.companyName||'',bank:e.bank||'',posType:e.posType||'sanal',profit:e.profit||0});
     });
   });
 
@@ -4231,7 +4400,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       const cn=e.companyName||'Bilinmiyor';
       const pt=e.posType||'sanal';
       const key=date+'|'+cn+'|'+pt;
-      if(!posAccountMap[key])posAccountMap[key]={date,companyName:cn,posType:pt,amount:0,profit:0,entries:[]};
+      if(!posAccountMap[key])posAccountMap[key]={date,companyId:e.companyId||'',companyName:cn,posType:pt,amount:0,profit:0,entries:[]};
       posAccountMap[key].amount=+(posAccountMap[key].amount+e.amount).toFixed(2);
       posAccountMap[key].profit=+(posAccountMap[key].profit+e.profit).toFixed(2);
       posAccountMap[key].entries.push(e);
@@ -4258,12 +4427,15 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     if(dateFrom&&t.date<dateFrom)return false;
     if(dateTo&&t.date>dateTo)return false;
     if(typeFilter!=='all'&&t.type!==typeFilter)return false;
+    if(kasaFilter!=='all'&&(t.kasaId||'nakit')!==kasaFilter)return false;
     return true;
   });
 
   const totalGiris=filtered.filter(t=>t.type==='giris').reduce((s,t)=>s+t.amount,0);
   const totalCikis=filtered.filter(t=>t.type==='cikis').reduce((s,t)=>s+t.amount,0);
   const genelBakiye=allTransactions.reduce((s,t)=>t.type==='giris'?s+t.amount:s-t.amount,0);
+  const kasaBalances=computeKasaBalances(transactions);
+  const kasaList=[{id:'nakit',name:'Nakit Kasa'},...(bankAccounts||[])];
 
   let running=0;
   const runningMap={};
@@ -4272,10 +4444,10 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const handleAdd=()=>{
     const amt=parseFloat(addForm.amount);
     if(!amt||!addForm.description.trim())return;
-    const entry={id:uid(),date:addForm.date,type:addForm.type,amount:amt,description:addForm.description.trim(),auto:false};
+    const entry={id:uid(),date:addForm.date,type:addForm.type,amount:amt,description:addForm.description.trim(),auto:false,kasaId:addForm.kasaId||'nakit',kasaLabel:kasaLabelFor(addForm.kasaId)};
     onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),entry]}));
     setAddOpen(false);
-    setAddForm({date:today,type:'giris',amount:'',description:''});
+    setAddForm({date:today,type:'giris',amount:'',description:'',kasaId:'nakit'});
   };
   const removeCariEntries=idSet=>{
     if(onUpdateCustomers&&idSet.size>0)onUpdateCustomers(prev=>(prev||[]).map(c=>({...c,cariEntries:(c.cariEntries||[]).filter(e=>!idSet.has(e.id))})));
@@ -4325,7 +4497,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     const posLabel=info.posType==='fiziki'?'Fiziki POS':'Sanal POS';
     const desc=info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)';
     const entryIds=info.entries.map(e=>e.id);
-    const entry={id:uid(),date:info.date,type:'giris',description:desc,amount:info.amount,auto:true,virtual:false,relatedEntryIds:entryIds};
+    const kasaId=kapatKasaSel[key]||'nakit';
+    const entry={id:uid(),date:info.date,type:'giris',description:desc,amount:info.amount,auto:true,virtual:false,relatedEntryIds:entryIds,kasaId,kasaLabel:kasaLabelFor(kasaId)};
     onUpdateKasa(prev=>({
       ...prev,
       transactions:[...(prev.transactions||[]),entry],
@@ -4339,7 +4512,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     available.forEach(([key,info])=>{
       const posLabel=info.posType==='fiziki'?'Fiziki POS':'Sanal POS';
       const eIds=info.entries.map(e=>e.id);
-      newTx.push({id:uid(),date:info.date,type:'giris',description:info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)',amount:info.amount,auto:true,virtual:false,relatedEntryIds:eIds});
+      const kasaId=kapatKasaSel[key]||'nakit';
+      newTx.push({id:uid(),date:info.date,type:'giris',description:info.date+' — '+info.companyName+' '+posLabel+' Gün Sonu ('+info.entries.length+' işlem)',amount:info.amount,auto:true,virtual:false,relatedEntryIds:eIds,kasaId,kasaLabel:kasaLabelFor(kasaId)});
       newIds.push(...eIds);
     });
     onUpdateKasa(prev=>({
@@ -4360,9 +4534,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   return(
     <div>
       <h2 style={{fontWeight:800,fontSize:'20px',marginBottom:'20px'}}>Kasa</h2>
-      <div style={{display:'flex',gap:'16px',marginBottom:'24px',flexWrap:'wrap'}}>
+      <div style={{display:'flex',gap:'16px',marginBottom:'16px',flexWrap:'wrap'}}>
         <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'180px'}}>
-          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Güncel Bakiye</div>
+          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Güncel Bakiye (Bekleyenler Dahil)</div>
           <div style={{fontSize:'26px',fontWeight:800,color:genelBakiye>=0?'#22c55e':'#ef4444'}}>{fmt(genelBakiye)} ₺</div>
         </div>
         <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'160px'}}>
@@ -4378,6 +4552,14 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
           <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Manuel Hareket Ekle</button>
         </div>
       </div>
+      <div style={{display:'flex',gap:'12px',marginBottom:'24px',flexWrap:'wrap'}}>
+        {kasaList.map(k=>(
+          <div key={k.id} style={{background:'rgba(30,39,64,.5)',border:'1px solid rgba(255,255,255,.06)',borderRadius:'10px',padding:'12px 18px',minWidth:'150px'}}>
+            <div style={{fontSize:'11px',color:'#64748b',marginBottom:'4px'}}>{k.name}</div>
+            <div style={{fontSize:'16px',fontWeight:700,color:(kasaBalances[k.id]||0)>=0?'#22c55e':'#ef4444'}}>{fmt(kasaBalances[k.id]||0)} ₺</div>
+          </div>
+        ))}
+      </div>
       <div style={{display:'flex',gap:'10px',marginBottom:'16px',flexWrap:'wrap',alignItems:'center'}}>
         <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={inS}/>
         <span style={{color:'#64748b'}}>—</span>
@@ -4387,12 +4569,16 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
           <option value="giris">Sadece Giriş</option>
           <option value="cikis">Sadece Çıkış</option>
         </select>
+        <select value={kasaFilter} onChange={e=>setKasaFilter(e.target.value)} style={inS}>
+          <option value="all">Tüm Kasalar</option>
+          {kasaList.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
+        </select>
       </div>
       <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
           <thead>
             <tr style={{background:'rgba(30,39,64,.8)',color:'#94a3b8'}}>
-              {['Tarih','Açıklama','Durum','Giriş','Çıkış','Bakiye',''].map(h=>(
+              {['Tarih','Açıklama','Kasa','Durum','Giriş','Çıkış','Bakiye',''].map(h=>(
                 <th key={h} style={{padding:'10px 12px',textAlign:h==='Giriş'||h==='Çıkış'||h==='Bakiye'?'right':'left',fontWeight:600,borderBottom:'1px solid rgba(255,255,255,.08)'}}>{h}</th>
               ))}
             </tr>
@@ -4402,6 +4588,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
               <tr key={t.id} style={rowStyle(t)}>
                 <td style={{padding:'9px 12px'}}>{renderDateCell(t)}</td>
                 <td style={{padding:'9px 12px'}}>{t.description}</td>
+                <td style={{padding:'9px 12px'}}>
+                  {t.virtual?<span style={{color:'#475569'}}>—</span>:<span style={{background:'rgba(148,163,184,.12)',color:'#94a3b8',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:600}}>{t.kasaLabel||kasaLabelFor(t.kasaId)}</span>}
+                </td>
                 <td style={{padding:'9px 12px'}}>
                   {t.virtual&&<span style={{background:'rgba(245,158,11,.2)',color:'#fcd34d',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Bekliyor</span>}
                   {!t.virtual&&t.auto&&t.type==='giris'&&!t.refId&&<span style={{background:'rgba(34,197,94,.15)',color:'#22c55e',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Aktarıldı</span>}
@@ -4418,7 +4607,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
               </tr>
             ))}
             {filtered.length===0&&(
-              <tr><td colSpan={7} style={{padding:'32px',textAlign:'center',color:'#475569'}}>Kayıt bulunamadı</td></tr>
+              <tr><td colSpan={8} style={{padding:'32px',textAlign:'center',color:'#475569'}}>Kayıt bulunamadı</td></tr>
             )}
           </tbody>
         </table>
@@ -4437,9 +4626,12 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
               return(
                 <div style={{display:'flex',flexDirection:'column',gap:'8px',overflowY:'auto',flex:1}}>
                   <div style={{fontSize:'12px',color:'#94a3b8',fontWeight:600,marginBottom:'4px'}}>Bekleyen POS Hesapları</div>
-                  {available.map(([key,info])=>(
+                  {available.map(([key,info])=>{
+                    const opts=kasaOptionsFor(info.companyId);
+                    const sel=kapatKasaSel[key]||'nakit';
+                    return(
                     <div key={key} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'14px 16px'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px',flexWrap:'wrap',gap:'8px'}}>
                         <div>
                           <span style={{fontWeight:700,fontSize:'14px'}}>{info.companyName}</span>
                           <span style={{marginLeft:'8px',padding:'2px 8px',borderRadius:'10px',fontSize:'11px',fontWeight:600,
@@ -4450,13 +4642,21 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
                         </div>
                         <button onClick={()=>handleGunuKapat(key)} style={{background:'#22c55e',border:'none',borderRadius:'6px',padding:'6px 14px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'12px',whiteSpace:'nowrap'}}>Kasaya Aktar</button>
                       </div>
+                      <div style={{marginBottom:'8px'}}>
+                        <label style={{fontSize:'11px',color:'#64748b',display:'block',marginBottom:'3px'}}>Hangi Kasaya</label>
+                        <select value={sel} onChange={e=>setKapatKasaSel(p=>({...p,[key]:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                          <option value="nakit">Nakit Kasa</option>
+                          {opts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      </div>
                       <div style={{display:'flex',gap:'16px',fontSize:'12px',color:'#94a3b8'}}>
                         <span>{info.entries.length} işlem</span>
                         <span>Tutar: <span style={{color:'#22c55e',fontWeight:600}}>{fmt(info.amount)} ₺</span></span>
                         <span>Kar: <span style={{color:'#4f8ef7',fontWeight:600}}>{fmt(info.profit)} ₺</span></span>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   {available.length>1&&(
                     <button onClick={()=>handleKapatAll(kapatDate)} style={{background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px',marginTop:'8px',alignSelf:'center'}}>Tümünü Kasaya Aktar</button>
                   )}
@@ -4484,6 +4684,12 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
               </div>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tutar (₺)</label><input type="number" min="0" step="0.01" value={addForm.amount} onChange={e=>setAddForm(p=>({...p,amount:e.target.value}))} placeholder="0.00" style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Açıklama</label><input type="text" value={addForm.description} onChange={e=>setAddForm(p=>({...p,description:e.target.value}))} placeholder="Açıklama..." style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Kasa</label>
+                <select value={addForm.kasaId} onChange={e=>setAddForm(p=>({...p,kasaId:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                  <option value="nakit">Nakit Kasa</option>
+                  {(bankAccounts||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
             </div>
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
               <button onClick={()=>setAddOpen(false)} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
@@ -4510,6 +4716,7 @@ function App(){
   const[expenses,setExpenses]=useState([]);
   const[partnerPayments,setPartnerPayments]=useState([]);
   const[partnerAdjustments,setPartnerAdjustments]=useState([]);
+  const[bankAccounts,setBankAccounts]=useState([]);
   const kasaRef=React.useRef(kasa);
   useEffect(()=>{kasaRef.current=kasa;},[kasa]);
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
@@ -4539,6 +4746,7 @@ function App(){
     const nextExpenses=Array.isArray(data.expenses)?data.expenses:[];
     const nextPartnerPayments=Array.isArray(data.partnerPayments)?data.partnerPayments:[];
     const nextPartnerAdjustments=Array.isArray(data.partnerAdjustments)?data.partnerAdjustments:[];
+    const nextBankAccounts=Array.isArray(data.bankAccounts)?data.bankAccounts:[];
     setCustomers(nextCustomers);
     setBanks(nextBanks);
     setKasa(nextKasa);
@@ -4547,8 +4755,9 @@ function App(){
     setExpenses(nextExpenses);
     setPartnerPayments(nextPartnerPayments);
     setPartnerAdjustments(nextPartnerAdjustments);
+    setBankAccounts(nextBankAccounts);
     savedAtRef.current=data.savedAt||'';
-    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners,expenses:nextExpenses,partnerPayments:nextPartnerPayments,partnerAdjustments:nextPartnerAdjustments});
+    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners,expenses:nextExpenses,partnerPayments:nextPartnerPayments,partnerAdjustments:nextPartnerAdjustments,bankAccounts:nextBankAccounts});
     isDirtyRef.current=false;
     setSaveStatus('idle');
     setSavedTime('');
@@ -4581,7 +4790,7 @@ function App(){
     if(!initialized||!auth)return;
     if(!initRef.current){initRef.current=true;return;}
     if(hydratingRef.current)return;
-    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments});
+    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts});
     if(currentSnapshot===lastServerSnapshotRef.current){
       isDirtyRef.current=false;
       if(saveStatus==='saving')setSaveStatus('idle');
@@ -4592,7 +4801,7 @@ function App(){
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
       const versionAtSave=dirtyVersionRef.current;
-      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
+      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
         .then(()=>{
           setSaveStatus('saved');setSavedTime(timeStr());
           // Kayıt sonrası güncel veriyi çek — ancak bu sırada yeni değişiklik yapıldıysa üzerine YAZMA
@@ -4608,7 +4817,7 @@ function App(){
         });
     },800);
     return()=>clearTimeout(saveTimerRef.current);
-  },[customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,initialized]);
+  },[customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts,initialized]);
 
   useEffect(()=>{
     if(!auth||auth.role!=='admin')return;
@@ -4694,13 +4903,14 @@ function App(){
               kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}
             />
           )}
-          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))}/>}
+          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts}/>}
+          {activePage==='kasalar'&&<KasalarPage bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))} companies={companies} kasa={kasa}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers} companies={companies}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
           {activePage==='companies'&&<CompaniesPage companies={companies} onUpdateCompanies={(updater)=>markDirty(()=>setCompanies(updater))}/>}
-          {activePage==='expenses'&&<ExpensesPage expenses={expenses} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
-          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(updater))} customers={customers} expenses={expenses} partnerPayments={partnerPayments} onUpdatePayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} partnerAdjustments={partnerAdjustments} onUpdateAdjustments={(updater)=>markDirty(()=>setPartnerAdjustments(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}/>}
+          {activePage==='expenses'&&<ExpensesPage expenses={expenses} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} bankAccounts={bankAccounts}/>}
+          {activePage==='partners'&&<PartnersPage partners={partners} onUpdatePartners={(updater)=>markDirty(()=>setPartners(updater))} customers={customers} expenses={expenses} partnerPayments={partnerPayments} onUpdatePayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} partnerAdjustments={partnerAdjustments} onUpdateAdjustments={(updater)=>markDirty(()=>setPartnerAdjustments(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} bankAccounts={bankAccounts}/>}
           {activePage==='admin'&&auth.role==='admin'&&<AdminUsersPage token={auth.token} currentUsername={auth.username} onUsernameChanged={(newUn)=>setAuth(p=>({...p,username:newUn}))}/>}
           {activePage==='admin'&&auth.role!=='admin'&&(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'80px',color:'#64748b'}}>Erişim yetkiniz yok.</div>

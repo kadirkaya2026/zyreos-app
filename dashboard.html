@@ -37,12 +37,12 @@ tailwind.config={theme:{extend:{colors:{
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:#0a0d14;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
   ::-webkit-scrollbar{width:6px;height:6px;}
-  ::-webkit-scrollbar-track{background:#0f1320;}
+  ::-webkit-scrollbar-track{background:#121a2e;}
   ::-webkit-scrollbar-thumb{background:#2d3748;border-radius:3px;}
   ::-webkit-scrollbar-thumb:hover{background:#4a5568;}
   .tabular-nums{font-variant-numeric:tabular-nums;}
   input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{opacity:1;}
-  select option{background:#1a2035;color:#e2e8f0;}
+  select option{background:#182238;color:#e2e8f0;}
   @media print{body{background:#fff;color:#000;}}
   @media(max-width:768px){.mobile-scroll-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}.mobile-scroll-table table{min-width:600px;}.mobile-full{width:100%!important;}.mobile-stack{flex-direction:column!important;}.mobile-p{padding:12px!important;}}
   .sidebar-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:199;}.sidebar-overlay.open{display:block;}
@@ -404,7 +404,7 @@ function LoginPage({onLogin,onGoRegister}){
   };
   return(
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#0a0d14'}}>
-      <div style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
+      <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
         <div style={{textAlign:'center',marginBottom:'32px'}}>
           <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></div>
           <div style={{color:'#64748b',fontSize:'13px',marginTop:'6px'}}>Finansal Takip Sistemi</div>
@@ -413,12 +413,12 @@ function LoginPage({onLogin,onGoRegister}){
           <div>
             <label style={{display:'block',color:'#94a3b8',fontSize:'12px',fontWeight:600,marginBottom:'6px',textTransform:'uppercase'}}>Kullanıcı Adı</label>
             <input value={username} onChange={e=>setUsername(e.target.value)} autoFocus required placeholder="admin"
-              style={{width:'100%',background:'#1a2035',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
+              style={{width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
           </div>
           <div>
             <label style={{display:'block',color:'#94a3b8',fontSize:'12px',fontWeight:600,marginBottom:'6px',textTransform:'uppercase'}}>Şifre</label>
             <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
-              style={{width:'100%',background:'#1a2035',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
+              style={{width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
           </div>
           {error&&<div style={{color:'#ef4444',fontSize:'13px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px'}}>{error}</div>}
           <button type="submit" disabled={loading}
@@ -455,7 +455,7 @@ function RegisterPage({onGoLogin}){
   };
   return(
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#0a0d14'}}>
-      <div style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
+      <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'20px',padding:'48px 40px',width:'100%',maxWidth:'400px',margin:'16px'}}>
         <div style={{textAlign:'center',marginBottom:'32px'}}>
           <div style={{fontSize:'32px',fontWeight:800,color:'#e2e8f0',letterSpacing:'-1px'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></div>
           <div style={{color:'#64748b',fontSize:'13px',marginTop:'6px'}}>Yeni Hesap Oluştur</div>
@@ -477,18 +477,18 @@ function RegisterPage({onGoLogin}){
             <div>
               <label style={{display:'block',color:'#94a3b8',fontSize:'12px',fontWeight:600,marginBottom:'6px',textTransform:'uppercase'}}>Kullanıcı Adı</label>
               <input value={username} onChange={e=>setUsername(e.target.value)} autoFocus required placeholder="orn_kullanici"
-                style={{width:'100%',background:'#1a2035',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
+                style={{width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
               <div style={{color:'#64748b',fontSize:'11px',marginTop:'4px'}}>Harf, rakam ve _ kullanılabilir (min 3 karakter)</div>
             </div>
             <div>
               <label style={{display:'block',color:'#94a3b8',fontSize:'12px',fontWeight:600,marginBottom:'6px',textTransform:'uppercase'}}>Şifre</label>
               <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required placeholder="En az 6 karakter"
-                style={{width:'100%',background:'#1a2035',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
+                style={{width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
             </div>
             <div>
               <label style={{display:'block',color:'#94a3b8',fontSize:'12px',fontWeight:600,marginBottom:'6px',textTransform:'uppercase'}}>Şifre Tekrar</label>
               <input type="password" value={password2} onChange={e=>setPassword2(e.target.value)} required placeholder="Şifreyi tekrar girin"
-                style={{width:'100%',background:'#1a2035',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
+                style={{width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'11px 14px',color:'#e2e8f0',fontSize:'14px',outline:'none'}}/>
             </div>
             {error&&<div style={{color:'#ef4444',fontSize:'13px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px'}}>{error}</div>}
             <button type="submit" disabled={loading}
@@ -511,7 +511,7 @@ function RegisterPage({onGoLogin}){
 /* ── CARD ── */
 const Card=({children,style={},className=''})=>(
   <div className={`rounded-2xl ${className}`}
-    style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.07)',padding:'20px',...style}}>
+    style={{background:'#121a2e',border:'1px solid #1e2a44',padding:'20px',...style}}>
     {children}
   </div>
 );
@@ -519,9 +519,9 @@ const Card=({children,style={},className=''})=>(
 /* ── METRIC CARD ── */
 const MetricCard=({label,value,color='#4f8ef7',sub,large=false})=>(
   <Card style={{padding:'20px'}}>
-    <div style={{color:'#94a3b8',fontSize:'12px',fontWeight:600,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:'8px'}}>{label}</div>
+    <div style={{color:'#64748b',fontSize:'11px',fontWeight:600,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:'8px'}}>{label}</div>
     <div className="tabular-nums" style={{color,fontSize:large?'28px':'22px',fontWeight:700,lineHeight:1.1}}>{value}</div>
-    {sub&&<div style={{color:'#64748b',fontSize:'12px',marginTop:'4px'}}>{sub}</div>}
+    {sub&&<div style={{color:'#475569',fontSize:'12px',marginTop:'4px'}}>{sub}</div>}
   </Card>
 );
 
@@ -530,8 +530,8 @@ const Modal=({open,onClose,title,children,width=480})=>{
   if(!open)return null;
   return(
     <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)'}}>
-      <div style={{background:'#0f1320',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'16px',width:'100%',maxWidth:width,maxHeight:'90vh',overflowY:'auto',margin:'16px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+      <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'16px',width:'100%',maxWidth:width,maxHeight:'90vh',overflowY:'auto',margin:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid #1e2a44'}}>
           <span style={{fontWeight:700,fontSize:'16px'}}>{title}</span>
           <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',padding:'4px',borderRadius:'6px',display:'flex',alignItems:'center',justifyContent:'center'}} className="hover:text-white"><IcoX size={18}/></button>
         </div>
@@ -546,7 +546,7 @@ const ConfirmModal=({open,onClose,onConfirm,title,message})=>(
   <Modal open={open} onClose={onClose} title={title} width={380}>
     <p style={{color:'#94a3b8',marginBottom:'24px',lineHeight:1.6}}>{message}</p>
     <div style={{display:'flex',gap:'12px',justifyContent:'flex-end'}}>
-      <button onClick={onClose} style={{padding:'8px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
+      <button onClick={onClose} style={{padding:'8px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
       <button onClick={()=>{onConfirm();onClose();}} style={{padding:'8px 20px',borderRadius:'8px',border:'none',background:'#ef4444',color:'#fff',cursor:'pointer',fontWeight:600}}>Sil</button>
     </div>
   </Modal>
@@ -559,7 +559,7 @@ const Field=({label,children,required=false,style={}})=>(
     {children}
   </div>
 );
-const inputStyle={width:'100%',background:'#1a2035',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'10px 12px',color:'#e2e8f0',fontSize:'14px',outline:'none'};
+const inputStyle={width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'10px 12px',color:'#e2e8f0',fontSize:'14px',outline:'none'};
 const Input=({style:s={},...props})=><input style={{...inputStyle,...s}} {...props}/>;
 const Select=({style:s={},...props})=><select style={{...inputStyle,...s}} {...props}/>;
 const Textarea=({style:s={},...props})=><textarea style={{...inputStyle,resize:'vertical',minHeight:'72px',...s}} {...props}/>;
@@ -723,7 +723,7 @@ function DashboardPage({customers,onNavigateCustomer}){
       return s+customerComm-bankCut-ownerShare;
     },0);
     return(
-      <div style={{background:'linear-gradient(135deg,rgba(15,23,42,0.9),rgba(20,30,60,0.9))',borderRadius:'14px',border:'1px solid rgba(255,255,255,0.08)',padding:'20px 22px',display:'flex',flexDirection:'column',gap:'10px'}}>
+      <div style={{background:'linear-gradient(135deg,rgba(15,23,42,0.9),rgba(20,30,60,0.9))',borderRadius:'14px',border:'1px solid #1e2a44',padding:'20px 22px',display:'flex',flexDirection:'column',gap:'10px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
           <div>
             <div style={{fontSize:'12px',fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>{label}</div>
@@ -762,7 +762,7 @@ function DashboardPage({customers,onNavigateCustomer}){
               const bak=calcBalance(c.cariEntries||[],c.openingBalance||0);
               const isBorc=bak>0;
               return(
-                <div key={c.id} onClick={()=>onNavigateCustomer(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderRadius:'10px',background:'#131929',cursor:'pointer',border:'1px solid transparent',transition:'border-color 0.15s'}} className="hover:border-blue-500/30">
+                <div key={c.id} onClick={()=>onNavigateCustomer(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderRadius:'10px',background:'#121a2e',cursor:'pointer',border:'1px solid transparent',transition:'border-color 0.15s'}} className="hover:border-blue-500/30">
                   <div>
                     <span style={{fontWeight:600,marginRight:'8px'}}>{c.name}</span>
                   </div>
@@ -781,7 +781,7 @@ function DashboardPage({customers,onNavigateCustomer}){
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
               <thead>
-                <tr style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+                <tr style={{borderBottom:'1px solid #1e2a44'}}>
                   {['Tarih','Müşteri','Tutar','Kar'].map(h=><th key={h} style={{textAlign:'left',padding:'6px 8px',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase'}}>{h}</th>)}
                 </tr>
               </thead>
@@ -818,14 +818,14 @@ function CustomerFormModal({open,onClose,onSave,initial}){
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 16px'}}>
         <Field label="Ad Soyad" required style={{gridColumn:'1/-1'}}><Input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Ad Soyad"/></Field>
         <Field label="Telefon"><Input value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="0532 xxx xx xx"/></Field>
-        <Field label="Açılış Bakiyesi (₺)"><input type="number" step="0.01" value={form.openingBalance||0} onChange={e=>set('openingBalance',parseFloat(e.target.value)||0)} style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'9px 12px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/></Field>
+        <Field label="Açılış Bakiyesi (₺)"><input type="number" step="0.01" value={form.openingBalance||0} onChange={e=>set('openingBalance',parseFloat(e.target.value)||0)} style={{width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'9px 12px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/></Field>
       </div>
-      <div style={{marginTop:'16px',background:'rgba(15,23,42,0.6)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.08)',padding:'14px'}}>
+      <div style={{marginTop:'16px',background:'rgba(15,23,42,0.6)',borderRadius:'10px',border:'1px solid #1e2a44',padding:'14px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
           <span style={{fontSize:'12px',fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Taksit Bazlı Komisyon Oranları (%)</span>
           <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
             <input type="number" step="0.1" min="0" max="100" placeholder="0.0"
-              style={{width:'72px',background:'rgba(30,39,64,.8)',border:'1px solid rgba(245,158,11,0.4)',borderRadius:'6px',padding:'4px 8px',color:'#f59e0b',fontWeight:700,fontSize:'12px',textAlign:'center'}}
+              style={{width:'72px',background:'#182238',border:'1px solid rgba(245,158,11,0.4)',borderRadius:'6px',padding:'4px 8px',color:'#f59e0b',fontWeight:700,fontSize:'12px',textAlign:'center'}}
               id="fillAllInput"/>
             <button onClick={()=>{const v=document.getElementById('fillAllInput').value;fillAll(v);}}
               style={{fontSize:'11px',padding:'4px 10px',borderRadius:'6px',border:'1px solid rgba(245,158,11,0.4)',background:'rgba(245,158,11,0.1)',color:'#f59e0b',cursor:'pointer',fontWeight:600}}>
@@ -842,7 +842,7 @@ function CustomerFormModal({open,onClose,onSave,initial}){
                 <div style={{position:'relative'}}>
                   <input type="number" step="0.1" min="0" max="100" value={rates[i]}
                     onChange={e=>setInstRate(i,parseFloat(e.target.value)||0)}
-                    style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'6px',padding:'6px 20px 6px 8px',color:'#f59e0b',fontWeight:700,fontSize:'13px',textAlign:'center',boxSizing:'border-box'}}/>
+                    style={{width:'100%',background:'#182238',border:'1px solid rgba(245,158,11,0.3)',borderRadius:'6px',padding:'6px 20px 6px 8px',color:'#f59e0b',fontWeight:700,fontSize:'13px',textAlign:'center',boxSizing:'border-box'}}/>
                   <span style={{position:'absolute',right:'6px',top:'50%',transform:'translateY(-50%)',color:'#64748b',fontSize:'11px',pointerEvents:'none'}}>%</span>
                 </div>
               </div>
@@ -852,7 +852,7 @@ function CustomerFormModal({open,onClose,onSave,initial}){
       </div>
       <Field label="Notlar" style={{marginTop:'12px'}}><Textarea value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="Notlar..."/></Field>
       <div style={{display:'flex',gap:'12px',justifyContent:'flex-end',marginTop:'8px'}}>
-        <button onClick={onClose} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
+        <button onClick={onClose} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
         <button onClick={()=>{if(!form.name)return alert('Ad Soyad zorunludur.');onSave(form);onClose();}}
           style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>Kaydet</button>
       </div>
@@ -1059,14 +1059,14 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       <span className="tabular-nums" style={{color,fontWeight:700,fontSize:'13px'}}>{val}</span>
     </div>
   );
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'6px 8px',color:'#e2e8f0',fontSize:'12px',width:'100%',boxSizing:'border-box'};
+  const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'6px',padding:'6px 8px',color:'#e2e8f0',fontSize:'12px',width:'100%',boxSizing:'border-box'};
 
   return(
     <Modal open={open} onClose={onClose} title={editingEntry?'Kaydı Düzenle':'Yeni Kayıt Ekle'} width={type==='bulk'?820:520}>
       <div style={{display:'flex',gap:'8px',marginBottom:'20px',flexWrap:'wrap'}}>
         {[['cekim','Kart Çekimi','#4f8ef7'],['nakit_odeme','Nakit Ödeme','#22c55e'],['nakit_tahsilat','Nakit Tahsilat','#06b6d4'],...(!editingEntry?[['bulk','Toplu Giriş','#f59e0b']]:[])].map(([v,l,c])=>(
           <button key={v} onClick={()=>setType(v)}
-            style={{flex:1,padding:'10px',borderRadius:'8px',border:`2px solid ${type===v?c:'rgba(255,255,255,0.1)'}`,background:type===v?c+'22':'transparent',color:type===v?c:'#94a3b8',cursor:'pointer',fontWeight:700,fontSize:'13px',transition:'all 0.15s'}}>{l}</button>
+            style={{flex:1,padding:'10px',borderRadius:'8px',border:`2px solid ${type===v?c:'#1e2a44'}`,background:type===v?c+'22':'transparent',color:type===v?c:'#94a3b8',cursor:'pointer',fontWeight:700,fontSize:'13px',transition:'all 0.15s'}}>{l}</button>
         ))}
       </div>
       {type==='cekim'?(
@@ -1117,7 +1117,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
             </Field>
           </div>
           {calc&&(
-            <div style={{background:'#131929',borderRadius:'10px',padding:'14px',marginTop:'4px',border:'1px solid rgba(255,255,255,0.07)'}}>
+            <div style={{background:'#121a2e',borderRadius:'10px',padding:'14px',marginTop:'4px',border:'1px solid #1e2a44'}}>
               <div style={{color:'#94a3b8',fontSize:'11px',fontWeight:700,letterSpacing:'0.05em',marginBottom:'8px',textTransform:'uppercase'}}>Hesaplama Önizlemesi</div>
               {previewRow('Müşteri Komisyonu',fmtTL(calc.customerComm)+' (%'+(form.customerRate||0)+')','#a855f7')}
               {previewRow('Müşteriye Nakit',fmtTL(calc.netToCustomer),'#4f8ef7')}
@@ -1149,7 +1149,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
         <div>
           <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
           <Field label="Yön" required>
-            <select value={nakit.direction||'artis'} onChange={e=>setNakit(p=>({...p,direction:e.target.value}))} style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'6px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'}}>
+            <select value={nakit.direction||'artis'} onChange={e=>setNakit(p=>({...p,direction:e.target.value}))} style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'6px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'}}>
               <option value="artis">Artış (Bakiye artar)</option>
               <option value="azalis">Azalış (Bakiye azalır)</option>
             </select>
@@ -1187,7 +1187,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
               <thead>
-                <tr style={{borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+                <tr style={{borderBottom:'1px solid #1e2a44'}}>
                   {['Tarih','Tutar (₺)','Banka','Taksit','Müş. Oranı %',''].map(h=>(
                     <th key={h} style={{padding:'6px 8px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
@@ -1227,7 +1227,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
         </div>
       )}
       <div style={{display:'flex',gap:'12px',justifyContent:'flex-end',marginTop:'16px'}}>
-        <button onClick={onClose} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
+        <button onClick={onClose} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
         <button onClick={handleSave}
           style={{padding:'10px 20px',borderRadius:'8px',border:'none',background:'#4f8ef7',color:'#fff',cursor:'pointer',fontWeight:700}}>{type==='bulk'?'Tümünü Kaydet':'Kaydet'}</button>
       </div>
@@ -1312,7 +1312,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
   return(
     <div>
       <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
-        <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
+        <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
         <div>
           <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
             <h2 style={{fontWeight:800,fontSize:'20px'}}>{customer.name}</h2>
@@ -1321,11 +1321,11 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
           <div style={{color:'#64748b',fontSize:'13px',marginTop:'2px'}}>{customer.phone}</div>
         </div>
         <div style={{marginLeft:'auto',display:'flex',gap:'8px'}}>
-          <button onClick={()=>setEditOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#1a2035',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoEdit size={14}/>Düzenle</button>
+          <button onClick={()=>setEditOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoEdit size={14}/>Düzenle</button>
         </div>
       </div>
       {/* tabs */}
-      <div style={{display:'flex',gap:'4px',marginBottom:'20px',borderBottom:'1px solid rgba(255,255,255,0.07)',paddingBottom:'0'}}>
+      <div style={{display:'flex',gap:'4px',marginBottom:'20px',borderBottom:'1px solid #1e2a44',paddingBottom:'0'}}>
         {tabs.map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)}
             style={{padding:'10px 20px',border:'none',background:'none',cursor:'pointer',fontWeight:700,fontSize:'13px',color:tab===v?'#4f8ef7':'#64748b',borderBottom:tab===v?'2px solid #4f8ef7':'2px solid transparent',marginBottom:'-1px',transition:'color 0.15s'}}>{l}</button>
@@ -1341,7 +1341,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
             <MetricCard label={bakiye>=0?'Kalan Bakiye (Borçluyum)':'Kalan Bakiye (Alacaklıyım)'} value={fmtTL(Math.abs(bakiye))} color={bakiye>=0?'#ef4444':'#22c55e'}/>
           </div>
           <Card style={{padding:0,overflow:'hidden'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid #1e2a44'}}>
               <span style={{fontWeight:700}}>Cari Hareketler</span>
               <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={14}/>Kayıt Ekle</button>
               <button onClick={()=>{setWaDate(yesterday);setWaOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 16px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px',marginLeft:'8px'}}>📤 WA Ekstre</button>
@@ -1350,7 +1350,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
                 <thead>
-                  <tr style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+                  <tr style={{borderBottom:'1px solid #1e2a44'}}>
                     {['Tarih','Açıklama / Banka / Taksit','Çekim Tutarı','Müşteri Kom. (%)','Müşteriye Nakit','Ödenen Nakit','Koşan Bakiye',''].map(h=>(
                       <th key={h} style={{padding:'10px 12px',textAlign:h===''?'center':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
                     ))}
@@ -1391,7 +1391,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
             </div>
           </Card>
           <div style={{marginTop:'16px',display:'flex',justifyContent:'flex-end'}}>
-            <div style={{background:'#0f1320',border:`2px solid ${bakiye>=0?'#ef4444':'#22c55e'}`,borderRadius:'12px',padding:'16px 24px',textAlign:'center',minWidth:'200px'}}>
+            <div style={{background:'#121a2e',border:`2px solid ${bakiye>=0?'#ef4444':'#22c55e'}`,borderRadius:'12px',padding:'16px 24px',textAlign:'center',minWidth:'200px'}}>
               <div style={{color:'#94a3b8',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'6px'}}>Kalan Bakiye</div>
               <div className="tabular-nums" style={{fontSize:'24px',fontWeight:800,color:bakiye>=0?'#ef4444':'#22c55e'}}>{fmtTL(Math.abs(bakiye))}</div>
               <div style={{fontSize:'12px',fontWeight:700,color:bakiye>=0?'#ef4444':'#22c55e',marginTop:'4px'}}>{bakiye>=0?'BORÇLUYUM':'ALACAKLIYIM'}</div>
@@ -1427,7 +1427,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
             <div style={{color:'#d97706',fontSize:'12px',marginTop:'8px'}}>Kart çekimlerinde uygulanan müşteri komisyon oranları</div>
           </div>
           {customer.notes&&(
-            <div style={{marginTop:'16px',background:'#131929',borderRadius:'10px',padding:'14px',border:'1px solid rgba(255,255,255,0.06)'}}>
+            <div style={{marginTop:'16px',background:'#121a2e',borderRadius:'10px',padding:'14px',border:'1px solid rgba(255,255,255,0.06)'}}>
               <div style={{color:'#64748b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'6px'}}>Notlar</div>
               <div style={{color:'#94a3b8',lineHeight:1.6}}>{customer.notes}</div>
             </div>
@@ -1436,7 +1436,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
       )}
       {/* EKSTRE */}
       {tab==='ekstre'&&(()=>{
-        const inS2={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
+        const inS2={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
         return(
         <div>
           <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px',flexWrap:'wrap'}}>
@@ -1454,7 +1454,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
                 <thead>
-                  <tr style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+                  <tr style={{borderBottom:'1px solid #1e2a44'}}>
                     {['Tarih','Açıklama','Çekim Tutarı','Müşteri Kom.','Müşteriye Nakit','Ödenen Nakit','Bakiye'].map(h=>(
                       <th key={h} style={{padding:'12px 14px',textAlign:'left',color:'#64748b',fontWeight:700,fontSize:'11px',textTransform:'uppercase'}}>{h}</th>
                     ))}
@@ -1507,11 +1507,11 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
         };
         return(
           <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{background:'#1a2035',borderRadius:'12px',padding:'28px',width:'420px',boxShadow:'0 8px 40px rgba(0,0,0,0.5)'}}>
+            <div style={{background:'#182238',borderRadius:'12px',padding:'28px',width:'420px',boxShadow:'0 8px 40px rgba(0,0,0,0.5)'}}>
               <h3 style={{margin:'0 0 20px',fontSize:'16px',fontWeight:700}}>WA Ekstre Gönder</h3>
               <div style={{marginBottom:'14px'}}>
                 <label style={{display:'block',fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Bakiye tarihi (bu tarihe kadar olan tüm kayıtlar dahil edilir)</label>
-                <input type="date" value={waDate} onChange={e=>setWaDate(e.target.value)} style={{width:'100%',background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.15)',borderRadius:'6px',padding:'8px 10px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/>
+                <input type="date" value={waDate} onChange={e=>setWaDate(e.target.value)} style={{width:'100%',background:'#182238',border:'1px solid #2b3b60',borderRadius:'6px',padding:'8px 10px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/>
               </div>
               <div style={{background:'rgba(255,255,255,0.05)',borderRadius:'8px',padding:'12px',marginBottom:'20px',fontSize:'12px',color:'#94a3b8',lineHeight:1.5}}>
                 <strong style={{color:'#e2e8f0'}}>Gönderilecek mesaj:</strong><br/>{preview}
@@ -1528,7 +1528,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
       })()}
       {tab==='bakiye_duzeltme'&&(()=>{
         const duzeltmeler=entries.filter(e=>e.type==='bakiye_duzeltme').sort((a,b)=>a.date<b.date?1:-1);
-        const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
+        const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
         const handleBdSave=()=>{
           const amt=parseFloat(bdForm.amount)||0;
           if(!amt)return;
@@ -1538,7 +1538,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
         };
         return(
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'24px',alignItems:'start'}}>
-            <div style={{background:'rgba(30,39,64,.6)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px'}}>
+            <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'12px',padding:'20px'}}>
               <h3 style={{fontWeight:700,fontSize:'14px',marginBottom:'16px',color:'#f59e0b'}}>Yeni Bakiye Düzeltme</h3>
               <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
                 <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
@@ -1569,7 +1569,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
               ):(
                 <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                   {duzeltmeler.map(e=>(
-                    <div key={e.id} style={{background:'rgba(30,39,64,.6)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'10px',padding:'12px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div key={e.id} style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'10px',padding:'12px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                       <div>
                         <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'3px'}}>{e.date}</div>
                         <div style={{fontWeight:600,fontSize:'13px'}}>{e.description}</div>
@@ -1642,7 +1642,7 @@ function CustomersPage({customers,banks,onUpdateCustomers,onUpdateKasa}){
           const cekim=(c.cariEntries||[]).filter(e=>e.type==='cekim').length;
           const isBorc=bak>0;
           return(
-            <Card key={c.id} style={{cursor:'pointer',transition:'border-color 0.15s',borderColor:'rgba(255,255,255,0.07)'}} className="hover:border-blue-500/30">
+            <Card key={c.id} style={{cursor:'pointer',transition:'border-color 0.15s',borderColor:'#1e2a44'}} className="hover:border-blue-500/30">
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px'}}>
                 <div onClick={()=>setDetailId(c.id)} style={{flex:1}}>
                   <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>
@@ -1824,9 +1824,9 @@ function POSPage({customers,banks}){
   const grandOwnerShare=bankRows.reduce((s,r)=>s+r.totalOwnerShare,0);
   const grandRealProfit=bankRows.reduce((s,r)=>s+r.totalRealProfit,0);
 
-  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
+  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'};
   const td={padding:'10px 14px'};
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'14px'};
+  const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'14px'};
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
@@ -1864,7 +1864,7 @@ function POSPage({customers,banks}){
         <>
           {/* Banka Bazlı Özet */}
           <Card style={{padding:0,overflow:'hidden'}}>
-            <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',fontWeight:700,fontSize:'14px'}}>
+            <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44',fontWeight:700,fontSize:'14px'}}>
               Banka Bazlı Tahsilat Özeti
             </div>
             <div style={{overflowX:'auto'}}>
@@ -1892,7 +1892,7 @@ function POSPage({customers,banks}){
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
+                  <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid #1e2a44'}}>
                     <td colSpan={2} style={{...td,color:'#94a3b8',fontWeight:700,fontSize:'12px',textTransform:'uppercase'}}>Toplam ({dayEntries.length} işlem)</td>
                     <td className="tabular-nums" style={{...td,color:'#4f8ef7',fontWeight:800}}>{fmtTL(grandTotal)}</td>
                     <td className="tabular-nums" style={{...td,color:'#ef4444',fontWeight:800}}>{fmtTL(grandCut)}</td>
@@ -1908,7 +1908,7 @@ function POSPage({customers,banks}){
           {/* İşlem Detayları — banka bazlı */}
           {bankRows.map(r=>(
             <Card key={r.bank} style={{padding:0,overflow:'hidden'}}>
-              <div style={{padding:'12px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div style={{padding:'12px 18px',borderBottom:'1px solid #1e2a44',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <span style={{fontWeight:700,fontSize:'13px'}}>{r.bank} — İşlem Detayları</span>
                 <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
                   <span style={{color:'#64748b',fontSize:'12px'}}>{r.entries.length} işlem</span>
@@ -1954,7 +1954,7 @@ function ReportsPage({customers}){
   const[dateFrom,setDateFrom]=useState('');
   const[dateTo,setDateTo]=useState('');
   const[selCustomerId,setSelCustomerId]=useState('');
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
+  const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
   const selCustomer=customers.find(c=>c.id===selCustomerId)||null;
 
   const filteredEntries=selCustomer
@@ -1970,7 +1970,7 @@ function ReportsPage({customers}){
   const totalOdenen=filteredEntries.filter(e=>e.type==='nakit_odeme').reduce((s,e)=>s+e.amount,0);
   const bakiye=calcBalance(filteredEntries,selCustomer?.openingBalance||0);
 
-  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
+  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'};
   const td={padding:'10px 14px'};
 
   return(
@@ -2027,7 +2027,7 @@ function ReportsPage({customers}){
           </div>
 
           <Card style={{padding:0,overflow:'hidden'}}>
-            <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <div>
                 <span style={{fontWeight:700,fontSize:'14px'}}>{selCustomer.name}</span>
                 <span style={{marginLeft:'10px',color:'#64748b',fontSize:'12px'}}>{selCustomer.code}</span>
@@ -2062,7 +2062,7 @@ function ReportsPage({customers}){
                     })}
                   </tbody>
                   <tfoot>
-                    <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
+                    <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid #1e2a44'}}>
                       <td colSpan={2} style={{...td,color:'#94a3b8',fontWeight:700,fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
                       <td className="tabular-nums" style={{...td,color:'#4f8ef7',fontWeight:800,textAlign:'right'}}>{fmtTL(totalCekim)}</td>
                       <td className="tabular-nums" style={{...td,color:'#a855f7',fontWeight:800,textAlign:'right'}}>{fmtTL(totalKom)}</td>
@@ -2139,7 +2139,7 @@ function ProfitPage({customers,companies}){
   const bankStats=Object.values(bankMap).map(b=>({...b,avgPct:b.totalC>0?+(b.bankCost/b.totalC*100).toFixed(2):0})).sort((a,b)=>b.bankCost-a.bankCost);
 
   const s={padding:'10px 14px'};
-  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
+  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'};
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
@@ -2158,17 +2158,17 @@ function ProfitPage({customers,companies}){
           <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
             <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Başlangıç Tarihi</label>
             <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
-              style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
+              style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
             <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Bitiş Tarihi</label>
             <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
-              style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
+              style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
             <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Müşteri</label>
             <select value={filterCustomer} onChange={e=>setFilterCustomer(e.target.value)}
-              style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',minWidth:'160px'}}>
+              style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',minWidth:'160px'}}>
               <option value="">Tüm Müşteriler</option>
               {customers.map(c=><option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
             </select>
@@ -2197,7 +2197,7 @@ function ProfitPage({customers,companies}){
 
       {/* İşlem Detay Tablosu */}
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontWeight:700,fontSize:'14px'}}>İşlem Detayları</span>
           <Badge color="#4f8ef7">{rows.length} kayıt</Badge>
         </div>
@@ -2241,7 +2241,7 @@ function ProfitPage({customers,companies}){
             </tbody>
             {rows.length>0&&(
               <tfoot>
-                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
+                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid #1e2a44'}}>
                   <td colSpan={4} style={{...s,color:'#94a3b8',fontWeight:700,fontSize:'12px',textTransform:'uppercase'}}>Toplam ({rows.length} işlem)</td>
                   <td className="tabular-nums" style={{...s,color:'#4f8ef7',fontWeight:800}}>{fmtTL(totalC)}</td>
                   <td className="tabular-nums" style={{...s,color:'#a855f7',fontWeight:800}}>{fmtTL(totalKom)}</td>
@@ -2256,7 +2256,7 @@ function ProfitPage({customers,companies}){
 
       {/* Müşteri Bazlı Özet */}
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',fontWeight:700,fontSize:'14px'}}>Müşteri Bazlı Kar Özeti</div>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44',fontWeight:700,fontSize:'14px'}}>Müşteri Bazlı Kar Özeti</div>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
             <thead><tr>{['Müşteri','Çekim Adedi','Toplam Çekim','Müşteri Kom.','Banka Maliyeti','NET KAR','Kar Marjı'].map(h=><th key={h} style={thS}>{h}</th>)}</tr></thead>
@@ -2280,7 +2280,7 @@ function ProfitPage({customers,companies}){
 
       {/* Banka Bazlı Maliyet */}
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',fontWeight:700,fontSize:'14px'}}>Banka Bazlı Maliyet Analizi</div>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44',fontWeight:700,fontSize:'14px'}}>Banka Bazlı Maliyet Analizi</div>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
             <thead><tr>{['Banka','İşlem Adedi','Toplam Çekim','Banka Maliyeti','Ort. Maliyet %'].map(h=><th key={h} style={thS}>{h}</th>)}</tr></thead>
@@ -2309,18 +2309,18 @@ function ProfitPage({customers,companies}){
             <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'flex-end'}}>
               <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
                 <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Şirket Seç</label>
-                <select value={rptCompany} onChange={e=>setRptCompany(e.target.value)} style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',minWidth:'200px'}}>
+                <select value={rptCompany} onChange={e=>setRptCompany(e.target.value)} style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',minWidth:'200px'}}>
                   <option value="">— Tüm Şirketler —</option>
                   {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
                 <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Başlangıç</label>
-                <input type="date" value={rptFrom} onChange={e=>setRptFrom(e.target.value)} style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
+                <input type="date" value={rptFrom} onChange={e=>setRptFrom(e.target.value)} style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
                 <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Bitiş</label>
-                <input type="date" value={rptTo} onChange={e=>setRptTo(e.target.value)} style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
+                <input type="date" value={rptTo} onChange={e=>setRptTo(e.target.value)} style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'}}/>
               </div>
             </div>
           </Card>
@@ -2362,7 +2362,7 @@ function ProfitPage({customers,companies}){
 
                 {withSettlement.length>0&&(
                   <Card style={{padding:0,overflow:'hidden'}}>
-                    <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+                    <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
                       <span style={{fontWeight:700,fontSize:'14px'}}>Detaylı Çekim & Yatma Tablosu ({withSettlement.length} işlem)</span>
                     </div>
                     <div style={{overflowX:'auto'}}>
@@ -2370,7 +2370,7 @@ function ProfitPage({customers,companies}){
                         <thead>
                           <tr>
                             {['Çekim Tarihi','Müşteri','Şirket','Tutar','Taksit','POS Kesintisi','Net Yatacak','Yatma Tarihi'].map(h=>
-                              <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                              <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
                             )}
                           </tr>
                         </thead>
@@ -2485,7 +2485,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
     });
   };
 
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
+  const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
   const bankColor=(name)=>{const b=INIT_BANKS.find(x=>x.name===name);return b?b.color:'#94a3b8';};
 
   return(
@@ -2535,7 +2535,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
         </div>
 
         {form.posTypes.fiziki&&(
-        <div style={{background:'#131929',borderRadius:'10px',border:'1px solid rgba(245,158,11,0.25)',padding:'14px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+        <div style={{background:'#121a2e',borderRadius:'10px',border:'1px solid rgba(245,158,11,0.25)',padding:'14px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
           <label style={{fontSize:'13px',color:'#f59e0b',fontWeight:700,whiteSpace:'nowrap'}}>Fiziki POS Çekim Oranı (%)</label>
           <input type="number" step="0.01" min="0" value={form.fizikiRate} onChange={e=>setForm(f=>({...f,fizikiRate:e.target.value}))} placeholder="Örn: 1.49"
             style={{...inS,width:'110px',padding:'7px 10px',fontSize:'13px',borderColor:'rgba(245,158,11,0.35)'}}/>
@@ -2547,7 +2547,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
         <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'12px',fontWeight:600}}>Banka Bazlı Sanal POS Komisyon Oranları — Her bankayı genişletip oranları girin</div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px',maxHeight:'45vh',overflowY:'auto'}}>
           {form.bankRates.map((br,bi)=>(
-            <div key={br.bankName} style={{background:'#131929',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)',overflow:'hidden',flexShrink:0}}>
+            <div key={br.bankName} style={{background:'#121a2e',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)',overflow:'hidden',flexShrink:0}}>
               <button onClick={()=>setOpenBank(openBank===bi?null:bi)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 16px',background:'none',border:'none',cursor:'pointer',color:'#e2e8f0'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                   <div style={{width:'10px',height:'10px',borderRadius:'50%',background:bankColor(br.bankName)}}/>
@@ -2585,7 +2585,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
 
         <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
           <button onClick={()=>{setModalOpen(false);resetForm();}}
-            style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+            style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
             İptal
           </button>
           <button onClick={handleSave}
@@ -2597,17 +2597,17 @@ function CompaniesPage({companies,onUpdateCompanies}){
 
       {companies.length>0&&(
         <Card style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
             <span style={{fontWeight:700,fontSize:'14px'}}>Kayıtlı Şirketler ({companies.length})</span>
           </div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
               <thead>
                 <tr>
-                  <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Şirket Adı</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Valör</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>POS Tipi</th>
-                  <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>İşlem</th>
+                  <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>Şirket Adı</th>
+                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>Valör</th>
+                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>POS Tipi</th>
+                  <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>İşlem</th>
                 </tr>
               </thead>
               <tbody>
@@ -2701,7 +2701,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}
 
   const totalExpenses=filtered.reduce((s,e)=>s+e.amount,0);
 
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
+  const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
@@ -2735,7 +2735,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}
             <button onClick={handleSave} style={{background:'#ef4444',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
               {editId?'Güncelle':'Ekle'}
             </button>
-            {editId&&<button onClick={resetForm} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>}
+            {editId&&<button onClick={resetForm} style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>}
           </div>
         </div>
       </Card>
@@ -2760,7 +2760,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}
 
       {filtered.length>0?(
         <Card style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
             <span style={{fontWeight:700,fontSize:'14px'}}>Gider Kayıtları ({filtered.length})</span>
           </div>
           <div style={{overflowX:'auto'}}>
@@ -2768,7 +2768,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}
               <thead>
                 <tr>
                   {['Tarih','Açıklama','Tutar','İşlem'].map(h=>
-                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
                   )}
                 </tr>
               </thead>
@@ -2788,7 +2788,7 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
+                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid #1e2a44'}}>
                   <td colSpan={2} style={{padding:'10px 14px',fontWeight:700,color:'#94a3b8',fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
                   <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:'#ef4444',fontWeight:800,fontSize:'15px'}}>{fmtTL(totalExpenses)}</td>
                   <td></td>
@@ -2849,7 +2849,7 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack,f
   return(
     <div>
       <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
-        <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
+        <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
         <div>
           <h2 style={{fontWeight:800,fontSize:'20px',margin:0}}>{partner.name}</h2>
           <div style={{fontSize:'12px',color:'#64748b'}}>Ortaklık Payı: %{partner.percent}{(from||to)&&<span style={{marginLeft:'10px',color:'#f59e0b'}}>Filtre: {from?fmtDate(from):'başlangıç'} — {to?fmtDate(to):'bugün'}</span>}</div>
@@ -2861,11 +2861,11 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack,f
         <MetricCard label={kalan>=0?'Kalan (Borçluyum)':'Kalan (Fazla Ödendi)'} value={fmtTL(Math.abs(kalan))} color={kalan>=0?'#ef4444':'#22c55e'}/>
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',fontWeight:700}}>Hakediş / Ödeme Dökümü</div>
+        <div style={{padding:'16px 20px',borderBottom:'1px solid #1e2a44',fontWeight:700}}>Hakediş / Ödeme Dökümü</div>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
             <thead>
-              <tr style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+              <tr style={{borderBottom:'1px solid #1e2a44'}}>
                 {['Tarih','Açıklama','Hakediş','Ödeme','Bakiye'].map(h=>(
                   <th key={h} style={{padding:'10px 12px',textAlign:h==='Tarih'||h==='Açıklama'?'left':'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
                 ))}
@@ -3028,7 +3028,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const getPartnerAdjTotal=(pid)=>adjustments.filter(a=>a.partnerId===pid).reduce((s,a)=>s+a.amount,0);
   const totalAdj=adjustments.reduce((s,a)=>s+a.amount,0);
 
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
+  const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
   const detailPartner=detailId?partners.find(p=>p.id===detailId):null;
   if(detailPartner)return <PartnerDetail partner={detailPartner} customers={customers} expenses={allExpenses} payments={payments} adjustments={adjustments} from={dateFrom} to={dateTo} onBack={()=>setDetailId(null)}/>;
@@ -3055,7 +3055,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               {editId?'Güncelle':'Ekle'}
             </button>
             {editId&&<button onClick={resetForm}
-              style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+              style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
               İptal
             </button>}
           </div>
@@ -3107,7 +3107,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               <thead>
                 <tr>
                   {['Ortak','Yüzde','Pay (Kar)','Ödenen','Kalan','İşlem'].map(h=>
-                    <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                    <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
                   )}
                 </tr>
               </thead>
@@ -3142,7 +3142,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
                 })}
               </tbody>
               <tfoot>
-                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid rgba(255,255,255,0.1)'}}>
+                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid #1e2a44'}}>
                   <td style={{padding:'10px 14px',fontWeight:700,color:'#94a3b8',fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
                   <td style={{padding:'10px 14px'}}><span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:totalPercent===100?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',color:totalPercent===100?'#22c55e':'#f59e0b'}}>%{totalPercent.toFixed(1)}</span></td>
                   <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:800,fontSize:'15px'}}>{fmtTL(netProfit+totalAdj)}</td>
@@ -3164,7 +3164,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       {/* Ödeme Geçmişi */}
       {payments.length>0&&(
         <Card style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
             <span style={{fontWeight:700,fontSize:'14px'}}>Ödeme Geçmişi ({payments.length})</span>
           </div>
           <div style={{overflowX:'auto'}}>
@@ -3172,7 +3172,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               <thead>
                 <tr>
                   {['Tarih','Ortak','Tutar','Not','İşlem'].map(h=>
-                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
                   )}
                 </tr>
               </thead>
@@ -3200,7 +3200,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       {/* Hakediş Düzeltme Geçmişi */}
       {adjustments.length>0&&(
         <Card style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
             <span style={{fontWeight:700,fontSize:'14px'}}>Hakediş Düzeltme Geçmişi ({adjustments.length})</span>
           </div>
           <div style={{overflowX:'auto'}}>
@@ -3208,7 +3208,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               <thead>
                 <tr>
                   {['Tarih','Ortak','Tutar','Not','İşlem'].map(h=>
-                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>{h}</th>
+                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
                   )}
                 </tr>
               </thead>
@@ -3236,7 +3236,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       {/* Ödeme Modalı */}
       {payModal&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
             <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>{editPayId?'Ödeme Düzenle':'Ortak Ödeme'} — {(partners.find(p=>p.id===payModal)||{}).name}</h3>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
@@ -3256,7 +3256,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               </div>
             </div>
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
-              <button onClick={()=>{setPayModal(null);setEditPayId(null);}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={()=>{setPayModal(null);setEditPayId(null);}} style={{background:'none',border:'1px solid #2b3b60',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
               <button onClick={handlePay} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>{editPayId?'Güncelle':'Ödeme Yap'}</button>
             </div>
           </div>
@@ -3266,7 +3266,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       {/* Hakediş Düzeltme Modalı */}
       {adjModal&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
             <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>{editAdjId?'Düzeltme Düzenle':'Hakediş Düzeltme'} — {(partners.find(p=>p.id===adjModal)||{}).name}</h3>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
@@ -3286,7 +3286,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               </div>
             </div>
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
-              <button onClick={()=>{setAdjModal(null);setEditAdjId(null);}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={()=>{setAdjModal(null);setEditAdjId(null);}} style={{background:'none',border:'1px solid #2b3b60',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
               <button onClick={handleAdjSave} style={{background:'#a855f7',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>{editAdjId?'Güncelle':'Kaydet'}</button>
             </div>
           </div>
@@ -3302,7 +3302,7 @@ function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
   const[msg,setMsg]=useState('');
   const[err,setErr]=useState('');
   const[loading,setLoading]=useState(false);
-  const inpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
+  const inpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid #1e2a44',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
   const submit=async()=>{
     setErr('');setMsg('');
     if(!form.newUsername.trim()){setErr('Kullanıcı adı boş olamaz');return;}
@@ -3324,14 +3324,14 @@ function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
   return(
     <div style={{maxWidth:'480px'}}>
       <Card style={{display:'flex',flexDirection:'column',gap:'18px'}}>
-        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Hesap Bilgileri</div>
+        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid #1e2a44'}}>Hesap Bilgileri</div>
         {err&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{err}</div>}
         {msg&&<div style={{color:'#22c55e',background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{msg}</div>}
         <div>
           <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
           <input style={inpS} value={form.newUsername} onChange={e=>setForm(p=>({...p,newUsername:e.target.value}))}/>
         </div>
-        <div style={{borderTop:'1px solid rgba(255,255,255,0.07)',paddingTop:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+        <div style={{borderTop:'1px solid #1e2a44',paddingTop:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
           <div style={{color:'#64748b',fontSize:'12px',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em'}}>Şifre Değiştir</div>
           <div>
             <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Mevcut Şifre</label>
@@ -3351,7 +3351,7 @@ function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
         </button>
       </Card>
       <Card style={{display:'flex',flexDirection:'column',gap:'12px',marginTop:'16px'}}>
-        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Veri Yönetimi</div>
+        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid #1e2a44'}}>Veri Yönetimi</div>
         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
           <button onClick={onExport} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',borderRadius:'10px',border:'1px solid rgba(34,197,94,0.25)',background:'rgba(34,197,94,0.06)',color:'#22c55e',cursor:'pointer',fontWeight:600,fontSize:'13px',textAlign:'left'}}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -3412,7 +3412,7 @@ function BankSettingsPage({banks,onUpdateBanks}){
           {notice&&<div style={{color:'#22c55e',fontSize:'12px',marginTop:'6px'}}>{notice}</div>}
         </div>
         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-          <button onClick={loadLatestRates} style={{background:'#1e293b',border:'1px solid rgba(255,255,255,.12)',color:'#e2e8f0',borderRadius:'10px',padding:'9px 14px',cursor:'pointer',fontWeight:700}}>Güncel Oranları Yükle</button>
+          <button onClick={loadLatestRates} style={{background:'#182238',border:'1px solid #2b3b60',color:'#e2e8f0',borderRadius:'10px',padding:'9px 14px',cursor:'pointer',fontWeight:700}}>Güncel Oranları Yükle</button>
           <button onClick={saveBanks} style={{background:'#22c55e',border:'none',color:'#052e16',borderRadius:'10px',padding:'9px 16px',cursor:'pointer',fontWeight:800}}>Kaydet</button>
         </div>
       </Card>
@@ -3436,7 +3436,7 @@ function BankSettingsPage({banks,onUpdateBanks}){
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:'8px'}}>
                   {b.rates.map((r,i)=>(
-                    <div key={i} style={{background:'#131929',borderRadius:'8px',padding:'10px',border:'1px solid rgba(255,255,255,0.06)'}}>
+                    <div key={i} style={{background:'#121a2e',borderRadius:'8px',padding:'10px',border:'1px solid rgba(255,255,255,0.06)'}}>
                       <div style={{color:'#64748b',fontSize:'10px',fontWeight:700,marginBottom:'6px',textTransform:'uppercase'}}>{i+1}. Taksit</div>
                       <input type="text" inputMode="decimal" value={r} onChange={e=>updateRate(b.id,i,e.target.value)}
                         style={{...inputStyle,padding:'5px 8px',fontSize:'13px',fontWeight:700,color:b.color,marginBottom:'4px'}}/>
@@ -3451,7 +3451,7 @@ function BankSettingsPage({banks,onUpdateBanks}){
       </div>
       {/* Comparison Table */}
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',gap:'16px'}}>
+        <div style={{padding:'16px 20px',borderBottom:'1px solid #1e2a44',display:'flex',alignItems:'center',gap:'16px'}}>
           <span style={{fontWeight:700}}>Banka Karşılaştırma</span>
           <Select value={compareInst} onChange={e=>setCompareInst(parseInt(e.target.value))} style={{width:'140px',padding:'6px 10px',fontSize:'13px'}}>
             {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1} Taksit</option>)}
@@ -3460,7 +3460,7 @@ function BankSettingsPage({banks,onUpdateBanks}){
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
             <thead>
-              <tr style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+              <tr style={{borderBottom:'1px solid #1e2a44'}}>
                 {['Banka','Oran (%)','İşlem Bedeli','10.000₺ Maliyet','10.000₺ Net'].map(h=>(
                   <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase'}}>{h}</th>
                 ))}
@@ -3530,7 +3530,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
   const toggleGroup=function(key){setExpanded(p=>({...p,[key]:!p[key]}));};
   const isGroupActive=(key)=>page===GROUPS[key].page||GROUPS[key].children.some(c=>c.id===page);
 
-  const sidebarStyle={width:w,minWidth:w,background:'#0c1021',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',height:'100vh',flexShrink:0,transition:'width 0.2s'};
+  const sidebarStyle={width:w,minWidth:w,background:'#0d1322',borderRight:'1px solid #1e2a44',display:'flex',flexDirection:'column',height:'100vh',flexShrink:0,transition:'width 0.2s'};
   if(isMobile){
     sidebarStyle.position='fixed';
     sidebarStyle.top=0;
@@ -3576,7 +3576,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
 
   return(
     <div style={sidebarStyle}>
-      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid rgba(255,255,255,0.07)',flexShrink:0,cursor:'pointer'}} onClick={()=>setPage('dashboard')}>
+      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',padding:collapsed?'0':'0 20px',borderBottom:'1px solid #1e2a44',flexShrink:0,cursor:'pointer'}} onClick={()=>setPage('dashboard')}>
         {!collapsed&&<span style={{fontWeight:800,fontSize:'18px',letterSpacing:'-0.5px',color:'#e2e8f0'}}>ZYRE<span style={{color:'#4f8ef7'}}>OS</span></span>}
         {collapsed&&<div style={{width:'32px',height:'32px',borderRadius:'8px',background:'#4f8ef7',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'14px',color:'#fff'}}>Z</div>}
       </div>
@@ -3630,7 +3630,7 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
           );
         })}
       </nav>
-      <div style={{padding:'8px',borderTop:'1px solid rgba(255,255,255,0.07)',flexShrink:0,display:'flex',flexDirection:'column',gap:'2px'}}>
+      <div style={{padding:'8px',borderTop:'1px solid #1e2a44',flexShrink:0,display:'flex',flexDirection:'column',gap:'2px'}}>
         {!collapsed&&(
           <div style={{padding:'8px 14px',borderRadius:'8px',background:'rgba(15,23,42,0.8)',marginBottom:'4px',display:'flex',alignItems:'center',gap:'6px'}}>
             <div style={{width:'7px',height:'7px',borderRadius:'50%',background:statusColor,flexShrink:0}}/>
@@ -3653,9 +3653,9 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
 }
 
 /* ── ADMIN USERS PAGE ── */
-const _adminInpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
+const _adminInpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid #1e2a44',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
 const _adminOverlayS={position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'};
-const _adminModalS={background:'#1e2433',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'400px',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',gap:'16px'};
+const _adminModalS={background:'#1e2433',borderRadius:'16px',padding:'24px',width:'100%',maxWidth:'400px',border:'1px solid #1e2a44',display:'flex',flexDirection:'column',gap:'16px'};
 
 function AdminUserModal({title,onClose,onSubmit,submitLabel,form,setForm,formErr,editModal,addModal}){
   return(
@@ -3688,7 +3688,7 @@ function AdminUserModal({title,onClose,onSubmit,submitLabel,form,setForm,formErr
           )}
         </div>
         <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
-          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
+          <button onClick={onClose} style={{padding:'10px 18px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600}}>İptal</button>
           <button onClick={onSubmit} style={{padding:'10px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',cursor:'pointer',fontWeight:700}}>{submitLabel}</button>
         </div>
       </div>
@@ -3758,7 +3758,7 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
   };
 
   const inpS=_adminInpS;
-  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'};
+  const thS={padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'};
   const td={padding:'10px 14px',fontSize:'13px'};
 
   const pending=users.filter(u=>u.status==='pending');
@@ -3777,7 +3777,7 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
       {/* Onay Bekleyenler */}
       {pending.length>0&&(
         <Card style={{padding:0,overflow:'hidden',border:'1px solid rgba(245,158,11,0.25)'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',gap:'10px'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44',display:'flex',alignItems:'center',gap:'10px'}}>
             <div style={{width:'8px',height:'8px',borderRadius:'50%',background:'#f59e0b',animation:'pulse 1.5s infinite'}}/>
             <span style={{fontWeight:700,fontSize:'14px',color:'#f59e0b'}}>Onay Bekleyen ({pending.length})</span>
           </div>
@@ -3813,7 +3813,7 @@ function AdminUsersPage({token,onUsernameChanged,currentUsername}){
 
       {/* Tüm Kullanıcılar */}
       <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'10px'}}>
+        <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'10px'}}>
           <span style={{fontWeight:700,fontSize:'14px'}}>Tüm Kullanıcılar ({users.length})</span>
           <div style={{display:'flex',gap:'8px'}}>
             <button onClick={load} style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(79,142,247,0.1)',border:'1px solid rgba(79,142,247,0.2)',borderRadius:'8px',padding:'6px 12px',color:'#4f8ef7',cursor:'pointer',fontSize:'12px',fontWeight:600}}>
@@ -3998,8 +3998,8 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
   const pendingCount=queue.filter(i=>i.status!=='assigned').length;
   const assignedCount=queue.filter(i=>i.status==='assigned').length;
 
-  const inp={background:'#1e2d45',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'#e2e8f0',padding:'6px 8px',fontSize:'13px',width:'100%'};
-  const dateInp={background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'#e2e8f0',padding:'8px 12px',fontSize:'13px',outline:'none'};
+  const inp={background:'#1e2d45',border:'1px solid #1e2a44',borderRadius:'6px',color:'#e2e8f0',padding:'6px 8px',fontSize:'13px',width:'100%'};
+  const dateInp={background:'rgba(255,255,255,0.05)',border:'1px solid #1e2a44',borderRadius:'8px',color:'#e2e8f0',padding:'8px 12px',fontSize:'13px',outline:'none'};
   const fBtn=(val,lbl,cnt,col)=>(
     <button onClick={()=>setStatusFilter(val)} style={{padding:'7px 14px',borderRadius:'8px',border:statusFilter===val?`1px solid ${col}44`:'1px solid transparent',cursor:'pointer',fontWeight:600,fontSize:'12px',background:statusFilter===val?col+'22':'rgba(255,255,255,0.04)',color:statusFilter===val?col:'#64748b',transition:'all .15s'}}>
       {lbl}{cnt!=null?` (${cnt})`:''}
@@ -4021,7 +4021,7 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
           <button onClick={()=>loadQueue(startDate,endDate)} style={{padding:'8px 18px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',fontWeight:700,fontSize:'13px',cursor:'pointer'}}>
             Filtrele
           </button>
-          <button onClick={()=>{setStartDate(today);setEndDate(today);loadQueue(today,today);}} style={{padding:'8px 14px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',fontWeight:600,fontSize:'12px',cursor:'pointer'}}>
+          <button onClick={()=>{setStartDate(today);setEndDate(today);loadQueue(today,today);}} style={{padding:'8px 14px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',fontWeight:600,fontSize:'12px',cursor:'pointer'}}>
             Bugün
           </button>
           <div style={{marginLeft:'auto',display:'flex',gap:'6px',flexWrap:'wrap'}}>
@@ -4052,7 +4052,7 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
       {filtered.map(item=>{
         const isAssigned=item.status==='assigned';
         return(
-          <div key={item.id} style={{background:'#131929',borderRadius:'12px',padding:'18px 20px',border:isAssigned?'1px solid rgba(34,197,94,0.2)':'1px solid rgba(255,255,255,0.07)'}}>
+          <div key={item.id} style={{background:'#121a2e',borderRadius:'12px',padding:'18px 20px',border:isAssigned?'1px solid rgba(34,197,94,0.2)':'1px solid #1e2a44'}}>
             <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'12px',alignItems:'center'}}>
               <span style={{fontSize:'12px',color:'#64748b'}}>📱 {item.from}</span>
               <span style={{fontSize:'12px',color:'#64748b'}}>🕐 {item.receivedAt?new Date(item.receivedAt).toLocaleString('tr-TR'):'-'}</span>
@@ -4160,7 +4160,7 @@ function Topbar({page,saved,onMenuToggle}){
   const showBtn=installPrompt||(isIOS&&!window.navigator.standalone);
   return(
     <div style={{position:'relative'}}>
-      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',borderBottom:'1px solid rgba(255,255,255,0.07)',background:'#0c1021',position:'sticky',top:0,zIndex:100,flexShrink:0}}>
+      <div style={{height:'56px',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',borderBottom:'1px solid #1e2a44',background:'#0d1322',position:'sticky',top:0,zIndex:100,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
           {isMobile&&(
             <button onClick={onMenuToggle} style={{background:'none',border:'none',color:'#94a3b8',cursor:'pointer',padding:'6px',display:'flex',alignItems:'center',borderRadius:'8px'}}>
@@ -4240,7 +4240,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
 
   const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
+  const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
   const kasaLabelFor=(id)=>id==='nakit'||!id?'Nakit Kasa':(((bankAccounts||[]).find(a=>a.id===id)||{}).name||'Nakit Kasa');
   const kasaOptionsFor=(companyId)=>(bankAccounts||[]).filter(a=>a.companyId===companyId);
   const valorLabelFor=(info)=>{
@@ -4596,7 +4596,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
         </div>
         <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'20px'}}>
           <button onClick={()=>{setBankModalOpen(false);resetBankForm();}}
-            style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+            style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
             İptal
           </button>
           <button onClick={handleSaveBankAccount}
@@ -4666,7 +4666,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       </div>
       {kapatOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'500px',maxWidth:'95vw',maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'500px',maxWidth:'95vw',maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
             <h3 style={{fontWeight:700,marginBottom:'6px',fontSize:'15px'}}>Hangi POS Hesabının Kasasını Kapatmak İstersiniz?</h3>
             <div style={{fontSize:'11px',color:'#64748b',marginBottom:'16px'}}>Her POS hesabı, bağlı olduğu firmanın valörüne göre farklı tarihte kasaya aktarılabilir hale gelir.</div>
             <div style={{marginBottom:'16px'}}>
@@ -4697,7 +4697,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
                     const opts=kasaOptionsFor(info.companyId);
                     const sel=kapatKasaSel[key]||'nakit';
                     return(
-                    <div key={key} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'14px 16px'}}>
+                    <div key={key} style={{background:'rgba(255,255,255,0.03)',border:'1px solid #1e2a44',borderRadius:'10px',padding:'14px 16px'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px',flexWrap:'wrap',gap:'8px'}}>
                         <div>
                           <span style={{fontWeight:700,fontSize:'14px'}}>{info.companyName}</span>
@@ -4755,14 +4755,14 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
             })()}
             {kapatErr&&<div style={{color:'#ef4444',fontSize:'12px',marginTop:'8px'}}>{kapatErr}</div>}
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
-              <button onClick={()=>{setKapatOpen(false);setKapatErr('');}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>Kapat</button>
+              <button onClick={()=>{setKapatOpen(false);setKapatErr('');}} style={{background:'none',border:'1px solid #2b3b60',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>Kapat</button>
             </div>
           </div>
         </div>
       )}
       {addOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
             <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Manuel Hareket Ekle</h3>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label><input type="date" value={addForm.date} onChange={e=>setAddForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
@@ -4782,7 +4782,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
               </div>
             </div>
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
-              <button onClick={()=>setAddOpen(false)} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={()=>setAddOpen(false)} style={{background:'none',border:'1px solid #2b3b60',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
               <button onClick={handleAdd} style={{background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Kaydet</button>
             </div>
           </div>
@@ -4790,7 +4790,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       )}
       {virmanOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
             <h3 style={{fontWeight:700,marginBottom:'6px',fontSize:'15px'}}>Kasalar Arası Virman</h3>
             <div style={{fontSize:'11px',color:'#64748b',marginBottom:'16px'}}>Bir kasadan diğerine para aktarır — kaynaktan çıkış, hedefe giriş olarak birlikte kaydedilir.</div>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -4810,7 +4810,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
             </div>
             {virmanErr&&<div style={{color:'#ef4444',fontSize:'12px',marginTop:'10px'}}>{virmanErr}</div>}
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
-              <button onClick={()=>{setVirmanOpen(false);setVirmanErr('');}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={()=>{setVirmanOpen(false);setVirmanErr('');}} style={{background:'none',border:'1px solid #2b3b60',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
               <button onClick={handleVirman} style={{background:'#a855f7',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>⇄ Virman Yap</button>
             </div>
           </div>

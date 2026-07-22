@@ -4285,6 +4285,20 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     });
   });
 
+  // Kaydedilmiş kasa hareketleri veya bekleyen valörler bugünden ileri tarihliyse
+  // (2. iş günü valörü gibi), sayfa her açıldığında tarih filtresi bunları
+  // otomatik kapsayacak şekilde genişlesin — aksi halde sayfa yenilenince
+  // varsayılan "bugüne kadar" aralığı bu kayıtları tekrar gizler.
+  const latestRelevantDate=(()=>{
+    let max=today;
+    transactions.forEach(t=>{if(t.date&&t.date>max)max=t.date;});
+    Object.keys(dailyCekimMap).forEach(d=>{if(d>max)max=d;});
+    return max;
+  })();
+  useEffect(()=>{
+    setDateTo(prev=>latestRelevantDate>prev?latestRelevantDate:prev);
+  },[latestRelevantDate]);
+
   // POS hesap bazlı gruplama (Gün Sonu modal için)
   const posAccountMap={};
   Object.entries(dailyCekimMap).forEach(([date,info])=>{

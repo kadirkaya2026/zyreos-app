@@ -15,6 +15,24 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.9/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+/* ZYREOS semantik tasarım token'ları — ham renk sınıfları yerine bunlar kullanılır */
+tailwind.config={theme:{extend:{colors:{
+  ink:'#0a0d14',        /* sayfa zemini */
+  surface:'#121a2e',    /* kart zemini */
+  raised:'#182238',     /* hover/yükseltilmiş zemin */
+  line:'#1e2a44',       /* standart kenarlık */
+  linehi:'#2b3b60',     /* vurgulu kenarlık */
+  primary:'#4f8ef7',    /* marka mavisi */
+  gain:'#22c55e',       /* giriş/pozitif */
+  loss:'#ef4444',       /* çıkış/negatif */
+  warn:'#f59e0b',       /* valör/bekleyen */
+  grape:'#a855f7',      /* virman */
+  muted:'#94a3b8',      /* ikincil metin */
+  dim:'#64748b',        /* soluk metin */
+  faint:'#475569'       /* en soluk metin */
+}}}};
+</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:#0a0d14;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
@@ -4470,59 +4488,59 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
 
   return(
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-extrabold tracking-tight text-slate-100">Kasalar</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Nakit ve banka hesaplarının bakiyeleri ile kasa hareketleri</p>
+          <p className="mt-0.5 text-xs text-dim">Nakit ve banka hesaplarının bakiyeleri ile kasa hareketleri</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={openNewBankAccount} className="inline-flex items-center gap-1.5 rounded-xl border border-blue-500/40 px-4 py-2.5 text-[13px] font-semibold text-blue-400 transition-colors hover:bg-blue-500/10">
-            <IcoPlus size={15}/>Yeni Banka Kasası
+          <button onClick={openNewBankAccount} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+            <IcoPlus size={14}/>Banka Kasası
           </button>
-          <button onClick={()=>{setKapatDate(today);setKapatErr('');setKapatOpen(true);}} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-[13px] font-bold text-black transition-colors hover:bg-amber-400">
-            Günü Kapat / Kasaya Aktar
-          </button>
-          <button onClick={()=>{setVirmanErr('');setVirmanOpen(true);}} className="inline-flex items-center gap-1.5 rounded-xl border border-purple-500/40 px-4 py-2.5 text-[13px] font-semibold text-purple-400 transition-colors hover:bg-purple-500/10">
+          <button onClick={()=>{setVirmanErr('');setVirmanOpen(true);}} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
             <IcoSwap size={14}/>Virman
           </button>
-          <button onClick={()=>setAddOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-blue-500">
-            <IcoPlus size={15}/>Manuel Hareket Ekle
+          <button onClick={()=>setAddOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+            <IcoPlus size={14}/>Manuel Hareket
+          </button>
+          <button onClick={()=>{setKapatDate(today);setKapatErr('');setKapatOpen(true);}} className="inline-flex items-center gap-1.5 rounded-lg bg-warn px-4 py-2 text-[13px] font-bold text-black shadow-[0_4px_16px_-6px_rgba(245,158,11,.55)] transition-all duration-150 hover:bg-amber-400 hover:shadow-[0_6px_20px_-6px_rgba(245,158,11,.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warn/60">
+            Günü Kapat / Kasaya Aktar
           </button>
         </div>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition-colors hover:border-slate-700">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Toplam Kasa Bakiyesi</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400"><IcoWallet size={16}/></span>
+        <div className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Toplam Bakiye</span>
+            <span className="text-primary/60"><IcoWallet size={15}/></span>
           </div>
-          <div className={"text-right text-2xl font-bold tabular-nums tracking-tight "+(toplamKasa>=0?'text-emerald-400':'text-red-400')}>{fmt(toplamKasa)} ₺</div>
-          <div className="mt-1 text-right text-[10px] text-slate-500">{kasaList.length} kasa</div>
+          <div className={"text-right text-[22px] font-bold tabular-nums tracking-tight "+(toplamKasa>=0?'text-gain':'text-loss')}>{fmt(toplamKasa)} ₺</div>
+          <div className="mt-1 text-right text-[10px] text-faint">{kasaList.length} kasa</div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition-colors hover:border-slate-700">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Bugünkü Giriş</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400"><IcoTrendUp size={16}/></span>
+        <div className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Bugünkü Giriş</span>
+            <span className="text-gain/60"><IcoTrendUp size={15}/></span>
           </div>
-          <div className="text-right text-2xl font-bold tabular-nums tracking-tight text-emerald-400">{fmt(bugunGiris)} ₺</div>
-          <div className="mt-1 text-right text-[10px] text-slate-500">{fmtDate(today)}</div>
+          <div className="text-right text-[22px] font-bold tabular-nums tracking-tight text-gain">{fmt(bugunGiris)} ₺</div>
+          <div className="mt-1 text-right text-[10px] text-faint">{fmtDate(today)}</div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition-colors hover:border-slate-700">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Bugünkü Çıkış</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 text-red-400"><IcoTrendDown size={16}/></span>
+        <div className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Bugünkü Çıkış</span>
+            <span className="text-loss/60"><IcoTrendDown size={15}/></span>
           </div>
-          <div className="text-right text-2xl font-bold tabular-nums tracking-tight text-red-400">{fmt(bugunCikis)} ₺</div>
-          <div className="mt-1 text-right text-[10px] text-slate-500">{fmtDate(today)}</div>
+          <div className="text-right text-[22px] font-bold tabular-nums tracking-tight text-loss">{fmt(bugunCikis)} ₺</div>
+          <div className="mt-1 text-right text-[10px] text-faint">{fmtDate(today)}</div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 transition-colors hover:border-slate-700">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Bekleyen Valör</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400"><IcoClockV size={16}/></span>
+        <div className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Bekleyen Valör</span>
+            <span className="text-warn/60"><IcoClockV size={15}/></span>
           </div>
-          <div className="text-right text-2xl font-bold tabular-nums tracking-tight text-amber-300">{fmt(bekleyenValor)} ₺</div>
-          <div className="mt-1 text-right text-[10px] text-slate-500">kasaya aktarılmayı bekliyor</div>
+          <div className="text-right text-[22px] font-bold tabular-nums tracking-tight text-amber-300">{fmt(bekleyenValor)} ₺</div>
+          <div className="mt-1 text-right text-[10px] text-faint">kasaya aktarılmayı bekliyor</div>
         </div>
       </div>
 
@@ -4531,28 +4549,28 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
           const accent=k.id==='nakit'?'#22c55e':bankColor(k.bankName);
           const selected=kasaFilter===k.id;
           const bal=kasaBalances[k.id]||0;
+          const initial=k.id==='nakit'?'₺':k.name.trim()[0].toUpperCase();
           return(
             <div key={k.id} onClick={()=>setKasaFilter(prev=>prev===k.id?'all':k.id)}
               title="Tıklayınca bu kasanın hareketlerini listeler"
-              className={"group relative cursor-pointer rounded-xl border p-5 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg "+(selected?'':'border-slate-800 bg-slate-900/60 hover:border-slate-600')}
-              style={selected?{borderColor:accent,background:`linear-gradient(150deg, ${accent}1f, rgba(15,23,42,.85))`,boxShadow:`0 8px 24px -8px ${accent}66`}:undefined}>
+              className={"group relative cursor-pointer overflow-hidden rounded-2xl border p-5 transition-all duration-150 hover:-translate-y-0.5 "+(selected?'':'border-line bg-surface/60 hover:border-linehi')}
+              style={selected?{borderColor:accent,background:`linear-gradient(150deg, ${accent}1c, rgba(15,23,42,.85))`,boxShadow:`0 8px 24px -8px ${accent}66`}:undefined}>
+              <span className="absolute inset-x-0 top-0 h-[3px]" style={{background:`linear-gradient(90deg, ${accent}, ${accent}44)`}}/>
+              <span aria-hidden="true" className="pointer-events-none absolute -bottom-5 -right-1 select-none text-[68px] font-black leading-none opacity-[0.055]" style={{color:accent}}>{initial}</span>
               {selected&&<span className="absolute right-4 top-4 h-2 w-2 rounded-full" style={{background:accent,boxShadow:`0 0 8px ${accent}`}}/>}
-              <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold" style={{background:`${accent}22`,color:accent}}>
-                  {k.id==='nakit'?'₺':k.name.trim()[0].toUpperCase()}
-                </span>
+              <div className="mb-5 flex items-start gap-3">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-bold text-slate-100">{k.name}</span>
-                  {k.id!=='nakit'&&<span className="block truncate text-[10px] text-slate-500">{companyNameFor(k.companyId)}</span>}
+                  <span className="block truncate text-[10px] text-dim">{k.id==='nakit'?'Fiziksel kasa':companyNameFor(k.companyId)+' · '+(k.bankName||'')}</span>
                 </span>
                 {k.id!=='nakit'&&(
                   <span className="flex shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" onClick={e=>e.stopPropagation()}>
-                    <button onClick={()=>openEditBankAccount(k)} title="Düzenle" className="rounded-md bg-white/5 p-1.5 text-blue-400 transition-colors hover:bg-blue-500/15"><IcoPencil size={12}/></button>
-                    <button onClick={()=>handleDeleteBankAccount(k.id)} title="Sil" className="rounded-md bg-white/5 p-1.5 text-red-400 transition-colors hover:bg-red-500/15"><IcoTrash size={12}/></button>
+                    <button onClick={()=>openEditBankAccount(k)} title="Düzenle" className="rounded-md bg-white/5 p-1.5 text-primary transition-colors duration-150 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><IcoPencil size={12}/></button>
+                    <button onClick={()=>handleDeleteBankAccount(k.id)} title="Sil" className="rounded-md bg-white/5 p-1.5 text-loss transition-colors duration-150 hover:bg-loss/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50"><IcoTrash size={12}/></button>
                   </span>
                 )}
               </div>
-              <div className={"text-right text-[21px] font-extrabold tabular-nums tracking-tight "+(bal>=0?'text-emerald-400':'text-red-400')}>{fmt(bal)} ₺</div>
+              <div className={"text-right text-[21px] font-extrabold tabular-nums tracking-tight "+(bal>=0?'text-gain':'text-loss')}>{fmt(bal)} ₺</div>
               {selected&&<div className="mt-1 text-right text-[10px] font-bold" style={{color:accent}}>● Hareketler listeleniyor</div>}
             </div>
           );
@@ -4588,59 +4606,59 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
         </div>
       </Modal>
       <div className="mb-4 flex flex-wrap items-center gap-2.5">
-        <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors focus:border-blue-500"/>
-        <span className="text-slate-600">—</span>
-        <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors focus:border-blue-500"/>
-        <select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)} className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors focus:border-blue-500">
+        <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="rounded-lg border border-line bg-surface/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors duration-150 focus:border-primary"/>
+        <span className="text-faint">—</span>
+        <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="rounded-lg border border-line bg-surface/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors duration-150 focus:border-primary"/>
+        <select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)} className="rounded-lg border border-line bg-surface/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors duration-150 focus:border-primary">
           <option value="all">Tümü</option>
           <option value="giris">Sadece Giriş</option>
           <option value="cikis">Sadece Çıkış</option>
         </select>
-        <select value={kasaFilter} onChange={e=>setKasaFilter(e.target.value)} className="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors focus:border-blue-500">
+        <select value={kasaFilter} onChange={e=>setKasaFilter(e.target.value)} className="rounded-lg border border-line bg-surface/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors duration-150 focus:border-primary">
           <option value="all">Tüm Kasalar</option>
           {kasaList.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
         </select>
       </div>
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3.5">
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface/40">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <span className="text-sm font-bold text-slate-200">Son Kasa Hareketleri</span>
-          <span className="text-xs tabular-nums text-slate-500">{filtered.length} kayıt</span>
+          <span className="text-xs tabular-nums text-dim">{filtered.length} kayıt</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-500">
+              <tr className="border-b border-line text-[11px] uppercase tracking-wider text-dim">
                 {['Tarih','Açıklama','Kasa','Durum','Giriş','Çıkış','Bakiye',''].map(h=>(
                   <th key={h} className={"px-4 py-3 font-semibold "+(h==='Giriş'||h==='Çıkış'||h==='Bakiye'?'text-right':'text-left')}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-line/60">
               {filtered.map(t=>(
-                <tr key={t.id} className={"transition-colors hover:bg-slate-800/30 "+(t.virtual?'bg-amber-500/5':'')} style={t.virtual?{borderLeft:'3px solid #f59e0b'}:(t.auto&&t.type==='giris'?{borderLeft:'3px solid #22c55e'}:undefined)}>
+                <tr key={t.id} className={"transition-colors duration-150 hover:bg-raised/40 "+(t.virtual?'bg-warn/5':'')} style={t.virtual?{borderLeft:'3px solid #f59e0b'}:(t.auto&&t.type==='giris'?{borderLeft:'3px solid #22c55e'}:undefined)}>
                   <td className="whitespace-nowrap px-4 py-2.5 text-slate-300">{renderDateCell(t)}</td>
                   <td className="px-4 py-2.5 text-slate-200">{t.description}</td>
                   <td className="px-4 py-2.5">
-                    {t.virtual?<span className="text-slate-600">—</span>:<span className="inline-flex items-center rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-semibold text-slate-300">{t.kasaLabel||kasaLabelFor(t.kasaId)}</span>}
+                    {t.virtual?<span className="text-faint">—</span>:<span className="inline-flex items-center rounded-md border border-linehi bg-raised/60 px-2 py-0.5 text-[11px] font-semibold text-muted">{t.kasaLabel||kasaLabelFor(t.kasaId)}</span>}
                   </td>
                   <td className="px-4 py-2.5">
-                    {t.virtual&&<span className="inline-flex items-center rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-300">Bekliyor</span>}
-                    {!t.virtual&&t.auto&&t.type==='giris'&&!t.refId&&<span className="inline-flex items-center rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">Aktarıldı</span>}
-                    {!t.virtual&&t.auto&&t.type==='giris'&&t.refId&&<span className="inline-flex items-center rounded-md border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-400">Tahsilat</span>}
-                    {!t.auto&&t.transferId&&<span className="inline-flex items-center rounded-md border border-purple-500/25 bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-300">⇄ Virman</span>}
-                    {!t.auto&&!t.transferId&&<span className="inline-flex items-center rounded-md border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-300">Manuel</span>}
-                    {t.auto&&t.type==='cikis'&&<span className="inline-flex items-center rounded-md border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-400">Ödeme</span>}
+                    {t.virtual&&<span className="inline-flex items-center rounded-md border border-warn/25 bg-warn/10 px-2 py-0.5 text-[11px] font-semibold text-amber-300">Bekliyor</span>}
+                    {!t.virtual&&t.auto&&t.type==='giris'&&!t.refId&&<span className="inline-flex items-center rounded-md border border-gain/25 bg-gain/10 px-2 py-0.5 text-[11px] font-semibold text-gain">Aktarıldı</span>}
+                    {!t.virtual&&t.auto&&t.type==='giris'&&t.refId&&<span className="inline-flex items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">Tahsilat</span>}
+                    {!t.auto&&t.transferId&&<span className="inline-flex items-center rounded-md border border-grape/25 bg-grape/10 px-2 py-0.5 text-[11px] font-semibold text-purple-300">⇄ Virman</span>}
+                    {!t.auto&&!t.transferId&&<span className="inline-flex items-center rounded-md border border-grape/20 bg-grape/5 px-2 py-0.5 text-[11px] font-semibold text-violet-300">Manuel</span>}
+                    {t.auto&&t.type==='cikis'&&<span className="inline-flex items-center rounded-md border border-loss/25 bg-loss/10 px-2 py-0.5 text-[11px] font-semibold text-loss">Ödeme</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-emerald-400">{t.type==='giris'?fmt(t.amount)+' ₺':''}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-red-400">{t.type==='cikis'?fmt(t.amount)+' ₺':''}</td>
-                  <td className={"px-4 py-2.5 text-right font-bold tabular-nums "+((runningMap[t.id]||0)>=0?'text-emerald-400':'text-red-400')}>{fmt(runningMap[t.id]||0)} ₺</td>
+                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gain">{t.type==='giris'?fmt(t.amount)+' ₺':''}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-loss">{t.type==='cikis'?fmt(t.amount)+' ₺':''}</td>
+                  <td className={"px-4 py-2.5 text-right font-bold tabular-nums "+((runningMap[t.id]||0)>=0?'text-gain':'text-loss')}>{fmt(runningMap[t.id]||0)} ₺</td>
                   <td className="px-4 py-2.5 text-right">
-                    <button onClick={()=>handleDelete(t.id)} className="rounded-md p-1 text-slate-600 transition-colors hover:bg-red-500/10 hover:text-red-400"><IcoTrash size={13}/></button>
+                    <button onClick={()=>handleDelete(t.id)} className="rounded-md p-1 text-faint transition-colors duration-150 hover:bg-loss/10 hover:text-loss focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50"><IcoTrash size={13}/></button>
                   </td>
                 </tr>
               ))}
               {filtered.length===0&&(
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-600">Kayıt bulunamadı</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-faint">Kayıt bulunamadı</td></tr>
               )}
             </tbody>
           </table>

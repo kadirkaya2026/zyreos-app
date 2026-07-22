@@ -4338,6 +4338,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     if(!amt||!addForm.description.trim())return;
     const entry={id:uid(),date:addForm.date,type:addForm.type,amount:amt,description:addForm.description.trim(),auto:false,kasaId:addForm.kasaId||'nakit',kasaLabel:kasaLabelFor(addForm.kasaId)};
     onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),entry]}));
+    ensureVisibleInFilter([addForm.date]);
     setAddOpen(false);
     setAddForm({date:today,type:'giris',amount:'',description:'',kasaId:'nakit'});
   };
@@ -4383,6 +4384,13 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       };
     });
   };
+  const ensureVisibleInFilter=(dates)=>{
+    if(!dates.length)return;
+    const minD=dates.reduce((a,b)=>a<b?a:b);
+    const maxD=dates.reduce((a,b)=>a>b?a:b);
+    setDateFrom(prev=>!prev||minD<prev?minD:prev);
+    setDateTo(prev=>!prev||maxD>prev?maxD:prev);
+  };
   const handleGunuKapat=(key)=>{
     const info=posAccountMap[key];
     if(!info||!info.amount)return;
@@ -4396,6 +4404,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       transactions:[...(prev.transactions||[]),entry],
       settledEntryIds:[...(prev.settledEntryIds||[]),...entryIds]
     }));
+    ensureVisibleInFilter([info.date]);
   };
   const handleKapatAll=(date)=>{
     const available=Object.entries(posAccountMap).filter(([k,v])=>v.date===date);
@@ -4413,6 +4422,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       transactions:[...(prev.transactions||[]),...newTx],
       settledEntryIds:[...(prev.settledEntryIds||[]),...newIds]
     }));
+    ensureVisibleInFilter([date]);
     setKapatOpen(false);setKapatErr('');
   };
 

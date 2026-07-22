@@ -4340,9 +4340,6 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     return true;
   });
 
-  const totalGiris=filtered.filter(t=>t.type==='giris').reduce((s,t)=>s+t.amount,0);
-  const totalCikis=filtered.filter(t=>t.type==='cikis').reduce((s,t)=>s+t.amount,0);
-  const genelBakiye=allTransactions.reduce((s,t)=>t.type==='giris'?s+t.amount:s-t.amount,0);
   const kasaBalances=computeKasaBalances(transactions);
   const kasaList=[{id:'nakit',name:'Nakit Kasa'},...(bankAccounts||[])];
 
@@ -4471,28 +4468,16 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
 
   return(
     <div>
-      <h2 style={{fontWeight:800,fontSize:'20px',marginBottom:'20px'}}>Kasalar</h2>
-      <div style={{display:'flex',gap:'16px',marginBottom:'16px',flexWrap:'wrap'}}>
-        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'180px'}}>
-          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Güncel Bakiye (Bekleyenler Dahil)</div>
-          <div style={{fontSize:'26px',fontWeight:800,color:genelBakiye>=0?'#22c55e':'#ef4444'}}>{fmt(genelBakiye)} ₺</div>
-        </div>
-        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'160px'}}>
-          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Giriş</div>
-          <div style={{fontSize:'20px',fontWeight:700,color:'#22c55e'}}>{fmt(totalGiris)} ₺</div>
-        </div>
-        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'160px'}}>
-          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Çıkış</div>
-          <div style={{fontSize:'20px',fontWeight:700,color:'#ef4444'}}>{fmt(totalCikis)} ₺</div>
-        </div>
-        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px',marginBottom:'20px'}}>
+        <h2 style={{fontWeight:800,fontSize:'20px'}}>Kasalar</h2>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={openNewBankAccount} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(79,142,247,0.4)',borderRadius:'8px',padding:'10px 18px',color:'#4f8ef7',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Yeni Banka Kasası</button>
           <button onClick={()=>{setKapatDate(today);setKapatErr('');setKapatOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Günü Kapat / Kasaya Aktar</button>
           <button onClick={()=>{setVirmanErr('');setVirmanOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(139,92,246,0.4)',borderRadius:'8px',padding:'10px 18px',color:'#a855f7',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>⇄ Virman</button>
           <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Manuel Hareket Ekle</button>
         </div>
       </div>
-      <div style={{display:'flex',gap:'14px',marginBottom:'24px',overflowX:'auto',paddingBottom:'8px'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'16px',marginBottom:'28px'}}>
         {kasaList.map(k=>{
           const accent=k.id==='nakit'?'#22c55e':bankColor(k.bankName);
           const selected=kasaFilter===k.id;
@@ -4500,19 +4485,24 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
           return(
             <div key={k.id} onClick={()=>setKasaFilter(prev=>prev===k.id?'all':k.id)}
               title="Tıklayınca bu kasanın hareketlerini listeler"
-              style={{background:selected?'rgba(255,255,255,0.07)':'rgba(30,39,64,.5)',border:selected?`1.5px solid ${accent}`:'1px solid rgba(255,255,255,.07)',borderLeft:`4px solid ${accent}`,borderRadius:'10px',padding:'12px 18px',minWidth:'180px',flexShrink:0,cursor:'pointer',transition:'all 0.15s',boxShadow:selected?`0 0 0 1px ${accent}33`:'none'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'4px'}}>
-                <div style={{fontSize:'12px',color:accent,fontWeight:700,whiteSpace:'nowrap'}}>{k.name}</div>
+              style={{position:'relative',background:selected?`linear-gradient(155deg, ${accent}20, rgba(19,25,41,.9))`:'rgba(19,25,41,.55)',border:selected?`1.5px solid ${accent}`:'1px solid rgba(255,255,255,.08)',borderRadius:'16px',padding:'18px 20px',cursor:'pointer',transition:'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',boxShadow:selected?`0 6px 24px -6px ${accent}55`:'0 2px 10px -4px rgba(0,0,0,.4)'}}>
+              {selected&&<div style={{position:'absolute',top:'14px',right:'16px',width:'8px',height:'8px',borderRadius:'50%',background:accent,boxShadow:`0 0 8px ${accent}`}}/>}
+              <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
+                <div style={{width:'36px',height:'36px',borderRadius:'11px',background:`${accent}22`,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'14px',color:accent,flexShrink:0}}>
+                  {k.id==='nakit'?'₺':k.name.trim()[0].toUpperCase()}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:'13px',fontWeight:700,color:'#e2e8f0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{k.name}</div>
+                  {k.id!=='nakit'&&<div style={{fontSize:'10px',color:'#64748b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{companyNameFor(k.companyId)}</div>}
+                </div>
                 {k.id!=='nakit'&&(
-                  <div style={{display:'flex',gap:'4px'}} onClick={e=>e.stopPropagation()}>
-                    <button onClick={()=>openEditBankAccount(k)} title="Düzenle" style={{background:'none',border:'none',color:'#4f8ef7',cursor:'pointer',padding:'2px'}}><IcoPencil size={12}/></button>
-                    <button onClick={()=>handleDeleteBankAccount(k.id)} title="Sil" style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px'}}><IcoTrash size={12}/></button>
+                  <div style={{display:'flex',gap:'2px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                    <button onClick={()=>openEditBankAccount(k)} title="Düzenle" style={{background:'rgba(255,255,255,.05)',border:'none',borderRadius:'6px',color:'#4f8ef7',cursor:'pointer',padding:'5px'}}><IcoPencil size={12}/></button>
+                    <button onClick={()=>handleDeleteBankAccount(k.id)} title="Sil" style={{background:'rgba(255,255,255,.05)',border:'none',borderRadius:'6px',color:'#ef4444',cursor:'pointer',padding:'5px'}}><IcoTrash size={12}/></button>
                   </div>
                 )}
               </div>
-              {k.id!=='nakit'&&<div style={{fontSize:'10px',color:'#64748b',marginBottom:'4px',whiteSpace:'nowrap'}}>{companyNameFor(k.companyId)}</div>}
-              <div style={{fontSize:'16px',fontWeight:700,color:bal>=0?'#22c55e':'#ef4444'}}>{fmt(bal)} ₺</div>
-              {selected&&<div style={{fontSize:'10px',color:accent,marginTop:'5px',fontWeight:700}}>● Hareketler listeleniyor</div>}
+              <div style={{fontSize:'21px',fontWeight:800,color:bal>=0?'#22c55e':'#ef4444',letterSpacing:'-0.3px'}}>{fmt(bal)} ₺</div>
             </div>
           );
         })}

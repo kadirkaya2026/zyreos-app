@@ -2630,143 +2630,6 @@ function CompaniesPage({companies,onUpdateCompanies}){
   );
 }
 
-/* ── KASALAR PAGE ── */
-function KasalarPage({bankAccounts,onUpdateBankAccounts,companies,kasa}){
-  const[modalOpen,setModalOpen]=useState(false);
-  const[editId,setEditId]=useState(null);
-  const[form,setForm]=useState({name:'',companyId:'',bankName:INIT_BANKS[0]?.name||''});
-
-  const balances=computeKasaBalances((kasa&&kasa.transactions)||[]);
-  const nakitBalance=balances['nakit']||0;
-  const totalBalance=Object.values(balances).reduce((s,v)=>s+v,0);
-  const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const bankColor=(name)=>{const b=INIT_BANKS.find(x=>x.name===name);return b?b.color:'#94a3b8';};
-  const companyName=(id)=>{const c=(companies||[]).find(co=>co.id===id);return c?c.name:'—';};
-
-  const resetForm=()=>{setForm({name:'',companyId:(companies&&companies[0])?companies[0].id:'',bankName:INIT_BANKS[0]?.name||''});setEditId(null);};
-  const openNew=()=>{resetForm();setModalOpen(true);};
-  const openEdit=(a)=>{setEditId(a.id);setForm({name:a.name,companyId:a.companyId||'',bankName:a.bankName||INIT_BANKS[0]?.name||''});setModalOpen(true);};
-
-  const handleSave=()=>{
-    if(!form.name.trim())return alert('Hesap adı giriniz.');
-    if(!form.companyId)return alert('Firma seçiniz.');
-    if(editId){
-      onUpdateBankAccounts(prev=>(prev||[]).map(a=>a.id===editId?{...a,name:form.name.trim(),companyId:form.companyId,bankName:form.bankName}:a));
-    }else{
-      onUpdateBankAccounts(prev=>[...(prev||[]),{id:uid(),name:form.name.trim(),companyId:form.companyId,bankName:form.bankName,createdAt:new Date().toISOString()}]);
-    }
-    setModalOpen(false);
-    resetForm();
-  };
-
-  const handleDelete=(id)=>{
-    if(!window.confirm('Bu banka kasasını silmek istediğinizden emin misiniz? Bu kasaya ait geçmiş kasa hareketleri silinmez, sadece kasa listesinden kaldırılır.'))return;
-    onUpdateBankAccounts(prev=>(prev||[]).filter(a=>a.id!==id));
-  };
-
-  const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'};
-
-  return(
-    <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px'}}>
-        <h2 style={{fontWeight:800,fontSize:'20px'}}>Kasalar</h2>
-        <button onClick={openNew}
-          style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
-          <IcoPlus size={15}/> Yeni Banka Kasası Ekle
-        </button>
-      </div>
-
-      <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
-        <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'180px'}}>
-          <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Toplam Kasa Bakiyesi</div>
-          <div style={{fontSize:'26px',fontWeight:800,color:totalBalance>=0?'#22c55e':'#ef4444'}}>{fmt(totalBalance)} ₺</div>
-        </div>
-      </div>
-
-      <Modal open={modalOpen} onClose={()=>{setModalOpen(false);resetForm();}} title={editId?'Banka Kasasını Düzenle':'Yeni Banka Kasası Ekle'} width={480}>
-        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Hesap Adı</label>
-            <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Örn: Akbank - Ana Hesap" style={inS}/>
-          </div>
-          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Firma</label>
-            <select value={form.companyId} onChange={e=>setForm(f=>({...f,companyId:e.target.value}))} style={inS}>
-              <option value="">Firma seçiniz</option>
-              {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Banka</label>
-            <select value={form.bankName} onChange={e=>setForm(f=>({...f,bankName:e.target.value}))} style={inS}>
-              {INIT_BANKS.map(b=><option key={b.name} value={b.name}>{b.name}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'20px'}}>
-          <button onClick={()=>{setModalOpen(false);resetForm();}}
-            style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
-            İptal
-          </button>
-          <button onClick={handleSave}
-            style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
-            {editId?'Güncelle':'Kaydet'}
-          </button>
-        </div>
-      </Modal>
-
-      <Card style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
-          <span style={{fontWeight:700,fontSize:'14px'}}>Kayıtlı Kasalar ({(bankAccounts||[]).length+1})</span>
-        </div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
-            <thead>
-              <tr>
-                <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Kasa Adı</th>
-                <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Firma</th>
-                <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>Bakiye</th>
-                <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                <td style={{padding:'10px 14px',fontWeight:600,display:'flex',alignItems:'center',gap:'8px'}}>
-                  <div style={{width:'10px',height:'10px',borderRadius:'50%',background:'#22c55e'}}/> Nakit Kasa
-                </td>
-                <td style={{padding:'10px 14px',color:'#64748b'}}>—</td>
-                <td style={{padding:'10px 14px',textAlign:'right',fontWeight:700,color:nakitBalance>=0?'#22c55e':'#ef4444'}}>{fmt(nakitBalance)} ₺</td>
-                <td style={{padding:'10px 14px',textAlign:'right',color:'#475569',fontSize:'11px'}}>Sabit</td>
-              </tr>
-              {(bankAccounts||[]).map(a=>{
-                const bal=balances[a.id]||0;
-                return(
-                  <tr key={a.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <td style={{padding:'10px 14px',fontWeight:600,display:'flex',alignItems:'center',gap:'8px'}}>
-                      <div style={{width:'10px',height:'10px',borderRadius:'50%',background:bankColor(a.bankName)}}/> {a.name}
-                    </td>
-                    <td style={{padding:'10px 14px',color:'#94a3b8'}}>{companyName(a.companyId)}</td>
-                    <td style={{padding:'10px 14px',textAlign:'right',fontWeight:700,color:bal>=0?'#22c55e':'#ef4444'}}>{fmt(bal)} ₺</td>
-                    <td style={{padding:'10px 14px',textAlign:'right'}}>
-                      <div style={{display:'flex',gap:'6px',justifyContent:'flex-end'}}>
-                        <button onClick={()=>openEdit(a)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
-                        <button onClick={()=>handleDelete(a.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {(bankAccounts||[]).length===0&&(
-        <div style={{textAlign:'center',padding:'40px 20px',color:'#64748b'}}>
-          <div style={{fontSize:'13px'}}>Henüz banka kasası eklenmedi. Nakit Kasa dışında bir kasa eklemek için "+ Yeni Banka Kasası Ekle" butonunu kullanın.</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ── GİDERLER PAGE ── */
 function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}){
   const today=todayStr();
@@ -3628,7 +3491,6 @@ function Sidebar({page,setPage,collapsed,setCollapsed,onReset,saveStatus,onExpor
   const TOP_NAV=[
     {id:'dashboard',label:'Dashboard',icon:<IcoHome/>},
     {id:'customers',label:'Müşteriler',icon:<IcoUsers/>},
-    {id:'kasa',label:'Kasa',icon:<IcoCash/>},
     {id:'kasalar',label:'Kasalar',icon:<IcoCash/>},
     {group:'reports'},
     {id:'companies',label:'Şirketler',icon:<IcoCog/>},
@@ -4250,7 +4112,7 @@ function WhatsAppQueuePage({token,allUsers,onReload}){
 }
 
 /* ── TOPBAR ── */
-const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',profit:'Kar Analizi',companies:'Şirketler',expenses:'Giderler',partners:'Ortaklar',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
+const PAGE_TITLES={dashboard:'Dashboard',customers:'Müşteriler',kasalar:'Kasalar',profit:'Kar Analizi',companies:'Şirketler',expenses:'Giderler',partners:'Ortaklar',hesabim:'Hesabım',admin:'Kullanıcı Yönetimi',waq:'WhatsApp Kuyruk'};
 function Topbar({page,saved,onMenuToggle}){
   const isMobile=useIsMobile();
   const[installPrompt,setInstallPrompt]=React.useState(null);
@@ -4332,7 +4194,7 @@ function useHashRouter(){
 }
 
 /* ── KASA PAGE ── */
-function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpdateExpenses,onUpdatePartnerPayments,bankAccounts}){
+function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpdateExpenses,onUpdatePartnerPayments,bankAccounts,onUpdateBankAccounts}){
   const transactions=(kasa&&kasa.transactions)||[];
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
@@ -4346,12 +4208,36 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const[kapatDate,setKapatDate]=useState(today);
   const[kapatErr,setKapatErr]=useState('');
   const[kapatKasaSel,setKapatKasaSel]=useState({});
+  const[bankModalOpen,setBankModalOpen]=useState(false);
+  const[bankEditId,setBankEditId]=useState(null);
+  const[bankForm,setBankForm]=useState({name:'',companyId:'',bankName:INIT_BANKS[0]?.name||''});
 
   const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
   const kasaLabelFor=(id)=>id==='nakit'||!id?'Nakit Kasa':(((bankAccounts||[]).find(a=>a.id===id)||{}).name||'Nakit Kasa');
   const kasaOptionsFor=(companyId)=>(bankAccounts||[]).filter(a=>a.companyId===companyId);
+  const bankColor=(name)=>{const b=INIT_BANKS.find(x=>x.name===name);return b?b.color:'#94a3b8';};
+  const companyNameFor=(id)=>{const c=(companies||[]).find(co=>co.id===id);return c?c.name:'—';};
+
+  const resetBankForm=()=>{setBankForm({name:'',companyId:(companies&&companies[0])?companies[0].id:'',bankName:INIT_BANKS[0]?.name||''});setBankEditId(null);};
+  const openNewBankAccount=()=>{resetBankForm();setBankModalOpen(true);};
+  const openEditBankAccount=(a)=>{setBankEditId(a.id);setBankForm({name:a.name,companyId:a.companyId||'',bankName:a.bankName||INIT_BANKS[0]?.name||''});setBankModalOpen(true);};
+  const handleSaveBankAccount=()=>{
+    if(!bankForm.name.trim())return alert('Hesap adı giriniz.');
+    if(!bankForm.companyId)return alert('Firma seçiniz.');
+    if(bankEditId){
+      onUpdateBankAccounts(prev=>(prev||[]).map(a=>a.id===bankEditId?{...a,name:bankForm.name.trim(),companyId:bankForm.companyId,bankName:bankForm.bankName}:a));
+    }else{
+      onUpdateBankAccounts(prev=>[...(prev||[]),{id:uid(),name:bankForm.name.trim(),companyId:bankForm.companyId,bankName:bankForm.bankName,createdAt:new Date().toISOString()}]);
+    }
+    setBankModalOpen(false);
+    resetBankForm();
+  };
+  const handleDeleteBankAccount=(id)=>{
+    if(!window.confirm('Bu banka kasasını silmek istediğinizden emin misiniz? Bu kasaya ait geçmiş kasa hareketleri silinmez, sadece kasa listesinden kaldırılır.'))return;
+    onUpdateBankAccounts(prev=>(prev||[]).filter(a=>a.id!==id));
+  };
 
   // Nakit tahsilat girişleri de auto+refId taşıdığı için legacy filtresinden muaf tutulmalı;
   // refId'si bir nakit_tahsilat cari kaydına işaret eden girişler gerçek tahsilattır.
@@ -4533,7 +4419,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
 
   return(
     <div>
-      <h2 style={{fontWeight:800,fontSize:'20px',marginBottom:'20px'}}>Kasa</h2>
+      <h2 style={{fontWeight:800,fontSize:'20px',marginBottom:'20px'}}>Kasalar</h2>
       <div style={{display:'flex',gap:'16px',marginBottom:'16px',flexWrap:'wrap'}}>
         <div style={{background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.08)',borderRadius:'12px',padding:'20px 28px',minWidth:'180px'}}>
           <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Güncel Bakiye (Bekleyenler Dahil)</div>
@@ -4548,18 +4434,65 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
           <div style={{fontSize:'20px',fontWeight:700,color:'#ef4444'}}>{fmt(totalCikis)} ₺</div>
         </div>
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={openNewBankAccount} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(79,142,247,0.4)',borderRadius:'8px',padding:'10px 18px',color:'#4f8ef7',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Yeni Banka Kasası</button>
           <button onClick={()=>{setKapatDate(today);setKapatErr('');setKapatOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Günü Kapat / Kasaya Aktar</button>
           <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Manuel Hareket Ekle</button>
         </div>
       </div>
-      <div style={{display:'flex',gap:'12px',marginBottom:'24px',flexWrap:'wrap'}}>
-        {kasaList.map(k=>(
-          <div key={k.id} style={{background:'rgba(30,39,64,.5)',border:'1px solid rgba(255,255,255,.06)',borderRadius:'10px',padding:'12px 18px',minWidth:'150px'}}>
-            <div style={{fontSize:'11px',color:'#64748b',marginBottom:'4px'}}>{k.name}</div>
-            <div style={{fontSize:'16px',fontWeight:700,color:(kasaBalances[k.id]||0)>=0?'#22c55e':'#ef4444'}}>{fmt(kasaBalances[k.id]||0)} ₺</div>
-          </div>
-        ))}
+      <div style={{display:'flex',gap:'14px',marginBottom:'24px',overflowX:'auto',paddingBottom:'8px'}}>
+        {kasaList.map(k=>{
+          const accent=k.id==='nakit'?'#22c55e':bankColor(k.bankName);
+          const selected=kasaFilter===k.id;
+          const bal=kasaBalances[k.id]||0;
+          return(
+            <div key={k.id} onClick={()=>setKasaFilter(prev=>prev===k.id?'all':k.id)}
+              title="Tıklayınca bu kasanın hareketlerini listeler"
+              style={{background:selected?'rgba(255,255,255,0.07)':'rgba(30,39,64,.5)',border:selected?`1.5px solid ${accent}`:'1px solid rgba(255,255,255,.07)',borderLeft:`4px solid ${accent}`,borderRadius:'10px',padding:'12px 18px',minWidth:'180px',flexShrink:0,cursor:'pointer',transition:'all 0.15s',boxShadow:selected?`0 0 0 1px ${accent}33`:'none'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'4px'}}>
+                <div style={{fontSize:'12px',color:accent,fontWeight:700,whiteSpace:'nowrap'}}>{k.name}</div>
+                {k.id!=='nakit'&&(
+                  <div style={{display:'flex',gap:'4px'}} onClick={e=>e.stopPropagation()}>
+                    <button onClick={()=>openEditBankAccount(k)} title="Düzenle" style={{background:'none',border:'none',color:'#4f8ef7',cursor:'pointer',padding:'2px'}}><IcoPencil size={12}/></button>
+                    <button onClick={()=>handleDeleteBankAccount(k.id)} title="Sil" style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',padding:'2px'}}><IcoTrash size={12}/></button>
+                  </div>
+                )}
+              </div>
+              {k.id!=='nakit'&&<div style={{fontSize:'10px',color:'#64748b',marginBottom:'4px',whiteSpace:'nowrap'}}>{companyNameFor(k.companyId)}</div>}
+              <div style={{fontSize:'16px',fontWeight:700,color:bal>=0?'#22c55e':'#ef4444'}}>{fmt(bal)} ₺</div>
+              {selected&&<div style={{fontSize:'10px',color:accent,marginTop:'5px',fontWeight:700}}>● Hareketler listeleniyor</div>}
+            </div>
+          );
+        })}
       </div>
+
+      <Modal open={bankModalOpen} onClose={()=>{setBankModalOpen(false);resetBankForm();}} title={bankEditId?'Banka Kasasını Düzenle':'Yeni Banka Kasası Ekle'} width={480}>
+        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Hesap Adı</label>
+            <input value={bankForm.name} onChange={e=>setBankForm(f=>({...f,name:e.target.value}))} placeholder="Örn: Akbank - Ana Hesap" style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+          </div>
+          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Firma</label>
+            <select value={bankForm.companyId} onChange={e=>setBankForm(f=>({...f,companyId:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+              <option value="">Firma seçiniz</option>
+              {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Banka</label>
+            <select value={bankForm.bankName} onChange={e=>setBankForm(f=>({...f,bankName:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+              {INIT_BANKS.map(b=><option key={b.name} value={b.name}>{b.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'20px'}}>
+          <button onClick={()=>{setBankModalOpen(false);resetBankForm();}}
+            style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+            İptal
+          </button>
+          <button onClick={handleSaveBankAccount}
+            style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
+            {bankEditId?'Güncelle':'Kaydet'}
+          </button>
+        </div>
+      </Modal>
       <div style={{display:'flex',gap:'10px',marginBottom:'16px',flexWrap:'wrap',alignItems:'center'}}>
         <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={inS}/>
         <span style={{color:'#64748b'}}>—</span>
@@ -4903,8 +4836,7 @@ function App(){
               kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}
             />
           )}
-          {activePage==='kasa'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts}/>}
-          {activePage==='kasalar'&&<KasalarPage bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))} companies={companies} kasa={kasa}/>}
+          {activePage==='kasalar'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers} companies={companies}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}

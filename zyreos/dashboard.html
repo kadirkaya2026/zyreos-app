@@ -4217,6 +4217,12 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const inS={background:'rgba(30,39,64,.8)',border:'1px solid rgba(255,255,255,.1)',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
   const kasaLabelFor=(id)=>id==='nakit'||!id?'Nakit Kasa':(((bankAccounts||[]).find(a=>a.id===id)||{}).name||'Nakit Kasa');
   const kasaOptionsFor=(companyId)=>(bankAccounts||[]).filter(a=>a.companyId===companyId);
+  const valorLabelFor=(info)=>{
+    if(info.posType==='fiziki')return 'Ertesi gün (Fiziki POS, hafta sonu dahil)';
+    const comp=(companies||[]).find(c=>c.id===info.companyId);
+    const vd=comp?comp.valorDays:1;
+    return vd===1?'Ertesi İş Günü valörü':'2. İş Günü valörü';
+  };
   const bankColor=(name)=>{const b=INIT_BANKS.find(x=>x.name===name);return b?b.color:'#94a3b8';};
   const companyNameFor=(id)=>{const c=(companies||[]).find(co=>co.id===id);return c?c.name:'—';};
 
@@ -4548,17 +4554,24 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       {kapatOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
           <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'500px',maxWidth:'95vw',maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
-            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>POS Gün Sonu Kapatma</h3>
+            <h3 style={{fontWeight:700,marginBottom:'6px',fontSize:'15px'}}>Hangi POS Hesabının Kasasını Kapatmak İstersiniz?</h3>
+            <div style={{fontSize:'11px',color:'#64748b',marginBottom:'16px'}}>Her POS hesabı, bağlı olduğu firmanın valörüne göre farklı tarihte kasaya aktarılabilir hale gelir.</div>
             <div style={{marginBottom:'16px'}}>
               <label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
               <input type="date" value={kapatDate} onChange={e=>{setKapatDate(e.target.value);setKapatErr('');}} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
             </div>
             {(()=>{
-              const available=Object.entries(posAccountMap).filter(([k,v])=>v.date===kapatDate);
-              if(!available.length)return <div style={{color:'#64748b',fontSize:'13px',padding:'20px 0',textAlign:'center'}}>Bu tarihte bekleyen POS hesabı bulunamadı.</div>;
+              const allPending=Object.entries(posAccountMap);
+              const available=allPending.filter(([k,v])=>v.date===kapatDate);
+              const upcoming=allPending.filter(([k,v])=>v.date!==kapatDate).sort((a,b)=>a[1].date<b[1].date?-1:1);
               return(
                 <div style={{display:'flex',flexDirection:'column',gap:'8px',overflowY:'auto',flex:1}}>
-                  <div style={{fontSize:'12px',color:'#94a3b8',fontWeight:600,marginBottom:'4px'}}>Bekleyen POS Hesapları</div>
+                  {!available.length&&(
+                    <div style={{color:'#64748b',fontSize:'13px',padding:'12px 0',textAlign:'center'}}>Bu tarihte kasaya aktarılabilecek POS hesabı yok.</div>
+                  )}
+                  {!!available.length&&(
+                    <div style={{fontSize:'12px',color:'#94a3b8',fontWeight:600,marginBottom:'4px'}}>Bugün Kasaya Aktarılabilir</div>
+                  )}
                   {available.map(([key,info])=>{
                     const opts=kasaOptionsFor(info.companyId);
                     const sel=kapatKasaSel[key]||'nakit';
@@ -4592,6 +4605,29 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
                   })}
                   {available.length>1&&(
                     <button onClick={()=>handleKapatAll(kapatDate)} style={{background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px',marginTop:'8px',alignSelf:'center'}}>Tümünü Kasaya Aktar</button>
+                  )}
+                  {!!upcoming.length&&(
+                    <>
+                      <div style={{fontSize:'12px',color:'#f59e0b',fontWeight:600,marginTop:'12px',marginBottom:'4px'}}>⚠ Valörü Henüz Gelmemiş / Başka Tarihe Ait Çekimler</div>
+                      {upcoming.map(([key,info])=>(
+                        <div key={key} style={{background:'rgba(245,158,11,0.05)',border:'1px solid rgba(245,158,11,0.15)',borderRadius:'10px',padding:'12px 16px'}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'8px'}}>
+                            <div>
+                              <span style={{fontWeight:700,fontSize:'13px'}}>{info.companyName}</span>
+                              <span style={{marginLeft:'8px',padding:'2px 8px',borderRadius:'10px',fontSize:'11px',fontWeight:600,
+                                background:info.posType==='fiziki'?'rgba(245,158,11,0.15)':'rgba(79,142,247,0.15)',
+                                color:info.posType==='fiziki'?'#f59e0b':'#4f8ef7'}}>
+                                {info.posType==='fiziki'?'Fiziki POS':'Sanal POS'}
+                              </span>
+                            </div>
+                            <button onClick={()=>{setKapatDate(info.date);setKapatErr('');}} style={{background:'none',border:'1px solid rgba(245,158,11,0.4)',borderRadius:'6px',padding:'5px 12px',color:'#f59e0b',cursor:'pointer',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}}>{fmtDate(info.date)} tarihine git</button>
+                          </div>
+                          <div style={{fontSize:'11px',color:'#94a3b8',marginTop:'6px'}}>
+                            {valorLabelFor(info)} — <span style={{color:'#fcd34d',fontWeight:600}}>{fmtDate(info.date)}</span> itibarıyla kasaya aktarılabilir olacak (Tutar: {fmt(info.amount)} ₺)
+                          </div>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               );

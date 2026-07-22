@@ -4390,6 +4390,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     const maxD=dates.reduce((a,b)=>a>b?a:b);
     setDateFrom(prev=>!prev||minD<prev?minD:prev);
     setDateTo(prev=>!prev||maxD>prev?maxD:prev);
+    setTypeFilter('all');
+    setKasaFilter('all');
   };
   const handleGunuKapat=(key)=>{
     const info=posAccountMap[key];

@@ -4204,6 +4204,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const[kasaFilter,setKasaFilter]=useState('all');
   const[addOpen,setAddOpen]=useState(false);
   const[addForm,setAddForm]=useState({date:today,type:'giris',amount:'',description:'',kasaId:'nakit'});
+  const[virmanOpen,setVirmanOpen]=useState(false);
+  const[virmanForm,setVirmanForm]=useState({date:today,fromKasa:'nakit',toKasa:'nakit',amount:'',description:''});
+  const[virmanErr,setVirmanErr]=useState('');
   const[kapatOpen,setKapatOpen]=useState(false);
   const[kapatDate,setKapatDate]=useState(today);
   const[kapatErr,setKapatErr]=useState('');
@@ -4356,6 +4359,21 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     setAddOpen(false);
     setAddForm({date:today,type:'giris',amount:'',description:'',kasaId:'nakit'});
   };
+  const handleVirman=()=>{
+    const amt=parseFloat(virmanForm.amount);
+    if(!amt){setVirmanErr('Tutar giriniz.');return;}
+    if(virmanForm.fromKasa===virmanForm.toKasa){setVirmanErr('Kaynak ve hedef kasa aynı olamaz.');return;}
+    const fromLabel=kasaLabelFor(virmanForm.fromKasa);
+    const toLabel=kasaLabelFor(virmanForm.toKasa);
+    const desc=virmanForm.description.trim()||('Virman: '+fromLabel+' → '+toLabel);
+    const transferId=uid();
+    const outEntry={id:uid(),date:virmanForm.date,type:'cikis',amount:amt,description:desc,auto:false,kasaId:virmanForm.fromKasa,kasaLabel:fromLabel,transferId};
+    const inEntry={id:uid(),date:virmanForm.date,type:'giris',amount:amt,description:desc,auto:false,kasaId:virmanForm.toKasa,kasaLabel:toLabel,transferId};
+    onUpdateKasa(prev=>({...prev,transactions:[...(prev.transactions||[]),outEntry,inEntry]}));
+    ensureVisibleInFilter([virmanForm.date]);
+    setVirmanOpen(false);setVirmanErr('');
+    setVirmanForm({date:today,fromKasa:'nakit',toKasa:'nakit',amount:'',description:''});
+  };
   const removeCariEntries=idSet=>{
     if(onUpdateCustomers&&idSet.size>0)onUpdateCustomers(prev=>(prev||[]).map(c=>({...c,cariEntries:(c.cariEntries||[]).filter(e=>!idSet.has(e.id))})));
   };
@@ -4386,6 +4404,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     }else if(tx.partnerPaymentId){
       if(!window.confirm('Bu hareket bir ortak ödemesine bağlı ('+(tx.description||'')+'). Silersen ORTAKLARDAKİ ödeme kaydı da silinecek. Emin misin?'))return;
       if(onUpdatePartnerPayments)onUpdatePartnerPayments(prev=>(prev||[]).filter(p=>p.id!==tx.partnerPaymentId));
+    }else if(tx.transferId){
+      if(!window.confirm('Bu bir virman hareketi. Silersen karşı kasadaki eşi de silinecek. Emin misin?'))return;
     }else{
       if(!window.confirm('Bu hareket silinsin mi?'))return;
     }
@@ -4393,7 +4413,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       const idsToUnsettle=tx.relatedEntryIds?new Set(tx.relatedEntryIds):new Set();
       return{
         ...prev,
-        transactions:(prev.transactions||[]).filter(t=>t.id!==id),
+        transactions:(prev.transactions||[]).filter(t=>t.id!==id&&!(tx.transferId&&t.transferId===tx.transferId)),
         settledEntryIds:idsToUnsettle.size>0?(prev.settledEntryIds||[]).filter(eid=>!idsToUnsettle.has(eid)):(prev.settledEntryIds||[])
       };
     });
@@ -4468,6 +4488,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={openNewBankAccount} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(79,142,247,0.4)',borderRadius:'8px',padding:'10px 18px',color:'#4f8ef7',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Yeni Banka Kasası</button>
           <button onClick={()=>{setKapatDate(today);setKapatErr('');setKapatOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'#f59e0b',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#000',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Günü Kapat / Kasaya Aktar</button>
+          <button onClick={()=>{setVirmanErr('');setVirmanOpen(true);}} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid rgba(139,92,246,0.4)',borderRadius:'8px',padding:'10px 18px',color:'#a855f7',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>⇄ Virman</button>
           <button onClick={()=>setAddOpen(true)} style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 18px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}><IcoPlus size={15}/>Manuel Hareket Ekle</button>
         </div>
       </div>
@@ -4560,7 +4581,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
                   {t.virtual&&<span style={{background:'rgba(245,158,11,.2)',color:'#fcd34d',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Bekliyor</span>}
                   {!t.virtual&&t.auto&&t.type==='giris'&&!t.refId&&<span style={{background:'rgba(34,197,94,.15)',color:'#22c55e',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Aktarıldı</span>}
                   {!t.virtual&&t.auto&&t.type==='giris'&&t.refId&&<span style={{background:'rgba(79,142,247,.15)',color:'#4f8ef7',borderRadius:'4px',padding:'1px 7px',fontSize:'11px',fontWeight:700}}>Tahsilat</span>}
-                  {!t.auto&&<span style={{background:'rgba(139,92,246,.2)',color:'#c4b5fd',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Manuel</span>}
+                  {!t.auto&&t.transferId&&<span style={{background:'rgba(168,85,247,.2)',color:'#c4b5fd',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>⇄ Virman</span>}
+                  {!t.auto&&!t.transferId&&<span style={{background:'rgba(139,92,246,.2)',color:'#c4b5fd',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Manuel</span>}
                   {t.auto&&t.type==='cikis'&&<span style={{background:'rgba(239,68,68,.15)',color:'#ef4444',borderRadius:'4px',padding:'1px 6px',fontSize:'11px'}}>Ödeme</span>}
                 </td>
                 <td style={{padding:'9px 12px',textAlign:'right',color:'#22c55e'}}>{t.type==='giris'?fmt(t.amount)+' ₺':''}</td>
@@ -4697,6 +4719,34 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
             <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
               <button onClick={()=>setAddOpen(false)} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
               <button onClick={handleAdd} style={{background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Kaydet</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {virmanOpen&&(
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
+          <div style={{background:'#131929',border:'1px solid rgba(255,255,255,.1)',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
+            <h3 style={{fontWeight:700,marginBottom:'6px',fontSize:'15px'}}>Kasalar Arası Virman</h3>
+            <div style={{fontSize:'11px',color:'#64748b',marginBottom:'16px'}}>Bir kasadan diğerine para aktarır — kaynaktan çıkış, hedefe giriş olarak birlikte kaydedilir.</div>
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label><input type="date" value={virmanForm.date} onChange={e=>setVirmanForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Kaynak Kasa (Çıkış)</label>
+                <select value={virmanForm.fromKasa} onChange={e=>{setVirmanErr('');setVirmanForm(p=>({...p,fromKasa:e.target.value}));}} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                  {kasaList.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
+                </select>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Hedef Kasa (Giriş)</label>
+                <select value={virmanForm.toKasa} onChange={e=>{setVirmanErr('');setVirmanForm(p=>({...p,toKasa:e.target.value}));}} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                  {kasaList.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
+                </select>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tutar (₺)</label><input type="number" min="0" step="0.01" value={virmanForm.amount} onChange={e=>{setVirmanErr('');setVirmanForm(p=>({...p,amount:e.target.value}));}} placeholder="0.00" style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Açıklama (Opsiyonel)</label><input type="text" value={virmanForm.description} onChange={e=>setVirmanForm(p=>({...p,description:e.target.value}))} placeholder="Örn: Nakit ihtiyaç için" style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
+            </div>
+            {virmanErr&&<div style={{color:'#ef4444',fontSize:'12px',marginTop:'10px'}}>{virmanErr}</div>}
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
+              <button onClick={()=>{setVirmanOpen(false);setVirmanErr('');}} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={handleVirman} style={{background:'#a855f7',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>⇄ Virman Yap</button>
             </div>
           </div>
         </div>

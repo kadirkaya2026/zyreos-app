@@ -3089,158 +3089,153 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
-      <h2 style={{fontWeight:800,fontSize:'20px'}}>Ortaklar</h2>
+      <div>
+        <h2 className="text-xl font-extrabold tracking-tight text-slate-100">Ortaklar</h2>
+        <p className="mt-0.5 text-xs text-dim">Kâr dağılımı, hakediş düzeltmeleri ve ortak ödemeleri</p>
+      </div>
 
       {/* Ortak Ekleme */}
       <Card>
-        <div style={{fontWeight:700,fontSize:'15px',marginBottom:'16px'}}>{editId?'Ortak Düzenle':'Yeni Ortak Ekle'}</div>
+        <div className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-dim">{editId?'Ortak Düzenle':'Yeni Ortak Ekle'}</div>
         <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'flex-end'}}>
           <div style={{display:'flex',flexDirection:'column',gap:'4px',flex:1,minWidth:'200px'}}>
-            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Ortak Adı</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-dim">Ortak Adı</label>
             <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Ad Soyad" style={inS}/>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'120px'}}>
-            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Ortaklık Yüzdesi (%)</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-dim">Ortaklık Yüzdesi (%)</label>
             <input type="number" step="0.1" min="0" max="100" value={form.percent} onChange={e=>setForm(f=>({...f,percent:e.target.value}))} placeholder="50" style={inS}/>
           </div>
           <div style={{display:'flex',gap:'8px'}}>
-            <button onClick={handleSave}
-              style={{background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
+            <button onClick={handleSave} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-[13px] font-bold text-white shadow-[0_4px_16px_-6px_rgba(79,142,247,.55)] transition-all duration-150 hover:bg-blue-500 hover:shadow-[0_6px_20px_-6px_rgba(79,142,247,.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
               {editId?'Güncelle':'Ekle'}
             </button>
-            {editId&&<button onClick={resetForm}
-              style={{padding:'10px 20px',borderRadius:'8px',border:'1px solid #1e2a44',background:'transparent',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
-              İptal
-            </button>}
+            {editId&&<button onClick={resetForm} className="rounded-lg border border-line px-4 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100">İptal</button>}
           </div>
         </div>
         {totalPercent>0&&(
-          <div style={{marginTop:'12px',padding:'8px 14px',borderRadius:'8px',
-            background:totalPercent===100?'rgba(34,197,94,0.1)':'rgba(245,158,11,0.1)',
-            border:`1px solid ${totalPercent===100?'rgba(34,197,94,0.3)':'rgba(245,158,11,0.3)'}`,
-            color:totalPercent===100?'#22c55e':'#f59e0b',fontSize:'12px',fontWeight:600}}>
+          <div className={"mt-3 rounded-lg border px-3.5 py-2 text-xs font-semibold "+(totalPercent===100?'border-gain/30 bg-gain/10 text-gain':'border-warn/30 bg-warn/10 text-amber-300')}>
             Toplam Ortaklık: %{totalPercent.toFixed(1)} {totalPercent!==100&&'(Toplam %100 olmalıdır)'}
           </div>
         )}
       </Card>
 
       {/* Karlılık Filtresi */}
-      <Card>
-        <div style={{fontWeight:700,fontSize:'15px',marginBottom:'14px'}}>Karlılık Analizi</div>
-        <div style={{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'flex-end',marginBottom:'16px'}}>
-          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Başlangıç Tarihi</label>
-            <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={inS}/>
+      <div className="flex flex-wrap items-end gap-2.5">
+        <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="rounded-lg border border-line bg-surface/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors duration-150 focus:border-primary"/>
+        <span className="pb-2 text-faint">—</span>
+        <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="rounded-lg border border-line bg-surface/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors duration-150 focus:border-primary"/>
+        {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom('');setDateTo('');}} className="rounded-lg border border-loss/30 bg-loss/10 px-3.5 py-2 text-xs font-semibold text-loss transition-colors duration-150 hover:bg-loss/20">Temizle</button>}
+      </div>
+
+      {/* Özet Kartları */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+        {[['Toplam Çekim',totalCekim,'text-primary','text-primary/60'],
+          ['Müşteri Kom.',totalKom,'text-purple-400','text-purple-400/60'],
+          ['POS Maliyeti',totalBankCost,'text-loss','text-loss/60'],
+          ['Brüt Kar',totalProfit,'text-gain','text-gain/60'],
+          ['Giderler',totalExpenses,'text-loss','text-loss/60']
+        ].map(([label,val,tcolor,icolor])=>(
+          <div key={label} className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">{label}</span>
+              <span className={icolor}><IcoWallet size={15}/></span>
+            </div>
+            <div className={"text-right text-[20px] font-bold tabular-nums tracking-tight "+tcolor}>{fmtTL(val)}</div>
           </div>
-          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Bitiş Tarihi</label>
-            <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={inS}/>
+        ))}
+        <div className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Net Kar</span>
+            <span className={netProfit>=0?'text-gain/60':'text-loss/60'}><IcoTrendUp size={15}/></span>
           </div>
-          {(dateFrom||dateTo)&&(
-            <button onClick={()=>{setDateFrom('');setDateTo('');}}
-              style={{padding:'8px 14px',borderRadius:'8px',border:'1px solid rgba(239,68,68,.3)',background:'rgba(239,68,68,.1)',color:'#ef4444',cursor:'pointer',fontSize:'12px',fontWeight:600}}>
-              Temizle
-            </button>
-          )}
+          <div className={"text-right text-[20px] font-extrabold tabular-nums tracking-tight "+(netProfit>=0?'text-gain':'text-loss')}>{fmtTL(netProfit)}</div>
+          <div className="mt-1 text-right text-[10px] text-faint">dağıtılacak</div>
         </div>
+      </div>
 
-        {/* Özet Kartları */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'14px',marginBottom:'20px'}}>
-          <MetricCard label="Toplam Çekim" value={fmtTL(totalCekim)} color="#4f8ef7"/>
-          <MetricCard label="Müşteri Komisyonu" value={fmtTL(totalKom)} color="#a855f7"/>
-          <MetricCard label="POS Maliyeti" value={fmtTL(totalBankCost)} color="#ef4444"/>
-          <MetricCard label="Brüt Kar" value={fmtTL(totalProfit)} color="#22c55e"/>
-          <MetricCard label="Giderler" value={fmtTL(totalExpenses)} color="#f59e0b"/>
-          <MetricCard label="Net Kar (Dağıtılacak)" value={fmtTL(netProfit)} color={netProfit>=0?'#22c55e':'#ef4444'} large/>
+      {/* Ortak Dağılım Kartları */}
+      {partners.length>0&&(
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {partners.map(p=>{
+            const adj=getPartnerAdjTotal(p.id);
+            const share=netProfit*(p.percent/100)+adj;
+            const paid=getPartnerTotalPaid(p.id);
+            const remaining=share-paid;
+            const accent=remaining>0?'#f59e0b':'#22c55e';
+            const initial=(p.name||'?').trim()[0].toUpperCase();
+            return(
+              <div key={p.id} className="group relative overflow-hidden rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
+                <span className="absolute inset-x-0 top-0 h-[3px]" style={{background:`linear-gradient(90deg, ${accent}, ${accent}44)`}}/>
+                <span aria-hidden="true" className="pointer-events-none absolute -bottom-5 -right-1 select-none text-[68px] font-black leading-none opacity-[0.055]" style={{color:accent}}>{initial}</span>
+                <div className="mb-4 flex items-start justify-between gap-2">
+                  <span onClick={()=>setDetailId(p.id)} title="Detay: günlük hakediş ve ödeme dökümü" className="min-w-0 flex-1 cursor-pointer">
+                    <span className="block truncate text-[14px] font-bold text-primary hover:underline">{p.name}</span>
+                    <span className="mt-0.5 inline-flex items-center rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">%{p.percent}</span>
+                  </span>
+                  <span className="flex shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                    <button onClick={()=>openEdit(p)} title="Düzenle" className="rounded-md bg-white/5 p-1.5 text-primary transition-colors duration-150 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><IcoPencil size={12}/></button>
+                    <button onClick={()=>handleDelete(p.id)} title="Sil" className="rounded-md bg-white/5 p-1.5 text-loss transition-colors duration-150 hover:bg-loss/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50"><IcoTrash size={12}/></button>
+                  </span>
+                </div>
+                <div className="mb-4 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-dim">Pay</div>
+                    <div className="text-[15px] font-bold tabular-nums text-gain">{fmtTL(share)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-dim">Ödenen</div>
+                    <div className="text-[15px] font-bold tabular-nums text-amber-300">{fmtTL(paid)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-dim">Kalan</div>
+                    <div className={"text-[15px] font-bold tabular-nums "+(remaining>0?'text-loss':'text-gain')}>{fmtTL(remaining)}</div>
+                  </div>
+                </div>
+                {adj!==0&&<div className={"mb-3 text-[11px] font-semibold "+(adj>0?'text-primary':'text-loss')}>Düzeltme: {adj>0?'+':''}{fmtTL(adj)}</div>}
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={()=>{setPayModal(p.id);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:'',kasaId:'nakit'});}} className="inline-flex items-center rounded-md border border-gain/30 bg-gain/10 px-2.5 py-1 text-[11px] font-semibold text-gain transition-colors duration-150 hover:bg-gain/20">Ödeme Yap</button>
+                  <button onClick={()=>{setAdjModal(p.id);setEditAdjId(null);setAdjForm({amount:'',date:todayStr(),note:'',direction:'ekle'});}} className="inline-flex items-center rounded-md border border-grape/30 bg-grape/10 px-2.5 py-1 text-[11px] font-semibold text-purple-300 transition-colors duration-150 hover:bg-grape/20">Hakediş Düzelt</button>
+                </div>
+              </div>
+            );
+          })}
         </div>
+      )}
 
-        {/* Ortak Dağılım Tablosu */}
-        {partners.length>0&&(
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
-              <thead>
-                <tr>
-                  {['Ortak','Yüzde','Pay (Kar)','Ödenen','Kalan','İşlem'].map(h=>
-                    <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {partners.map(p=>{
-                  const adj=getPartnerAdjTotal(p.id);
-                  const share=netProfit*(p.percent/100)+adj;
-                  const paid=getPartnerTotalPaid(p.id);
-                  const remaining=share-paid;
-                  return(
-                    <tr key={p.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                      <td style={{padding:'10px 14px',fontWeight:700}}><span onClick={()=>setDetailId(p.id)} title="Detay: günlük hakediş ve ödeme dökümü" style={{cursor:'pointer',color:'#4f8ef7',textDecoration:'underline'}}>{p.name}</span></td>
-                      <td style={{padding:'10px 14px'}}>
-                        <span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:'rgba(79,142,247,0.15)',color:'#4f8ef7'}}>%{p.percent}</span>
-                      </td>
-                      <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:700,fontSize:'15px'}}>
-                        {fmtTL(share)}
-                        {adj!==0&&<div style={{fontSize:'10px',color:adj>0?'#4f8ef7':'#ef4444',fontWeight:600}}>Düzeltme: {adj>0?'+':''}{fmtTL(adj)}</div>}
-                      </td>
-                      <td className="tabular-nums" style={{padding:'10px 14px',color:'#f59e0b',fontWeight:600}}>{fmtTL(paid)}</td>
-                      <td className="tabular-nums" style={{padding:'10px 14px',color:remaining>0?'#ef4444':'#22c55e',fontWeight:700}}>{fmtTL(remaining)}</td>
-                      <td style={{padding:'10px 14px'}}>
-                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          <button onClick={()=>{setPayModal(p.id);setEditPayId(null);setPayForm({amount:'',date:todayStr(),note:'',kasaId:'nakit'});}} style={{background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#22c55e',fontSize:'11px',fontWeight:600}}>Ödeme Yap</button>
-                          <button onClick={()=>{setAdjModal(p.id);setEditAdjId(null);setAdjForm({amount:'',date:todayStr(),note:'',direction:'ekle'});}} style={{background:'rgba(168,85,247,0.1)',border:'1px solid rgba(168,85,247,0.3)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#a855f7',fontSize:'11px',fontWeight:600}}>Hakediş Düzelt</button>
-                          <button onClick={()=>openEdit(p)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
-                          <button onClick={()=>handleDelete(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr style={{background:'rgba(255,255,255,0.03)',borderTop:'2px solid #1e2a44'}}>
-                  <td style={{padding:'10px 14px',fontWeight:700,color:'#94a3b8',fontSize:'12px',textTransform:'uppercase'}}>Toplam</td>
-                  <td style={{padding:'10px 14px'}}><span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'12px',fontWeight:700,background:totalPercent===100?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',color:totalPercent===100?'#22c55e':'#f59e0b'}}>%{totalPercent.toFixed(1)}</span></td>
-                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#22c55e',fontWeight:800,fontSize:'15px'}}>{fmtTL(netProfit+totalAdj)}</td>
-                  <td className="tabular-nums" style={{padding:'10px 14px',color:'#f59e0b',fontWeight:700}}>{fmtTL(payments.reduce((s,p)=>s+p.amount,0))}</td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-
-        {partners.length===0&&(
-          <div style={{textAlign:'center',padding:'40px',color:'#64748b'}}>
-            <div style={{fontSize:'15px',fontWeight:600}}>Ortak ekleyerek karlılık dağılımını görün</div>
-          </div>
-        )}
-      </Card>
+      {partners.length===0&&(
+        <div className="py-16 text-center">
+          <div className="mb-1 text-base font-semibold text-slate-300">Ortak ekleyerek karlılık dağılımını görün</div>
+        </div>
+      )}
 
       {/* Ödeme Geçmişi */}
       {payments.length>0&&(
-        <Card style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
-            <span style={{fontWeight:700,fontSize:'14px'}}>Ödeme Geçmişi ({payments.length})</span>
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface/40">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <span className="text-sm font-bold text-slate-200">Ödeme Geçmişi</span>
+            <span className="text-xs tabular-nums text-dim">{payments.length} kayıt</span>
           </div>
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
               <thead>
-                <tr>
-                  {['Tarih','Ortak','Tutar','Not','İşlem'].map(h=>
-                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
+                <tr className="border-b border-line text-[11px] uppercase tracking-wider text-dim">
+                  {['Tarih','Ortak','Tutar','Not',''].map(h=>
+                    <th key={h} className={"px-4 py-3 font-semibold "+(h==='Tutar'?'text-right':'text-left')}>{h}</th>
                   )}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line/60">
                 {payments.sort((a,b)=>b.date.localeCompare(a.date)).map(p=>(
-                  <tr key={p.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <td className="tabular-nums" style={{padding:'10px 14px',color:'#94a3b8'}}>{fmtDate(p.date)}</td>
-                    <td style={{padding:'10px 14px',fontWeight:600}}>{p.partnerName}</td>
-                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:'#22c55e',fontWeight:700}}>{fmtTL(p.amount)}</td>
-                    <td style={{padding:'10px 14px',color:'#94a3b8'}}>{p.note||'—'}</td>
-                    <td style={{padding:'10px 14px'}}>
-                      <div style={{display:'flex',gap:'6px'}}>
-                        <button onClick={()=>openEditPayment(p)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
-                        <button onClick={()=>handleDeletePayment(p.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                  <tr key={p.id} className="transition-colors duration-150 hover:bg-raised/40">
+                    <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-slate-300">{fmtDate(p.date)}</td>
+                    <td className="px-4 py-2.5 font-semibold text-slate-200">{p.partnerName}</td>
+                    <td className="px-4 py-2.5 text-right font-bold tabular-nums text-gain">{fmtTL(p.amount)}</td>
+                    <td className="px-4 py-2.5 text-dim">{p.note||'—'}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={()=>openEditPayment(p)} title="Düzenle" className="rounded-md p-1 text-primary transition-colors duration-150 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><IcoPencil size={13}/></button>
+                        <button onClick={()=>handleDeletePayment(p.id)} title="Sil" className="rounded-md p-1 text-faint transition-colors duration-150 hover:bg-loss/10 hover:text-loss focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50"><IcoTrash size={13}/></button>
                       </div>
                     </td>
                   </tr>
@@ -3248,35 +3243,36 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Hakediş Düzeltme Geçmişi */}
       {adjustments.length>0&&(
-        <Card style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
-            <span style={{fontWeight:700,fontSize:'14px'}}>Hakediş Düzeltme Geçmişi ({adjustments.length})</span>
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface/40">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <span className="text-sm font-bold text-slate-200">Hakediş Düzeltme Geçmişi</span>
+            <span className="text-xs tabular-nums text-dim">{adjustments.length} kayıt</span>
           </div>
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
               <thead>
-                <tr>
-                  {['Tarih','Ortak','Tutar','Not','İşlem'].map(h=>
-                    <th key={h} style={{padding:'10px 14px',textAlign:h==='Tutar'?'right':'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>{h}</th>
+                <tr className="border-b border-line text-[11px] uppercase tracking-wider text-dim">
+                  {['Tarih','Ortak','Tutar','Not',''].map(h=>
+                    <th key={h} className={"px-4 py-3 font-semibold "+(h==='Tutar'?'text-right':'text-left')}>{h}</th>
                   )}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line/60">
                 {[...adjustments].sort((a,b)=>b.date.localeCompare(a.date)).map(a=>(
-                  <tr key={a.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <td className="tabular-nums" style={{padding:'10px 14px',color:'#94a3b8'}}>{fmtDate(a.date)}</td>
-                    <td style={{padding:'10px 14px',fontWeight:600}}>{a.partnerName}</td>
-                    <td className="tabular-nums" style={{padding:'10px 14px',textAlign:'right',color:a.amount>=0?'#4f8ef7':'#ef4444',fontWeight:700}}>{a.amount>=0?'+':''}{fmtTL(a.amount)}</td>
-                    <td style={{padding:'10px 14px',color:'#94a3b8'}}>{a.note||'—'}</td>
-                    <td style={{padding:'10px 14px'}}>
-                      <div style={{display:'flex',gap:'6px'}}>
-                        <button onClick={()=>openEditAdj(a)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
-                        <button onClick={()=>handleDeleteAdj(a.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
+                  <tr key={a.id} className="transition-colors duration-150 hover:bg-raised/40">
+                    <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-slate-300">{fmtDate(a.date)}</td>
+                    <td className="px-4 py-2.5 font-semibold text-slate-200">{a.partnerName}</td>
+                    <td className={"px-4 py-2.5 text-right font-bold tabular-nums "+(a.amount>=0?'text-primary':'text-loss')}>{a.amount>=0?'+':''}{fmtTL(a.amount)}</td>
+                    <td className="px-4 py-2.5 text-dim">{a.note||'—'}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={()=>openEditAdj(a)} title="Düzenle" className="rounded-md p-1 text-primary transition-colors duration-150 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><IcoPencil size={13}/></button>
+                        <button onClick={()=>handleDeleteAdj(a.id)} title="Sil" className="rounded-md p-1 text-faint transition-colors duration-150 hover:bg-loss/10 hover:text-loss focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50"><IcoTrash size={13}/></button>
                       </div>
                     </td>
                   </tr>
@@ -3284,7 +3280,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Ödeme Modalı */}

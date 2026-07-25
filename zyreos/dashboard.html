@@ -2492,11 +2492,13 @@ function CompaniesPage({companies,onUpdateCompanies}){
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px'}}>
-        <h2 style={{fontWeight:800,fontSize:'20px'}}>Şirketler (POS Yönetimi)</h2>
-        <button onClick={openNew}
-          style={{display:'flex',alignItems:'center',gap:'6px',background:'#4f8ef7',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>
-          + Yeni Şirket Ekle
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-extrabold tracking-tight text-slate-100">Şirketler</h2>
+          <p className="mt-0.5 text-xs text-dim">POS sağlayıcı firmalar, valör süreleri ve banka komisyon oranları</p>
+        </div>
+        <button onClick={openNew} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-bold text-white shadow-[0_4px_16px_-6px_rgba(79,142,247,.55)] transition-all duration-150 hover:bg-blue-500 hover:shadow-[0_6px_20px_-6px_rgba(79,142,247,.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
+          <IcoPlus size={15}/>Yeni Şirket
         </button>
       </div>
 
@@ -2598,57 +2600,48 @@ function CompaniesPage({companies,onUpdateCompanies}){
       </Modal>
 
       {companies.length>0&&(
-        <Card style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid #1e2a44'}}>
-            <span style={{fontWeight:700,fontSize:'14px'}}>Kayıtlı Şirketler ({companies.length})</span>
-          </div>
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
-              <thead>
-                <tr>
-                  <th style={{padding:'10px 14px',textAlign:'left',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>Şirket Adı</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>Valör</th>
-                  <th style={{padding:'10px 14px',textAlign:'center',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>POS Tipi</th>
-                  <th style={{padding:'10px 14px',textAlign:'right',color:'#64748b',fontWeight:600,fontSize:'11px',textTransform:'uppercase',borderBottom:'1px solid #1e2a44'}}>İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {companies.map(c=>{
-                  const mc=migrateCompany(c);
-                  return(
-                    <tr key={c.id} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                      <td style={{padding:'10px 14px',fontWeight:600}}>{c.name}</td>
-                      <td style={{padding:'10px 14px',textAlign:'center'}}>
-                        <span style={{padding:'3px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:700,
-                          background:c.valorDays===1?'rgba(34,197,94,0.15)':'rgba(245,158,11,0.15)',
-                          color:c.valorDays===1?'#22c55e':'#f59e0b'}}>
-                          {c.valorDays===1?'Ertesi İş Günü':'2 İş Günü'}
-                        </span>
-                      </td>
-                      <td style={{padding:'10px 14px',textAlign:'center'}}>
-                        {(mc.posTypes?mc.posTypes.sanal:true)&&<span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(79,142,247,0.1)',color:'#4f8ef7',marginRight:'4px'}}>Sanal</span>}
-                        {(mc.posTypes?mc.posTypes.fiziki:true)&&<span style={{padding:'3px 8px',borderRadius:'12px',fontSize:'11px',fontWeight:600,background:'rgba(245,158,11,0.1)',color:'#f59e0b'}}>Fiziki</span>}
-                      </td>
-                      <td style={{padding:'10px 14px',textAlign:'right'}}>
-                        <div style={{display:'flex',gap:'6px',justifyContent:'flex-end'}}>
-                          <button onClick={()=>openEdit(c)} style={{background:'none',border:'1px solid rgba(79,142,247,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#4f8ef7',fontSize:'11px',fontWeight:600}}>Düzenle</button>
-                          <button onClick={()=>handleDelete(c.id)} style={{background:'none',border:'1px solid rgba(239,68,68,0.25)',borderRadius:'6px',padding:'5px 10px',cursor:'pointer',color:'#ef4444',fontSize:'11px',fontWeight:600}}>Sil</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {companies.map(c=>{
+            const mc=migrateCompany(c);
+            const accent=c.valorDays===1?'#22c55e':'#f59e0b';
+            const initial=(c.name||'?').trim()[0].toUpperCase();
+            const tanimliBanka=(mc.bankRates||[]).filter(br=>(br.sanalRates||[]).some(r=>parseFloat(r)>0)||parseFloat(br.fizikiRate)>0).length;
+            return(
+              <div key={c.id} onClick={()=>openEdit(c)}
+                title="Tıklayınca şirketi düzenler"
+                className="group relative cursor-pointer overflow-hidden rounded-2xl border border-line bg-surface/60 p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-linehi">
+                <span className="absolute inset-x-0 top-0 h-[3px]" style={{background:`linear-gradient(90deg, ${accent}, ${accent}44)`}}/>
+                <span aria-hidden="true" className="pointer-events-none absolute -bottom-5 -right-1 select-none text-[68px] font-black leading-none opacity-[0.055]" style={{color:accent}}>{initial}</span>
+                <div className="mb-4 flex items-start gap-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-bold text-slate-100">{c.name}</span>
+                    <span className={"mt-0.5 block text-[11px] "+(tanimliBanka===0?'font-semibold text-loss':'text-dim')}>
+                      {tanimliBanka===0?'⚠ Komisyon oranı tanımlı değil':tanimliBanka+' banka oranı tanımlı'}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" onClick={e=>e.stopPropagation()}>
+                    <button onClick={()=>openEdit(c)} title="Düzenle" className="rounded-md bg-white/5 p-1.5 text-primary transition-colors duration-150 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><IcoPencil size={12}/></button>
+                    <button onClick={()=>handleDelete(c.id)} title="Sil" className="rounded-md bg-white/5 p-1.5 text-loss transition-colors duration-150 hover:bg-loss/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50"><IcoTrash size={12}/></button>
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={"inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold "+(c.valorDays===1?'border-gain/25 bg-gain/10 text-gain':'border-warn/25 bg-warn/10 text-amber-300')}>
+                    {c.valorDays===1?'Ertesi İş Günü':'2 İş Günü'}
+                  </span>
+                  {(mc.posTypes?mc.posTypes.sanal:true)&&<span className="inline-flex items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">Sanal POS</span>}
+                  {(mc.posTypes?mc.posTypes.fiziki:true)&&<span className="inline-flex items-center rounded-md border border-warn/25 bg-warn/10 px-2 py-0.5 text-[11px] font-semibold text-amber-300">Fiziki POS</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {companies.length===0&&(
-        <div style={{textAlign:'center',padding:'60px 20px',color:'#64748b'}}>
-          <div style={{fontSize:'40px',marginBottom:'12px'}}>🏢</div>
-          <div style={{fontSize:'16px',fontWeight:600,marginBottom:'6px'}}>Henüz şirket eklenmedi</div>
-          <div style={{fontSize:'13px'}}>"+ Yeni Şirket Ekle" butonu ile şirket ekleyebilirsiniz</div>
+        <div className="py-16 text-center">
+          <div className="mb-3 text-4xl">🏢</div>
+          <div className="mb-1 text-base font-semibold text-slate-300">Henüz şirket eklenmedi</div>
+          <div className="text-[13px] text-dim">"Yeni Şirket" butonuyla ilk POS sağlayıcını ekle</div>
         </div>
       )}
     </div>

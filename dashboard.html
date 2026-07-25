@@ -201,6 +201,19 @@ const INIT_BANKS=[
   {id:9,name:'YKB',fee:0,color:'#0066cc',rates:[3.65,6.15,7.80,9.49,11.21,12.75,14.50,16.25,18.12,19.90,21.64,23.00]},
 ];
 const BANK_RATES_VERSION='iyzico-2026-05-05';
+// PayNet (odeme.paynet.com.tr) sanal POS bireysel kart oran tablosu — kullanıcının paylaştığı ekran görüntüsünden
+const PAYNET_SANAL_RATES={
+  'Akbank':[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30],
+  'Garanti':[3.65,6.54,8.40,10.27,12.01,13.56,15.54,17.41,19.21,21.03,22.90,24.77],
+  'QNB':[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30],
+  'İş Bankası':[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30],
+  'Vakıf':[3.65,6.32,8.09,9.86,11.63,13.00,15.18,16.50,18.20,20.49,22.60,24.30],
+  'Ziraat':[3.65,5.79,7.48,9.38,10.76,12.78,14.64,16.45,18.07,19.90,21.64,23.10],
+  'Kuveyt':[3.65,6.46,8.33,10.20,12.06,13.93,15.95,17.82,19.69,21.56,23.43,25.30],
+  'YKB':[3.65,6.15,7.80,9.49,11.21,12.75,14.50,16.25,18.12,19.90,21.64,23.00],
+  'Halk':[3.65,0,0,0,0,0,0,0,0,0,0,0],
+  'Diğer Banka':[3.65,0,0,0,0,0,0,0,0,0,0,0],
+};
 function rateNum(v){return +(String(v??0).replace(',','.'))||0;}
 function normalizeBanks(banks,applyLatestRates=false){
   const src=Array.isArray(banks)?banks:[];
@@ -2532,6 +2545,19 @@ function CompaniesPage({companies,onUpdateCompanies}){
     setBulkRate('');
   };
 
+  const applyPaynetPreset=()=>{
+    if(!window.confirm('PayNet oran tablosu (banka bazlı, 12 taksit) tüm bankalara uygulanacak ve mevcut oranların üzerine yazılacak. Devam edilsin mi?'))return;
+    setForm(f=>{
+      const existingNames=new Set(f.bankRates.map(br=>br.bankName));
+      const missing=Object.keys(PAYNET_SANAL_RATES).filter(name=>!existingNames.has(name)).map(name=>({bankName:name,sanalRates:Array(12).fill(0),fizikiRate:0}));
+      const merged=[...f.bankRates,...missing].map(br=>{
+        const preset=PAYNET_SANAL_RATES[br.bankName];
+        return preset?{...br,sanalRates:[...preset]}:br;
+      });
+      return{...f,bankRates:merged};
+    });
+  };
+
   const handleSave=()=>{
     if(!form.name.trim())return alert('Şirket adı giriniz.');
     if(!form.posTypes.sanal&&!form.posTypes.fiziki)return alert('En az bir POS tipi seçiniz (Sanal ve/veya Fiziki).');
@@ -2625,14 +2651,23 @@ function CompaniesPage({companies,onUpdateCompanies}){
 
         {form.posTypes.sanal&&(<>
         <div style={{fontSize:'12px',color:'#94a3b8',marginBottom:'12px',fontWeight:600}}>Bu şirkette kullandığınız bankalar — eklediğiniz bankalar kart çekimi ekranında görünür</div>
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-linehi bg-raised/30 p-3">
-          <span className="text-[12px] font-semibold text-dim">Tüm bankalara aynı Tek Çekim oranını uygula:</span>
-          <input type="number" step="0.01" min="0" value={bulkRate} onChange={e=>setBulkRate(e.target.value)} placeholder="Örn: 3.65"
-            style={{...inS,width:'100px',padding:'6px 10px',fontSize:'12px'}}/>
-          <button onClick={applyBulkTekCekim} disabled={!bulkRate&&bulkRate!==0} className={"inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-colors duration-150 "+(bulkRate?'bg-gain text-white hover:bg-emerald-500':'cursor-not-allowed bg-raised text-faint')}>
-            Uygula
-          </button>
-          <span className="text-[11px] text-faint">Eksik bankaları otomatik ekler, sadece Peşin/Tek Çekim alanını doldurur</span>
+        <div className="mb-3 flex flex-col gap-2.5 rounded-xl border border-dashed border-linehi bg-raised/30 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-semibold text-dim">Tüm bankalara aynı Tek Çekim oranını uygula:</span>
+            <input type="number" step="0.01" min="0" value={bulkRate} onChange={e=>setBulkRate(e.target.value)} placeholder="Örn: 3.65"
+              style={{...inS,width:'100px',padding:'6px 10px',fontSize:'12px'}}/>
+            <button onClick={applyBulkTekCekim} disabled={!bulkRate&&bulkRate!==0} className={"inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold transition-colors duration-150 "+(bulkRate?'bg-gain text-white hover:bg-emerald-500':'cursor-not-allowed bg-raised text-faint')}>
+              Uygula
+            </button>
+            <span className="text-[11px] text-faint">Eksik bankaları otomatik ekler, sadece Peşin/Tek Çekim alanını doldurur</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
+            <span className="text-[12px] font-semibold text-dim">PayNet taksit tablosunu yükle (banka bazlı, 12 taksit):</span>
+            <button onClick={applyPaynetPreset} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-bold text-white transition-colors duration-150 hover:bg-blue-500">
+              Yükle
+            </button>
+            <span className="text-[11px] text-faint">Akbank, Garanti, QNB, İş Bankası, Vakıf, Ziraat, Kuveyt, YKB, Halk, Diğer Banka'nın tüm taksit oranlarını doldurur</span>
+          </div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'12px',maxHeight:'45vh',overflowY:'auto'}}>
           {form.bankRates.length===0&&(

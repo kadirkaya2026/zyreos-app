@@ -4580,7 +4580,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const kasaList=[{id:'nakit',name:'Nakit Kasa'},...(bankAccounts||[])];
   const toplamKasa=Object.values(kasaBalances).reduce((s,v)=>s+v,0);
   const bugunGiris=allTransactions.filter(t=>!t.virtual&&t.date===today&&t.type==='giris').reduce((s,t)=>s+t.amount,0);
-  const bugunCikis=allTransactions.filter(t=>t.date===today&&t.type==='cikis').reduce((s,t)=>s+t.amount,0);
+  const bugunCikis=allTransactions.filter(t=>t.date===today&&t.type==='cikis'&&t.refCustomer).reduce((s,t)=>s+t.amount,0);
   const bekleyenValor=Object.values(dailyCekimMap).reduce((s,i)=>s+i.amount,0);
 
   let running=0;
@@ -4741,11 +4741,11 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
         </div>
         <div className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Bugünkü Çıkış</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Bugün Müşteriye Ödenen</span>
             <span className="text-loss/60"><IcoTrendDown size={15}/></span>
           </div>
           <div className="text-right text-[22px] font-bold tabular-nums tracking-tight text-loss">{fmt(bugunCikis)} ₺</div>
-          <div className="mt-1 text-right text-[10px] text-faint">{fmtDate(today)}</div>
+          <div className="mt-1 text-right text-[10px] text-faint">{fmtDate(today)} · gider/virman/ortak ödemesi hariç</div>
         </div>
         <div className="rounded-2xl border border-line bg-surface/60 p-5 transition-colors duration-150 hover:border-linehi">
           <div className="mb-3 flex items-center justify-between gap-2">

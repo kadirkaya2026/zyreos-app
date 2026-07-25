@@ -248,6 +248,30 @@ function computeKasaBalances(transactions){
   });
   return map;
 }
+// Kredi hesabı: aylık faiz aya girişte anaparaya eklenir, o ay yapılan ödemeler o aya düşülür.
+function computeLoanBalance(loan){
+  const rate=(parseFloat(loan.monthlyRate)||0)/100;
+  const start=loan.startDate;
+  if(!start)return parseFloat(loan.principal)||0;
+  let balance=parseFloat(loan.principal)||0;
+  const payments=((loan.payments||[]).slice()).sort((a,b)=>a.date<b.date?-1:1);
+  let pIdx=0;
+  let cursor=new Date(start+'T00:00:00');
+  const now=new Date();
+  while(true){
+    const next=new Date(cursor);next.setMonth(next.getMonth()+1);
+    if(next>now)break;
+    balance+=balance*rate;
+    const nextStr=localDateStr(next);
+    while(pIdx<payments.length&&payments[pIdx].date<nextStr){
+      balance-=parseFloat(payments[pIdx].amount)||0;
+      pIdx++;
+    }
+    cursor=next;
+  }
+  while(pIdx<payments.length){balance-=parseFloat(payments[pIdx].amount)||0;pIdx++;}
+  return +balance.toFixed(2);
+}
 function localDateStr(d){
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,'0');
@@ -4404,7 +4428,7 @@ function useHashRouter(){
 }
 
 /* ── KASA PAGE ── */
-function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpdateExpenses,onUpdatePartnerPayments,bankAccounts,onUpdateBankAccounts}){
+function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpdateExpenses,onUpdatePartnerPayments,bankAccounts,onUpdateBankAccounts,loans,onUpdateLoans}){
   const transactions=(kasa&&kasa.transactions)||[];
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
@@ -4423,7 +4447,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const[kapatKasaSel,setKapatKasaSel]=useState({});
   const[bankModalOpen,setBankModalOpen]=useState(false);
   const[bankEditId,setBankEditId]=useState(null);
-  const[bankForm,setBankForm]=useState({name:'',companyId:'',bankName:INIT_BANKS[0]?.name||''});
+  const[bankForm,setBankForm]=useState({kasaType:'banka',name:'',companyId:'',bankName:INIT_BANKS[0]?.name||'',principal:'',monthlyRate:'5',startDate:today});
+  const[loanPayModal,setLoanPayModal]=useState(null);
+  const[loanPayForm,setLoanPayForm]=useState({date:today,amount:''});
 
   const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
@@ -4439,16 +4465,28 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const bankColor=(name)=>{const b=INIT_BANKS.find(x=>x.name===name);return b?b.color:'#94a3b8';};
   const companyNameFor=(id)=>{const c=(companies||[]).find(co=>co.id===id);return c?c.name:'—';};
 
-  const resetBankForm=()=>{setBankForm({name:'',companyId:(companies&&companies[0])?companies[0].id:'',bankName:INIT_BANKS[0]?.name||''});setBankEditId(null);};
+  const resetBankForm=()=>{setBankForm({kasaType:'banka',name:'',companyId:(companies&&companies[0])?companies[0].id:'',bankName:INIT_BANKS[0]?.name||'',principal:'',monthlyRate:'5',startDate:today});setBankEditId(null);};
   const openNewBankAccount=()=>{resetBankForm();setBankModalOpen(true);};
-  const openEditBankAccount=(a)=>{setBankEditId(a.id);setBankForm({name:a.name,companyId:a.companyId||'',bankName:a.bankName||INIT_BANKS[0]?.name||''});setBankModalOpen(true);};
+  const openEditBankAccount=(a)=>{setBankEditId(a.id);setBankForm({kasaType:'banka',name:a.name,companyId:a.companyId||'',bankName:a.bankName||INIT_BANKS[0]?.name||'',principal:'',monthlyRate:'5',startDate:today});setBankModalOpen(true);};
+  const openEditLoan=(l)=>{setBankEditId(l.id);setBankForm({kasaType:'kredi',name:l.name,companyId:'',bankName:'',principal:String(l.principal),monthlyRate:String(l.monthlyRate),startDate:l.startDate});setBankModalOpen(true);};
   const handleSaveBankAccount=()=>{
     if(!bankForm.name.trim())return alert('Hesap adı giriniz.');
-    if(!bankForm.companyId)return alert('Firma seçiniz.');
-    if(bankEditId){
-      onUpdateBankAccounts(prev=>(prev||[]).map(a=>a.id===bankEditId?{...a,name:bankForm.name.trim(),companyId:bankForm.companyId,bankName:bankForm.bankName}:a));
+    if(bankForm.kasaType==='kredi'){
+      const principal=parseFloat(bankForm.principal)||0;
+      if(!principal)return alert('Anapara tutarı giriniz.');
+      if(!bankForm.startDate)return alert('Başlangıç tarihi giriniz.');
+      if(bankEditId){
+        onUpdateLoans(prev=>(prev||[]).map(l=>l.id===bankEditId?{...l,name:bankForm.name.trim(),principal,monthlyRate:parseFloat(bankForm.monthlyRate)||0,startDate:bankForm.startDate}:l));
+      }else{
+        onUpdateLoans(prev=>[...(prev||[]),{id:uid(),name:bankForm.name.trim(),principal,monthlyRate:parseFloat(bankForm.monthlyRate)||0,startDate:bankForm.startDate,payments:[],createdAt:new Date().toISOString()}]);
+      }
     }else{
-      onUpdateBankAccounts(prev=>[...(prev||[]),{id:uid(),name:bankForm.name.trim(),companyId:bankForm.companyId,bankName:bankForm.bankName,createdAt:new Date().toISOString()}]);
+      if(!bankForm.companyId)return alert('Firma seçiniz.');
+      if(bankEditId){
+        onUpdateBankAccounts(prev=>(prev||[]).map(a=>a.id===bankEditId?{...a,name:bankForm.name.trim(),companyId:bankForm.companyId,bankName:bankForm.bankName}:a));
+      }else{
+        onUpdateBankAccounts(prev=>[...(prev||[]),{id:uid(),name:bankForm.name.trim(),companyId:bankForm.companyId,bankName:bankForm.bankName,createdAt:new Date().toISOString()}]);
+      }
     }
     setBankModalOpen(false);
     resetBankForm();
@@ -4456,6 +4494,21 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const handleDeleteBankAccount=(id)=>{
     if(!window.confirm('Bu banka kasasını silmek istediğinizden emin misiniz? Bu kasaya ait geçmiş kasa hareketleri silinmez, sadece kasa listesinden kaldırılır.'))return;
     onUpdateBankAccounts(prev=>(prev||[]).filter(a=>a.id!==id));
+  };
+  const handleDeleteLoan=(id)=>{
+    if(!window.confirm('Bu kredi hesabını silmek istediğinizden emin misiniz? Ödeme geçmişi de silinecek.'))return;
+    onUpdateLoans(prev=>(prev||[]).filter(l=>l.id!==id));
+  };
+  const openLoanPayModal=(id)=>{setLoanPayModal(id);setLoanPayForm({date:today,amount:''});};
+  const handleSaveLoanPayment=()=>{
+    const amt=parseFloat(loanPayForm.amount)||0;
+    if(!amt)return alert('Tutar giriniz.');
+    onUpdateLoans(prev=>(prev||[]).map(l=>l.id===loanPayModal?{...l,payments:[...(l.payments||[]),{id:uid(),date:loanPayForm.date,amount:amt}]}:l));
+    setLoanPayModal(null);
+  };
+  const handleDeleteLoanPayment=(loanId,paymentId)=>{
+    if(!window.confirm('Bu ödeme kaydı silinsin mi?'))return;
+    onUpdateLoans(prev=>(prev||[]).map(l=>l.id===loanId?{...l,payments:(l.payments||[]).filter(p=>p.id!==paymentId)}:l));
   };
 
   // Nakit tahsilat girişleri de auto+refId taşıdığı için legacy filtresinden muaf tutulmalı;
@@ -4682,7 +4735,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={openNewBankAccount} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
-            <IcoPlus size={14}/>Banka Kasası
+            <IcoPlus size={14}/>Yeni Kasa Ekle
           </button>
           <button onClick={()=>{setVirmanErr('');setVirmanOpen(true);}} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
             <IcoSwap size={14}/>Virman
@@ -4762,24 +4815,78 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
             </div>
           );
         })}
+        {(loans||[]).map(l=>{
+          const debt=computeLoanBalance(l);
+          const initial=(l.name||'?').trim()[0].toUpperCase();
+          return(
+            <div key={l.id} className="group relative overflow-hidden rounded-2xl border border-grape/30 bg-surface/60 p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-grape/50">
+              <span className="absolute inset-x-0 top-0 h-[3px]" style={{background:'linear-gradient(90deg, #a855f7, #a855f744)'}}/>
+              <span aria-hidden="true" className="pointer-events-none absolute -bottom-5 -right-1 select-none text-[68px] font-black leading-none text-grape opacity-[0.055]">{initial}</span>
+              <div className="mb-4 flex items-start gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-bold text-slate-100">{l.name}</span>
+                  <span className="block truncate text-[10px] text-dim">Kredi · %{l.monthlyRate}/ay · {fmtDate(l.startDate)}</span>
+                </span>
+                <span className="flex shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                  <button onClick={()=>openEditLoan(l)} title="Düzenle" className="rounded-md bg-white/5 p-1.5 text-primary transition-colors duration-150 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><IcoPencil size={12}/></button>
+                  <button onClick={()=>handleDeleteLoan(l.id)} title="Sil" className="rounded-md bg-white/5 p-1.5 text-loss transition-colors duration-150 hover:bg-loss/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50"><IcoTrash size={12}/></button>
+                </span>
+              </div>
+              <div className="text-right text-[21px] font-extrabold tabular-nums tracking-tight text-loss">-{fmt(debt)} ₺</div>
+              <div className="mt-1 text-right text-[10px] text-faint">güncel borç (faiz dahil)</div>
+              <button onClick={()=>openLoanPayModal(l.id)} className="mt-3 w-full rounded-lg border border-gain/30 bg-gain/10 py-1.5 text-[11px] font-semibold text-gain transition-colors duration-150 hover:bg-gain/20">+ Ödeme Ekle</button>
+              {(l.payments||[]).length>0&&(
+                <div className="mt-3 flex flex-col gap-1 border-t border-line pt-2">
+                  {[...l.payments].sort((a,b)=>b.date<a.date?-1:1).slice(0,3).map(p=>(
+                    <div key={p.id} className="flex items-center justify-between text-[11px] text-dim">
+                      <span>{fmtDate(p.date)}</span>
+                      <span className="font-semibold text-gain">{fmt(p.amount)} ₺</span>
+                      <button onClick={()=>handleDeleteLoanPayment(l.id,p.id)} title="Sil" className="text-faint hover:text-loss"><IcoTrash size={11}/></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <Modal open={bankModalOpen} onClose={()=>{setBankModalOpen(false);resetBankForm();}} title={bankEditId?'Banka Kasasını Düzenle':'Yeni Banka Kasası Ekle'} width={480}>
+      <Modal open={bankModalOpen} onClose={()=>{setBankModalOpen(false);resetBankForm();}} title={bankEditId?(bankForm.kasaType==='kredi'?'Kredi Hesabını Düzenle':'Banka Kasasını Düzenle'):'Yeni Kasa Ekle'} width={480}>
         <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          {!bankEditId&&(
+            <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Kasa Türü</label>
+              <div style={{display:'flex',gap:'8px'}}>
+                <button type="button" onClick={()=>setBankForm(f=>({...f,kasaType:'banka'}))} className={"flex-1 rounded-lg border px-3 py-2 text-[13px] font-semibold transition-colors duration-150 "+(bankForm.kasaType==='banka'?'border-primary bg-primary/15 text-primary':'border-line text-dim hover:text-slate-200')}>Banka Hesabı</button>
+                <button type="button" onClick={()=>setBankForm(f=>({...f,kasaType:'kredi'}))} className={"flex-1 rounded-lg border px-3 py-2 text-[13px] font-semibold transition-colors duration-150 "+(bankForm.kasaType==='kredi'?'border-grape bg-grape/15 text-purple-300':'border-line text-dim hover:text-slate-200')}>Kredi Hesabı</button>
+              </div>
+            </div>
+          )}
           <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Hesap Adı</label>
-            <input value={bankForm.name} onChange={e=>setBankForm(f=>({...f,name:e.target.value}))} placeholder="Örn: Akbank - Ana Hesap" style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+            <input value={bankForm.name} onChange={e=>setBankForm(f=>({...f,name:e.target.value}))} placeholder={bankForm.kasaType==='kredi'?'Örn: İşbank İhtiyaç Kredisi':'Örn: Akbank - Ana Hesap'} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
           </div>
-          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Firma</label>
-            <select value={bankForm.companyId} onChange={e=>setBankForm(f=>({...f,companyId:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
-              <option value="">Firma seçiniz</option>
-              {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Banka</label>
-            <select value={bankForm.bankName} onChange={e=>setBankForm(f=>({...f,bankName:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
-              {INIT_BANKS.map(b=><option key={b.name} value={b.name}>{b.name}</option>)}
-            </select>
-          </div>
+          {bankForm.kasaType==='kredi'?(<>
+            <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Anapara (₺)</label>
+              <input type="number" min="0" step="0.01" value={bankForm.principal} onChange={e=>setBankForm(f=>({...f,principal:e.target.value}))} placeholder="0.00" style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+            </div>
+            <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Aylık Faiz Oranı (%)</label>
+              <input type="number" min="0" step="0.01" value={bankForm.monthlyRate} onChange={e=>setBankForm(f=>({...f,monthlyRate:e.target.value}))} placeholder="5" style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+            </div>
+            <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Başlangıç Tarihi</label>
+              <input type="date" value={bankForm.startDate} onChange={e=>setBankForm(f=>({...f,startDate:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+            </div>
+          </>):(<>
+            <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Firma</label>
+              <select value={bankForm.companyId} onChange={e=>setBankForm(f=>({...f,companyId:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                <option value="">Firma seçiniz</option>
+                {(companies||[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div><label style={{fontSize:'11px',color:'#64748b',fontWeight:600,display:'block',marginBottom:'4px'}}>Banka</label>
+              <select value={bankForm.bankName} onChange={e=>setBankForm(f=>({...f,bankName:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}>
+                {INIT_BANKS.map(b=><option key={b.name} value={b.name}>{b.name}</option>)}
+              </select>
+            </div>
+          </>)}
         </div>
         <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'20px'}}>
           <button onClick={()=>{setBankModalOpen(false);resetBankForm();}}
@@ -4792,6 +4899,27 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
           </button>
         </div>
       </Modal>
+
+      {/* Kredi Ödemesi Ekle Modalı */}
+      {loanPayModal&&(
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
+            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Kredi Ödemesi Ekle</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
+                <input type="date" value={loanPayForm.date} onChange={e=>setLoanPayForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tutar (₺)</label>
+                <input type="number" min="0" step="0.01" value={loanPayForm.amount} onChange={e=>setLoanPayForm(p=>({...p,amount:e.target.value}))} placeholder="0.00" style={{...inS,width:'100%',boxSizing:'border-box'}}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end',marginTop:'20px'}}>
+              <button onClick={()=>setLoanPayModal(null)} style={{background:'none',border:'1px solid #2b3b60',borderRadius:'8px',padding:'8px 16px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>İptal</button>
+              <button onClick={handleSaveLoanPayment} style={{background:'#22c55e',border:'none',borderRadius:'8px',padding:'8px 20px',color:'#fff',cursor:'pointer',fontWeight:700,fontSize:'13px'}}>Kaydet</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="rounded-lg border border-line bg-surface/80 px-3 py-2 text-[13px] text-slate-200 outline-none transition-colors duration-150 focus:border-primary"/>
         <span className="text-faint">—</span>
@@ -5027,6 +5155,7 @@ function App(){
   const[partnerPayments,setPartnerPayments]=useState([]);
   const[partnerAdjustments,setPartnerAdjustments]=useState([]);
   const[bankAccounts,setBankAccounts]=useState([]);
+  const[loans,setLoans]=useState([]);
   const kasaRef=React.useRef(kasa);
   useEffect(()=>{kasaRef.current=kasa;},[kasa]);
   const[collapsed,setCollapsed]=usePersist('sidebarCollapsed',false);
@@ -5057,6 +5186,7 @@ function App(){
     const nextPartnerPayments=Array.isArray(data.partnerPayments)?data.partnerPayments:[];
     const nextPartnerAdjustments=Array.isArray(data.partnerAdjustments)?data.partnerAdjustments:[];
     const nextBankAccounts=Array.isArray(data.bankAccounts)?data.bankAccounts:[];
+    const nextLoans=Array.isArray(data.loans)?data.loans:[];
     setCustomers(nextCustomers);
     setBanks(nextBanks);
     setKasa(nextKasa);
@@ -5066,8 +5196,9 @@ function App(){
     setPartnerPayments(nextPartnerPayments);
     setPartnerAdjustments(nextPartnerAdjustments);
     setBankAccounts(nextBankAccounts);
+    setLoans(nextLoans);
     savedAtRef.current=data.savedAt||'';
-    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners,expenses:nextExpenses,partnerPayments:nextPartnerPayments,partnerAdjustments:nextPartnerAdjustments,bankAccounts:nextBankAccounts});
+    lastServerSnapshotRef.current=stableSerialize({customers:nextCustomers,banks:nextBanks,kasa:nextKasa,companies:nextCompanies,partners:nextPartners,expenses:nextExpenses,partnerPayments:nextPartnerPayments,partnerAdjustments:nextPartnerAdjustments,bankAccounts:nextBankAccounts,loans:nextLoans});
     isDirtyRef.current=false;
     setSaveStatus('idle');
     setSavedTime('');
@@ -5100,7 +5231,7 @@ function App(){
     if(!initialized||!auth)return;
     if(!initRef.current){initRef.current=true;return;}
     if(hydratingRef.current)return;
-    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts});
+    const currentSnapshot=stableSerialize({customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts,loans});
     if(currentSnapshot===lastServerSnapshotRef.current){
       isDirtyRef.current=false;
       if(saveStatus==='saving')setSaveStatus('idle');
@@ -5111,7 +5242,7 @@ function App(){
     setSaveStatus('saving');
     saveTimerRef.current=setTimeout(()=>{
       const versionAtSave=dirtyVersionRef.current;
-      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
+      apiSaveData(auth.token,{customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts,loans,bankRatesVersion:BANK_RATES_VERSION,savedAt:savedAtRef.current})
         .then(()=>{
           setSaveStatus('saved');setSavedTime(timeStr());
           // Kayıt sonrası güncel veriyi çek — ancak bu sırada yeni değişiklik yapıldıysa üzerine YAZMA
@@ -5127,7 +5258,7 @@ function App(){
         });
     },800);
     return()=>clearTimeout(saveTimerRef.current);
-  },[customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts,initialized]);
+  },[customers,banks,kasa,companies,partners,expenses,partnerPayments,partnerAdjustments,bankAccounts,loans,initialized]);
 
   useEffect(()=>{
     if(!auth||auth.role!=='admin')return;
@@ -5213,7 +5344,7 @@ function App(){
               kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}
             />
           )}
-          {activePage==='kasalar'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))}/>}
+          {activePage==='kasalar'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))} loans={loans} onUpdateLoans={(updater)=>markDirty(()=>setLoans(updater))}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
           {activePage==='profit'&&<ProfitPage customers={customers} companies={companies}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}

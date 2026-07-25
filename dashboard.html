@@ -201,8 +201,8 @@ const INIT_BANKS=[
   {id:9,name:'YKB',fee:0,color:'#0066cc',rates:[3.65,6.15,7.80,9.49,11.21,12.75,14.50,16.25,18.12,19.90,21.64,23.00]},
 ];
 const BANK_RATES_VERSION='iyzico-2026-05-05';
-// PayNet (odeme.paynet.com.tr) sanal POS bireysel kart oran tablosu — kullanıcının paylaştığı ekran görüntüsünden
-const PAYNET_SANAL_RATES={
+// PayNet (odeme.paynet.com.tr) sanal POS bireysel kart oran tabloları — kullanıcının paylaştığı ekran görüntülerinden
+const PAYNET_SANAL_RATES_1={
   'Akbank':[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30],
   'Garanti':[3.65,6.54,8.40,10.27,12.01,13.56,15.54,17.41,19.21,21.03,22.90,24.77],
   'QNB':[3.65,6.61,8.48,10.35,12.21,14.08,15.95,17.82,19.69,21.56,23.43,25.30],
@@ -213,6 +213,18 @@ const PAYNET_SANAL_RATES={
   'YKB':[3.65,6.15,7.80,9.49,11.21,12.75,14.50,16.25,18.12,19.90,21.64,23.00],
   'Halk':[3.65,0,0,0,0,0,0,0,0,0,0,0],
   'Diğer Banka':[3.65,0,0,0,0,0,0,0,0,0,0,0],
+};
+const PAYNET_SANAL_RATES_2={
+  'Akbank':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'Garanti':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'QNB':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'İş Bankası':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'Vakıf':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'Ziraat':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'Kuveyt':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'Halk':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'Diğer Banka':[3.69,7.90,9.70,11.60,13.50,15.40,17.30,19.20,21.10,23.00,24.90,25.70],
+  'YKB':[3.69,0,0,0,0,0,0,0,0,0,0,0],
 };
 function rateNum(v){return +(String(v??0).replace(',','.'))||0;}
 function normalizeBanks(banks,applyLatestRates=false){
@@ -2545,13 +2557,13 @@ function CompaniesPage({companies,onUpdateCompanies}){
     setBulkRate('');
   };
 
-  const applyPaynetPreset=()=>{
-    if(!window.confirm('PayNet oran tablosu (banka bazlı, 12 taksit) tüm bankalara uygulanacak ve mevcut oranların üzerine yazılacak. Devam edilsin mi?'))return;
+  const applyPaynetPreset=(presetTable,label)=>{
+    if(!window.confirm(label+' oran tablosu (banka bazlı, 12 taksit) tüm bankalara uygulanacak ve mevcut oranların üzerine yazılacak. Devam edilsin mi?'))return;
     setForm(f=>{
       const existingNames=new Set(f.bankRates.map(br=>br.bankName));
-      const missing=Object.keys(PAYNET_SANAL_RATES).filter(name=>!existingNames.has(name)).map(name=>({bankName:name,sanalRates:Array(12).fill(0),fizikiRate:0}));
+      const missing=Object.keys(presetTable).filter(name=>!existingNames.has(name)).map(name=>({bankName:name,sanalRates:Array(12).fill(0),fizikiRate:0}));
       const merged=[...f.bankRates,...missing].map(br=>{
-        const preset=PAYNET_SANAL_RATES[br.bankName];
+        const preset=presetTable[br.bankName];
         return preset?{...br,sanalRates:[...preset]}:br;
       });
       return{...f,bankRates:merged};
@@ -2663,10 +2675,13 @@ function CompaniesPage({companies,onUpdateCompanies}){
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
             <span className="text-[12px] font-semibold text-dim">PayNet taksit tablosunu yükle (banka bazlı, 12 taksit):</span>
-            <button onClick={applyPaynetPreset} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-bold text-white transition-colors duration-150 hover:bg-blue-500">
-              Yükle
+            <button onClick={()=>applyPaynetPreset(PAYNET_SANAL_RATES_1,'1.')} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-bold text-white transition-colors duration-150 hover:bg-blue-500">
+              1. Oranları Yükle
             </button>
-            <span className="text-[11px] text-faint">Akbank, Garanti, QNB, İş Bankası, Vakıf, Ziraat, Kuveyt, YKB, Halk, Diğer Banka'nın tüm taksit oranlarını doldurur</span>
+            <button onClick={()=>applyPaynetPreset(PAYNET_SANAL_RATES_2,'2.')} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-bold text-white transition-colors duration-150 hover:bg-blue-500">
+              2. Oranları Yükle
+            </button>
+            <span className="text-[11px] text-faint">Bankaları otomatik ekler, her bankanın tüm taksit oranlarını doldurur</span>
           </div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'12px',maxHeight:'45vh',overflowY:'auto'}}>

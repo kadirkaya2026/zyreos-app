@@ -35,7 +35,9 @@ tailwind.config={theme:{extend:{colors:{
 </script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{overflow-x:hidden;max-width:100vw;}
   body{background:#0a0d14;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+  img,svg,video{max-width:100%;}
   ::-webkit-scrollbar{width:6px;height:6px;}
   ::-webkit-scrollbar-track{background:#121a2e;}
   ::-webkit-scrollbar-thumb{background:#2d3748;border-radius:3px;}
@@ -747,14 +749,14 @@ function DashboardPage({customers,onNavigateCustomer}){
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
 
       {/* Dönem Kartları */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'16px'}}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <PeriodCard label="Bugün Yatacak" sub={today} entries={todaySettlement}/>
         <PeriodCard label="Bu Hafta" sub={`${weekStartStr} — ${today}`} entries={weekCekim}/>
         <PeriodCard label="Bu Ay" sub={today.slice(0,7)} entries={monthCekim}/>
       </div>
 
       {/* Müşteri Bakiye + Son Çekimler */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <div style={{fontWeight:700,marginBottom:'16px',fontSize:'14px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Müşteri Bakiye Özeti</div>
           <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
@@ -815,7 +817,7 @@ function CustomerFormModal({open,onClose,onSave,initial}){
   const fillAll=(v)=>setForm(p=>({...p,installmentRates:Array(12).fill(parseFloat(v)||0)}));
   return(
     <Modal open={open} onClose={onClose} title={initial?'Müşteriyi Düzenle':'Yeni Müşteri'} width={560}>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 16px'}}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-4">
         <Field label="Ad Soyad" required style={{gridColumn:'1/-1'}}><Input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Ad Soyad"/></Field>
         <Field label="Telefon"><Input value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="0532 xxx xx xx"/></Field>
         <Field label="Açılış Bakiyesi (₺)"><input type="number" step="0.01" value={form.openingBalance||0} onChange={e=>set('openingBalance',parseFloat(e.target.value)||0)} style={{width:'100%',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'9px 12px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/></Field>
@@ -833,7 +835,7 @@ function CustomerFormModal({open,onClose,onSave,initial}){
             </button>
           </div>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px'}}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {Array.from({length:12},(_,i)=>{
             const rates=form.installmentRates||Array(12).fill(3.5);
             return(
@@ -1071,7 +1073,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       </div>
       {type==='cekim'?(
         <div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 16px'}}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-4">
             <Field label="Tarih" required><Input type="date" value={form.date} onChange={e=>set('date',e.target.value)}/></Field>
             <Field label="Açıklama"><Input value={form.description} onChange={e=>set('description',e.target.value)}/></Field>
             <Field label="Çekim Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={form.amount} onChange={e=>set('amount',e.target.value)} placeholder="10000"/></Field>
@@ -1162,7 +1164,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           {selCompanyId&&<div style={{marginBottom:'10px',padding:'8px 12px',borderRadius:'8px',background:'rgba(79,142,247,0.08)',border:'1px solid rgba(79,142,247,0.2)',fontSize:'12px',color:'#4f8ef7'}}>
             Şirket: <b>{mc?.name}</b> | POS: <b>{posType==='fiziki'?'Fiziki':'Sanal'}</b>
           </div>}
-          <div style={{marginBottom:'10px',display:'grid',gridTemplateColumns:selCompanyId?'1fr auto':'1fr',gap:'0 16px',alignItems:'end'}}>
+          <div className={"mb-2.5 grid grid-cols-1 items-end sm:gap-x-4"+(selCompanyId?" sm:grid-cols-[1fr_auto]":"")}>
             <Field label="Şirket" required>
               <Select value={selCompanyId} onChange={e=>{setSelCompanyId(e.target.value);setPosType('sanal');}}>
                 <option value="">— Şirket Seçiniz —</option>
@@ -1171,7 +1173,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
             </Field>
             {selCompanyId&&(
               <Field label="POS Tipi">
-                <div style={{display:'flex',gap:'12px',paddingTop:'4px',paddingBottom:'8px',whiteSpace:'nowrap'}}>
+                <div style={{display:'flex',gap:'12px',paddingTop:'4px',paddingBottom:'8px',flexWrap:'wrap'}}>
                   {allowedPos.sanal&&<label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px',color:posType==='sanal'?'#4f8ef7':'#94a3b8',fontWeight:posType==='sanal'?700:400}}>
                     <input type="radio" name="posTypeBulk" checked={posType==='sanal'} onChange={()=>{setPosType('sanal');}} style={{accentColor:'#4f8ef7'}}/>
                     Sanal POS
@@ -1311,7 +1313,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
   const tabs=[['cari','Cari Hesap'],['bilgi','Müşteri Bilgileri'],['ekstre','Ekstre'],['bakiye_duzeltme','Bakiye Düzeltme']];
   return(
     <div>
-      <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}}>
         <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
         <div>
           <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
@@ -1325,7 +1327,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
         </div>
       </div>
       {/* tabs */}
-      <div style={{display:'flex',gap:'4px',marginBottom:'20px',borderBottom:'1px solid #1e2a44',paddingBottom:'0'}}>
+      <div style={{display:'flex',gap:'4px',marginBottom:'20px',borderBottom:'1px solid #1e2a44',paddingBottom:'0',flexWrap:'wrap'}}>
         {tabs.map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)}
             style={{padding:'10px 20px',border:'none',background:'none',cursor:'pointer',fontWeight:700,fontSize:'13px',color:tab===v?'#4f8ef7':'#64748b',borderBottom:tab===v?'2px solid #4f8ef7':'2px solid transparent',marginBottom:'-1px',transition:'color 0.15s'}}>{l}</button>
@@ -1402,7 +1404,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
       {/* BİLGİ */}
       {tab==='bilgi'&&(
         <Card>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {[['Ad Soyad',customer.name],['Müşteri Kodu',customer.code||'—'],['Telefon',customer.phone||'—'],['E-posta',customer.email||'—'],['Adres',customer.address||'—'],['Vergi No',customer.taxNo||'—']].map(([l,v])=>(
               <div key={l}>
                 <div style={{color:'#64748b',fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>{l}</div>
@@ -1507,7 +1509,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
         };
         return(
           <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{background:'#182238',borderRadius:'12px',padding:'28px',width:'420px',boxShadow:'0 8px 40px rgba(0,0,0,0.5)'}}>
+            <div style={{background:'#182238',borderRadius:'12px',padding:'28px',width:'420px',maxWidth:'95vw',boxShadow:'0 8px 40px rgba(0,0,0,0.5)'}}>
               <h3 style={{margin:'0 0 20px',fontSize:'16px',fontWeight:700}}>WA Ekstre Gönder</h3>
               <div style={{marginBottom:'14px'}}>
                 <label style={{display:'block',fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Bakiye tarihi (bu tarihe kadar olan tüm kayıtlar dahil edilir)</label>
@@ -1537,7 +1539,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
           setBdForm({date:new Date().toISOString().slice(0,10),direction:'azalis',amount:'',description:''});
         };
         return(
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'24px',alignItems:'start'}}>
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
             <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'12px',padding:'20px'}}>
               <h3 style={{fontWeight:700,fontSize:'14px',marginBottom:'16px',color:'#f59e0b'}}>Yeni Bakiye Düzeltme</h3>
               <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -1908,7 +1910,7 @@ function POSPage({customers,banks}){
           {/* İşlem Detayları — banka bazlı */}
           {bankRows.map(r=>(
             <Card key={r.bank} style={{padding:0,overflow:'hidden'}}>
-              <div style={{padding:'12px 18px',borderBottom:'1px solid #1e2a44',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div style={{padding:'12px 18px',borderBottom:'1px solid #1e2a44',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'8px'}}>
                 <span style={{fontWeight:700,fontSize:'13px'}}>{r.bank} — İşlem Detayları</span>
                 <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
                   <span style={{color:'#64748b',fontSize:'12px'}}>{r.entries.length} işlem</span>
@@ -2566,7 +2568,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
                         <button onClick={()=>handleFillAllForBank(bi)} style={{padding:'5px 12px',borderRadius:'6px',border:'1px solid rgba(79,142,247,0.3)',background:'rgba(79,142,247,0.1)',color:'#4f8ef7',cursor:'pointer',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}}>Tümüne Uygula</button>
                       </div>
                     </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:'6px'}}>
+                    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                       {br.sanalRates.map((r,ri)=>(
                         <div key={ri} style={{display:'flex',flexDirection:'column',gap:'2px'}}>
                           <label style={{fontSize:'10px',color:'#64748b',fontWeight:600,textAlign:'center'}}>{ri===0?'Peşin':(ri+1)+' Taksit'}</label>
@@ -3434,7 +3436,7 @@ function BankSettingsPage({banks,onUpdateBanks}){
                   <input type="text" inputMode="decimal" value={b.fee} onChange={e=>updateFee(b.id,e.target.value)}
                     style={{...inputStyle,width:'100px',padding:'6px 10px',fontSize:'13px'}}/>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:'8px'}}>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                   {b.rates.map((r,i)=>(
                     <div key={i} style={{background:'#121a2e',borderRadius:'8px',padding:'10px',border:'1px solid rgba(255,255,255,0.06)'}}>
                       <div style={{color:'#64748b',fontSize:'10px',fontWeight:700,marginBottom:'6px',textTransform:'uppercase'}}>{i+1}. Taksit</div>

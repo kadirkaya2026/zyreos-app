@@ -5213,6 +5213,11 @@ function CustomersPageWithDetail({customers,banks,companies,onUpdateCustomers,in
         </div>
       </div>
 
+      <div className="mb-4 flex items-center gap-2.5 border-t border-line pt-6">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Müşteri Listesi</span>
+        <span className="text-[11px] text-faint">{customers.length} kayıt</span>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {customers.map((c,i)=>{
           const bak=custBalances[i];

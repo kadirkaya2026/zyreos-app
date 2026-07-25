@@ -272,6 +272,20 @@ function isTurkishHoliday(s){
   const mmdd=s.slice(5);
   return TR_FIXED_HOLIDAYS.includes(mmdd)||TR_VARIABLE_HOLIDAYS.has(s);
 }
+const TR_FIXED_HOLIDAY_NAMES={
+  '01-01':'Yılbaşı','04-23':'Ulusal Egemenlik ve Çocuk Bayramı','05-01':'Emek ve Dayanışma Günü',
+  '05-19':'Atatürk\'ü Anma, Gençlik ve Spor Bayramı','07-15':'Demokrasi ve Milli Birlik Günü',
+  '08-30':'Zafer Bayramı','10-29':'Cumhuriyet Bayramı'
+};
+const TR_VARIABLE_HOLIDAY_NAMES={
+  '2026-03-19':'Ramazan Bayramı Arefesi','2026-03-20':'Ramazan Bayramı (1. Gün)','2026-03-21':'Ramazan Bayramı (2. Gün)','2026-03-22':'Ramazan Bayramı (3. Gün)',
+  '2026-05-26':'Kurban Bayramı Arefesi','2026-05-27':'Kurban Bayramı (1. Gün)','2026-05-28':'Kurban Bayramı (2. Gün)','2026-05-29':'Kurban Bayramı (3. Gün)','2026-05-30':'Kurban Bayramı (4. Gün)',
+  '2027-03-09':'Ramazan Bayramı Arefesi','2027-03-10':'Ramazan Bayramı (1. Gün)','2027-03-11':'Ramazan Bayramı (2. Gün)',
+  '2027-05-16':'Kurban Bayramı Arefesi','2027-05-17':'Kurban Bayramı (1. Gün)','2027-05-18':'Kurban Bayramı (2. Gün)','2027-05-19':'Kurban Bayramı (3. Gün)',
+};
+function turkishHolidayName(s){
+  return TR_VARIABLE_HOLIDAY_NAMES[s]||TR_FIXED_HOLIDAY_NAMES[s.slice(5)]||'Resmi Tatil';
+}
 function isBankingDay(s){
   if(isWeekend(s))return false;
   if(isTurkishHoliday(s))return false;
@@ -712,6 +726,8 @@ function DashboardPage({customers,onNavigateCustomer}){
   const weekCekim=filter(weekStartStr,today);
   const monthCekim=filter(monthStartStr,today);
   const todaySettlement=filterSettlement(today,today);
+  const todayIsHoliday=isTurkishHoliday(today);
+  const todaySettlementHasSanal=todaySettlement.some(e=>e.posType!=='fiziki');
 
   const recentCekim=[...allCekim].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
 
@@ -754,6 +770,11 @@ function DashboardPage({customers,onNavigateCustomer}){
         <PeriodCard label="Bu Hafta" sub={`${weekStartStr} — ${today}`} entries={weekCekim}/>
         <PeriodCard label="Bu Ay" sub={today.slice(0,7)} entries={monthCekim}/>
       </div>
+      {todayIsHoliday&&todaySettlementHasSanal&&(
+        <div className="rounded-lg border border-warn/30 bg-warn/10 px-4 py-2.5 text-[13px] text-amber-300">
+          ⚠ Dikkat: Bugün <b>{turkishHolidayName(today)}</b> (resmi tatil) — sanal POS tahsilatları bankaya bugün geçmeyebilir, bir sonraki iş gününe kayabilir. Fiziki POS bundan etkilenmez.
+        </div>
+      )}
 
       {/* Müşteri Bakiye + Son Çekimler */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -1846,6 +1867,11 @@ function POSPage({customers,banks}){
             Gösterilen yatış günü: {fmtLongDate(selDate)}
           </div>
         </div>
+        {isTurkishHoliday(selDate)&&dayEntries.some(e=>e.posType!=='fiziki')&&(
+          <div className="mt-3 rounded-lg border border-warn/30 bg-warn/10 px-3.5 py-2.5 text-[13px] text-amber-300">
+            ⚠ {fmtLongDate(selDate)} <b>{turkishHolidayName(selDate)}</b> nedeniyle resmi tatil — sanal POS tahsilatları bu tarihte bankaya geçmeyebilir, bir sonraki iş gününe kayabilir. Fiziki POS etkilenmez.
+          </div>
+        )}
       </Card>
 
       {/* Özet Metrikler */}
@@ -2359,6 +2385,7 @@ function ProfitPage({customers,companies}){
             const todayTotal=withSettlement.filter(e=>e.settlementDate===today).reduce((s,e)=>s+e.netAmount,0);
             const tomorrowTotal=withSettlement.filter(e=>e.settlementDate===tomorrow).reduce((s,e)=>s+e.netAmount,0);
             const dayAfterTotal=withSettlement.filter(e=>e.settlementDate===dayAfter).reduce((s,e)=>s+e.netAmount,0);
+            const todayHasSanal=withSettlement.some(e=>e.settlementDate===today&&e.posType!=='fiziki');
 
             return(
               <>
@@ -2367,6 +2394,11 @@ function ProfitPage({customers,companies}){
                   <MetricCard label={'Yarın Yatacak ('+fmtDate(tomorrow)+')'} value={fmtTL(tomorrowTotal)} color="#4f8ef7"/>
                   <MetricCard label={'Ertesi Gün ('+fmtDate(dayAfter)+')'} value={fmtTL(dayAfterTotal)} color="#f59e0b"/>
                 </div>
+                {isTurkishHoliday(today)&&todayHasSanal&&(
+                  <div className="rounded-lg border border-warn/30 bg-warn/10 px-4 py-2.5 text-[13px] text-amber-300">
+                    ⚠ Dikkat: Bugün <b>{turkishHolidayName(today)}</b> (resmi tatil) — sanal POS tahsilatları bankaya bugün geçmeyebilir, bir sonraki iş gününe kayabilir. Fiziki POS bundan etkilenmez.
+                  </div>
+                )}
 
                 {withSettlement.length>0&&(
                   <div className="overflow-hidden rounded-2xl border border-line bg-surface/40">
@@ -4828,6 +4860,11 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
               <label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
               <input type="date" value={kapatDate} onChange={e=>{setKapatDate(e.target.value);setKapatErr('');}} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
             </div>
+            {isTurkishHoliday(kapatDate)&&Object.values(posAccountMap).some(v=>v.date===kapatDate&&v.posType!=='fiziki')&&(
+              <div style={{marginBottom:'16px',borderRadius:'8px',border:'1px solid rgba(245,158,11,0.3)',background:'rgba(245,158,11,0.1)',padding:'10px 14px',fontSize:'12px',color:'#fcd34d'}}>
+                ⚠ {fmtDate(kapatDate)} <b>{turkishHolidayName(kapatDate)}</b> nedeniyle resmi tatil — sanal POS tahsilatları bu tarihte bankaya geçmeyebilir, bir sonraki iş gününe kayabilir. Fiziki POS etkilenmez.
+              </div>
+            )}
             {(()=>{
               const allPending=Object.entries(posAccountMap);
               const available=allPending.filter(([k,v])=>v.date===kapatDate);

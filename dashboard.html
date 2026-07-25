@@ -884,11 +884,11 @@ function CustomerFormModal({open,onClose,onSave,initial}){
 }
 
 /* ── ADD ENTRY MODAL ── */
-function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks,companies}){
+function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks,companies,bankAccounts}){
   const[type,setType]=useState('cekim');
   const today=todayStr();
   const[form,setForm]=useState({date:today,description:'Kart Çekimi',amount:'',bank:'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
-  const[nakit,setNakit]=useState({date:today,description:'Nakit Ödeme',amount:''});
+  const[nakit,setNakit]=useState({date:today,description:'Nakit Ödeme',amount:'',kasaId:'nakit'});
   const newBulkRow=()=>({id:uid(),date:today,amount:'',bank:'',installment:1,customerRate:customer?.installmentRates?.[0]??customer?.commissionRate??3.5});
   const[bulkRows,setBulkRows]=useState([newBulkRow()]);
   const[selCompanyId,setSelCompanyId]=useState('');
@@ -910,10 +910,10 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       if(editingEntry){
         if(editingEntry.type==='nakit_odeme'){
           setType('nakit_odeme');
-          setNakit({date:editingEntry.date||today,description:editingEntry.description||'Nakit Ödeme',amount:String(editingEntry.amount||'')});
+          setNakit({date:editingEntry.date||today,description:editingEntry.description||'Nakit Ödeme',amount:String(editingEntry.amount||''),kasaId:editingEntry.kasaId||'nakit'});
         }else if(editingEntry.type==='nakit_tahsilat'){
           setType('nakit_tahsilat');
-          setNakit({date:editingEntry.date||today,description:editingEntry.description||'Nakit Tahsilat',amount:String(editingEntry.amount||'')});
+          setNakit({date:editingEntry.date||today,description:editingEntry.description||'Nakit Tahsilat',amount:String(editingEntry.amount||''),kasaId:editingEntry.kasaId||'nakit'});
         }else if(editingEntry.type==='bakiye_duzeltme'){
           setType('bakiye_duzeltme');
           setNakit({date:editingEntry.date||today,description:editingEntry.description||'Bakiye Düzeltme',amount:String(editingEntry.amount||''),direction:editingEntry.direction||'artis'});
@@ -928,7 +928,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
         setType('cekim');
         const defRate=customer?.installmentRates?.[0]??customer?.commissionRate??3.5;
         setForm({date:today,description:'Kart Çekimi',amount:'',bank:'',installment:1,customerRate:defRate});
-        setNakit({date:today,description:'Nakit Ödeme',amount:''});
+        setNakit({date:today,description:'Nakit Ödeme',amount:'',kasaId:'nakit'});
         setBulkRows([newBulkRow()]);
         setSelCompanyId('');
         setPosType('sanal');
@@ -1027,11 +1027,13 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       }else if(type==='nakit_tahsilat'){
         const amt=parseFloat(nakit.amount)||0;
         if(!amt)return alert('Tutar giriniz.');
-        onUpdate({...editingEntry,date:nakit.date,description:nakit.description||'Nakit Tahsilat',amount:amt,type:'nakit_tahsilat'});
+        if(!nakit.kasaId)return alert('Kasa seçiniz.');
+        onUpdate({...editingEntry,date:nakit.date,description:nakit.description||'Nakit Tahsilat',amount:amt,type:'nakit_tahsilat',kasaId:nakit.kasaId});
       }else{
         const amt=parseFloat(nakit.amount)||0;
         if(!amt)return alert('Tutar giriniz.');
-        onUpdate({...editingEntry,date:nakit.date,description:nakit.description||'Nakit Ödeme',amount:amt});
+        if(!nakit.kasaId)return alert('Kasa seçiniz.');
+        onUpdate({...editingEntry,date:nakit.date,description:nakit.description||'Nakit Ödeme',amount:amt,kasaId:nakit.kasaId});
       }
       onClose();
       return;
@@ -1045,11 +1047,13 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
     }else if(type==='nakit_odeme'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
-      onSave({id:uid(),date:nakit.date,type:'nakit_odeme',description:nakit.description||'Nakit Ödeme',amount:amt,createdAt:new Date().toISOString()});
+      if(!nakit.kasaId)return alert('Kasa seçiniz.');
+      onSave({id:uid(),date:nakit.date,type:'nakit_odeme',description:nakit.description||'Nakit Ödeme',amount:amt,kasaId:nakit.kasaId,createdAt:new Date().toISOString()});
     }else if(type==='nakit_tahsilat'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
-      onSave({id:uid(),date:nakit.date,type:'nakit_tahsilat',description:nakit.description||'Nakit Tahsilat',amount:amt,createdAt:new Date().toISOString()});
+      if(!nakit.kasaId)return alert('Kasa seçiniz.');
+      onSave({id:uid(),date:nakit.date,type:'nakit_tahsilat',description:nakit.description||'Nakit Tahsilat',amount:amt,kasaId:nakit.kasaId,createdAt:new Date().toISOString()});
     }else if(type==='bakiye_duzeltme'){
       const amt=parseFloat(nakit.amount)||0;
       if(!amt)return alert('Tutar giriniz.');
@@ -1158,14 +1162,26 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
           <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
           <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))}/></Field>
           <Field label="Ödeme Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="5000"/></Field>
+          <Field label="Hangi Kasadan Ödendi" required>
+            <select value={nakit.kasaId} onChange={e=>setNakit(p=>({...p,kasaId:e.target.value}))} style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'6px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'}}>
+              <option value="nakit">Nakit Kasa</option>
+              {(bankAccounts||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </Field>
         </div>
       ):type==='nakit_tahsilat'?(
         <div>
           <Field label="Tarih" required><Input type="date" value={nakit.date} onChange={e=>setNakit(p=>({...p,date:e.target.value}))}/></Field>
           <Field label="Açıklama"><Input value={nakit.description} onChange={e=>setNakit(p=>({...p,description:e.target.value}))} placeholder="Nakit tahsilat açıklaması..."/></Field>
           <Field label="Tahsilat Tutarı (₺)" required><Input type="number" step="0.01" min="0" value={nakit.amount} onChange={e=>setNakit(p=>({...p,amount:e.target.value}))} placeholder="5000"/></Field>
+          <Field label="Hangi Kasaya Yatırıldı" required>
+            <select value={nakit.kasaId} onChange={e=>setNakit(p=>({...p,kasaId:e.target.value}))} style={{background:'#182238',border:'1px solid #1e2a44',borderRadius:'6px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px',width:'100%',boxSizing:'border-box'}}>
+              <option value="nakit">Nakit Kasa</option>
+              {(bankAccounts||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </Field>
           <div style={{background:'rgba(6,182,212,0.08)',border:'1px solid rgba(6,182,212,0.2)',borderRadius:'8px',padding:'10px 12px',fontSize:'12px',color:'#67e8f9',marginTop:'8px'}}>
-            Bu kayıt bakiyeyi azaltır ve kasaya nakit giriş olarak yansır.
+            Bu kayıt bakiyeyi azaltır ve seçilen kasaya nakit giriş olarak yansır.
           </div>
         </div>
       ):type==='bakiye_duzeltme'?(
@@ -1259,7 +1275,8 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
 }
 
 /* ── CUSTOMER DETAIL ── */
-function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpdateKasa}){
+function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpdateKasa,bankAccounts}){
+  const kasaLabelFor=(id)=>id==='nakit'||!id?'Nakit Kasa':(((bankAccounts||[]).find(a=>a.id===id)||{}).name||'Nakit Kasa');
   const[tab,setTab]=useState('cari');
   const[addOpen,setAddOpen]=useState(false);
   const[editOpen,setEditOpen]=useState(false);
@@ -1282,10 +1299,10 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
     const current=customer.cariEntries||[];
     const kasaEntries=newEntries.map(e=>{
       if(e.type==='nakit_odeme'){
-        return{id:uid(),date:e.date,type:'cikis',amount:e.amount,description:'Ödeme - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true,createdAt:e.createdAt||new Date().toISOString()};
+        return{id:uid(),date:e.date,type:'cikis',amount:e.amount,description:'Ödeme - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true,kasaId:e.kasaId||'nakit',kasaLabel:kasaLabelFor(e.kasaId),createdAt:e.createdAt||new Date().toISOString()};
       }
       if(e.type==='nakit_tahsilat'){
-        return{id:uid(),date:e.date,type:'giris',amount:e.amount,description:'Nakit Tahsilat - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true,createdAt:e.createdAt||new Date().toISOString()};
+        return{id:uid(),date:e.date,type:'giris',amount:e.amount,description:'Nakit Tahsilat - '+customer.name,refId:e.id,refCustomer:customer.name,auto:true,kasaId:e.kasaId||'nakit',kasaLabel:kasaLabelFor(e.kasaId),createdAt:e.createdAt||new Date().toISOString()};
       }
       return null;
     }).filter(Boolean);
@@ -1302,10 +1319,10 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
     const arr=Array.isArray(updated)?updated:[updated];
     const kasaUpdates=arr.map(e=>{
       if(e.type==='nakit_odeme'){
-        return{refId:e.id,date:e.date,type:'cikis',amount:e.amount,description:'Ödeme - '+customer.name};
+        return{refId:e.id,date:e.date,type:'cikis',amount:e.amount,description:'Ödeme - '+customer.name,kasaId:e.kasaId||'nakit',kasaLabel:kasaLabelFor(e.kasaId)};
       }
       if(e.type==='nakit_tahsilat'){
-        return{refId:e.id,date:e.date,type:'giris',amount:e.amount,description:'Nakit Tahsilat - '+customer.name};
+        return{refId:e.id,date:e.date,type:'giris',amount:e.amount,description:'Nakit Tahsilat - '+customer.name,kasaId:e.kasaId||'nakit',kasaLabel:kasaLabelFor(e.kasaId)};
       }
       return null;
     }).filter(Boolean);
@@ -1507,7 +1524,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
         </div>
         );
       })()}
-      <AddEntryModal open={addOpen||!!editingEntry} onClose={()=>{setAddOpen(false);setEditingEntry(null);}} onSave={handleAddEntry} onUpdate={handleUpdateEntry} editingEntry={editingEntry||null} customer={customer} banks={banks} companies={companies}/>
+      <AddEntryModal open={addOpen||!!editingEntry} onClose={()=>{setAddOpen(false);setEditingEntry(null);}} onSave={handleAddEntry} onUpdate={handleUpdateEntry} editingEntry={editingEntry||null} customer={customer} banks={banks} companies={companies} bankAccounts={bankAccounts}/>
       {waOpen&&(()=>{
         const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
         const filteredE=(customer.cariEntries||[]).filter(e=>e.date&&e.date<=waDate);
@@ -5237,7 +5254,7 @@ function App(){
             <CustomersPageWithDetail
               customers={customers} banks={banks} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))}
               initDetailId={detailCustomerId} onClearDetail={()=>navigate('customers')}
-              kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))}
+              kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} bankAccounts={bankAccounts}
             />
           )}
           {activePage==='kasalar'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))}/>}
@@ -5263,7 +5280,7 @@ function App(){
 }
 
 /* Wrapper to handle detail navigation via URL hash */
-function CustomersPageWithDetail({customers,banks,companies,onUpdateCustomers,initDetailId,onClearDetail,kasa,onUpdateKasa}){
+function CustomersPageWithDetail({customers,banks,companies,onUpdateCustomers,initDetailId,onClearDetail,kasa,onUpdateKasa,bankAccounts}){
   // ── TÜM HOOK'LAR KOŞULSUZ ÜSTTE ──
   const[addOpen,setAddOpen]=useState(false);
   const[deleteId,setDeleteId]=useState(null);
@@ -5294,7 +5311,7 @@ function CustomersPageWithDetail({customers,banks,companies,onUpdateCustomers,in
       onUpdateKasa(prev=>({...prev,transactions:(prev.transactions||[]).map(t=>{
         const u=kasaUpdates.find(k=>k.refId===t.refId);
         if(!u)return t;
-        return{...t,date:u.date,type:u.type,amount:u.amount,description:u.description};
+        return{...t,date:u.date,type:u.type,amount:u.amount,description:u.description,kasaId:u.kasaId,kasaLabel:u.kasaLabel};
       })}));
     }
   };
@@ -5309,6 +5326,7 @@ function CustomersPageWithDetail({customers,banks,companies,onUpdateCustomers,in
         onBack={()=>onClearDetail()}
         onUpdateCustomer={handleUpdateCustomer}
         onUpdateKasa={onUpdateKasa}
+        bankAccounts={bankAccounts}
       />
     );
   }

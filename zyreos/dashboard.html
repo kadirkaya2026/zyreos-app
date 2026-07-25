@@ -3358,7 +3358,7 @@ function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
   const[msg,setMsg]=useState('');
   const[err,setErr]=useState('');
   const[loading,setLoading]=useState(false);
-  const inpS={width:'100%',padding:'10px 14px',background:'rgba(255,255,255,0.05)',border:'1px solid #1e2a44',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
+  const inpS={width:'100%',padding:'10px 14px',background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',color:'#e2e8f0',fontSize:'14px',outline:'none',boxSizing:'border-box'};
   const submit=async()=>{
     setErr('');setMsg('');
     if(!form.newUsername.trim()){setErr('Kullanıcı adı boş olamaz');return;}
@@ -3379,54 +3379,61 @@ function HesabimPage({token,username,onUpdated,onExport,onImport,onReset}){
   };
   return(
     <div style={{maxWidth:'480px'}}>
-      <Card style={{display:'flex',flexDirection:'column',gap:'18px'}}>
-        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid #1e2a44'}}>Hesap Bilgileri</div>
-        {err&&<div style={{color:'#ef4444',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{err}</div>}
-        {msg&&<div style={{color:'#22c55e',background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:'8px',padding:'10px 14px',fontSize:'13px'}}>{msg}</div>}
-        <div>
-          <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Kullanıcı Adı</label>
-          <input style={inpS} value={form.newUsername} onChange={e=>setForm(p=>({...p,newUsername:e.target.value}))}/>
+      <div className="mb-6">
+        <h2 className="text-xl font-extrabold tracking-tight text-slate-100">Hesabım</h2>
+        <p className="mt-0.5 text-xs text-dim">Hesap bilgileri, şifre ve veri yönetimi</p>
+      </div>
+      <div className="rounded-2xl border border-line bg-surface/60 p-5">
+        <div className="mb-4 border-b border-line pb-3 text-[11px] font-semibold uppercase tracking-wider text-dim">Hesap Bilgileri</div>
+        <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+          {err&&<div className="rounded-lg border border-loss/25 bg-loss/10 px-3.5 py-2.5 text-[13px] text-loss">{err}</div>}
+          {msg&&<div className="rounded-lg border border-gain/25 bg-gain/10 px-3.5 py-2.5 text-[13px] text-gain">{msg}</div>}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-dim">Kullanıcı Adı</label>
+            <input style={inpS} value={form.newUsername} onChange={e=>setForm(p=>({...p,newUsername:e.target.value}))}/>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-line pt-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-dim">Şifre Değiştir</div>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-dim">Mevcut Şifre</label>
+              <input style={inpS} type="password" value={form.currentPassword} onChange={e=>setForm(p=>({...p,currentPassword:e.target.value}))} placeholder="Değiştirmek istiyorsanız girin"/>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-dim">Yeni Şifre</label>
+              <input style={inpS} type="password" value={form.newPassword} onChange={e=>setForm(p=>({...p,newPassword:e.target.value}))} placeholder="Min 6 karakter"/>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-dim">Yeni Şifre (Tekrar)</label>
+              <input style={inpS} type="password" value={form.confirmPassword} onChange={e=>setForm(p=>({...p,confirmPassword:e.target.value}))} placeholder="Yeni şifreyi tekrar girin"/>
+            </div>
+          </div>
+          <button onClick={submit} disabled={loading} className={"rounded-lg px-4 py-2.5 text-[14px] font-bold text-white transition-all duration-150 "+(loading?'cursor-default bg-primary/70':'bg-primary shadow-[0_4px_16px_-6px_rgba(79,142,247,.55)] hover:bg-blue-500 hover:shadow-[0_6px_20px_-6px_rgba(79,142,247,.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60')}>
+            {loading?'Kaydediliyor…':'Kaydet'}
+          </button>
         </div>
-        <div style={{borderTop:'1px solid #1e2a44',paddingTop:'16px',display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div style={{color:'#64748b',fontSize:'12px',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em'}}>Şifre Değiştir</div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Mevcut Şifre</label>
-            <input style={inpS} type="password" value={form.currentPassword} onChange={e=>setForm(p=>({...p,currentPassword:e.target.value}))} placeholder="Değiştirmek istiyorsanız girin"/>
-          </div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Yeni Şifre</label>
-            <input style={inpS} type="password" value={form.newPassword} onChange={e=>setForm(p=>({...p,newPassword:e.target.value}))} placeholder="Min 6 karakter"/>
-          </div>
-          <div>
-            <label style={{display:'block',color:'#94a3b8',fontSize:'12px',marginBottom:'6px',fontWeight:600}}>Yeni Şifre (Tekrar)</label>
-            <input style={inpS} type="password" value={form.confirmPassword} onChange={e=>setForm(p=>({...p,confirmPassword:e.target.value}))} placeholder="Yeni şifreyi tekrar girin"/>
-          </div>
-        </div>
-        <button onClick={submit} disabled={loading} style={{padding:'12px',borderRadius:'10px',border:'none',background:'linear-gradient(135deg,#4f8ef7,#3b6fd4)',color:'#fff',fontWeight:700,fontSize:'14px',cursor:'pointer',opacity:loading?0.7:1}}>
-          {loading?'Kaydediliyor…':'Kaydet'}
-        </button>
-      </Card>
-      <Card style={{display:'flex',flexDirection:'column',gap:'12px',marginTop:'16px'}}>
-        <div style={{fontWeight:700,fontSize:'16px',color:'#e2e8f0',paddingBottom:'4px',borderBottom:'1px solid #1e2a44'}}>Veri Yönetimi</div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-line bg-surface/60 p-5">
+        <div className="mb-4 border-b border-line pb-3 text-[11px] font-semibold uppercase tracking-wider text-dim">Veri Yönetimi</div>
         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-          <button onClick={onExport} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',borderRadius:'10px',border:'1px solid rgba(34,197,94,0.25)',background:'rgba(34,197,94,0.06)',color:'#22c55e',cursor:'pointer',fontWeight:600,fontSize:'13px',textAlign:'left'}}>
+          <button onClick={onExport} className="flex items-center gap-2.5 rounded-lg border border-gain/25 bg-gain/10 px-4 py-3 text-left text-[13px] font-semibold text-gain transition-colors duration-150 hover:bg-gain/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gain/50">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Yedek Al
-            <span style={{color:'#64748b',fontWeight:400,fontSize:'12px',marginLeft:'auto'}}>Tüm verileri JSON olarak indir</span>
+            <span className="ml-auto text-xs font-normal text-dim">Tüm verileri JSON olarak indir</span>
           </button>
-          <label style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',borderRadius:'10px',border:'1px solid rgba(245,158,11,0.25)',background:'rgba(245,158,11,0.06)',color:'#f59e0b',cursor:'pointer',fontWeight:600,fontSize:'13px'}}>
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-warn/25 bg-warn/10 px-4 py-3 text-[13px] font-semibold text-amber-300 transition-colors duration-150 hover:bg-warn/15">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Geri Yükle
-            <span style={{color:'#64748b',fontWeight:400,fontSize:'12px',marginLeft:'auto'}}>JSON yedekten geri yükle</span>
+            <span className="ml-auto text-xs font-normal text-dim">JSON yedekten geri yükle</span>
             <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport&&onImport(e.target.files[0]);e.target.value='';}}/>
           </label>
-          <button onClick={onReset} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',borderRadius:'10px',border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.05)',color:'#ef4444',cursor:'pointer',fontWeight:600,fontSize:'13px',textAlign:'left'}}>
+          <button onClick={onReset} className="flex items-center gap-2.5 rounded-lg border border-loss/25 bg-loss/10 px-4 py-3 text-left text-[13px] font-semibold text-loss transition-colors duration-150 hover:bg-loss/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-loss/50">
             <IcoRefresh size={16}/>
             Verileri Sıfırla
-            <span style={{color:'#64748b',fontWeight:400,fontSize:'12px',marginLeft:'auto'}}>Tüm müşteri ve kayıtları sil</span>
+            <span className="ml-auto text-xs font-normal text-dim">Tüm müşteri ve kayıtları sil</span>
           </button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

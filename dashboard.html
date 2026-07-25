@@ -396,6 +396,17 @@ function calcCekim(amount,installment,customerRate,bank){
 }
 function todayStr(){return localDateStr(new Date());}
 function timeStr(){const d=new Date();return d.toLocaleTimeString('tr-TR');}
+// Şirket sahibi payı: yeni kayıtlarda entry.ownerFee zaten şirketin kendi oranıyla hesaplanıp profit'e işlenmiş olur.
+// Bu alan yoksa (eski kayıtlar), geriye dönük uyumluluk için eski sabit %1 varsayımıyla tahmin edilir.
+function ownerFeeOf(e){
+  if(e.ownerFee!==undefined)return e.ownerFee;
+  const bankCost=e.bankCost||0;
+  return +(((e.amount||0)-bankCost)*0.01).toFixed(2);
+}
+function netProfitOf(e){
+  if(e.ownerFee!==undefined)return e.profit||0;
+  return +((e.profit||0)-ownerFeeOf(e)).toFixed(2);
+}
 
 /* ── ICONS (inline SVG components) ── */
 const Icon=({d,size=18,color='currentColor',className=''})=>(
@@ -760,8 +771,7 @@ function DashboardPage({customers,onNavigateCustomer}){
     const total=sum(entries,'amount');
     const realProfit=entries.reduce((s,e)=>{
       const bankCut=e.bankCost||+(e.amount*(e.bankRate||0)/100).toFixed(2);
-      const netDeposit=e.amount-bankCut;
-      const ownerShare=+(netDeposit*0.01).toFixed(2);
+      const ownerShare=ownerFeeOf({...e,bankCost:bankCut});
       const customerComm=e.customerComm||0;
       return s+customerComm-bankCut-ownerShare;
     },0);
@@ -1004,8 +1014,9 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
       const customerComm=+(amt*(form.customerRate||0)/100).toFixed(2);
       const netToCustomer=+(amt-customerComm).toFixed(2);
       const bankCost=+(amt*bankRate/100).toFixed(2);
-      const profit=+(amt*((form.customerRate||0)-bankRate)/100).toFixed(2);
-      return{customerComm,netToCustomer,bankRate,bankCost,profit};
+      const ownerFee=+((amt-bankCost)*(mc.ownerRate||0)/100).toFixed(2);
+      const profit=+(amt*((form.customerRate||0)-bankRate)/100-ownerFee).toFixed(2);
+      return{customerComm,netToCustomer,bankRate,bankCost,ownerFee,profit};
     }
     if(!effectiveBank)return null;
     return calcCekim(amt,posType==='fiziki'?1:form.installment,form.customerRate,effectiveBank);
@@ -1019,22 +1030,23 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
 
   const buildCekimEntry=(entryBase,amt,bankName,inst,custRate)=>{
     const br=mc?mc.bankRates.find(b=>b.bankName===bankName):null;
-    let bankRate,bankCost,profit,customerComm,netToCustomer;
+    let bankRate,bankCost,profit,customerComm,netToCustomer,ownerFee;
     if(br){
       bankRate=posType==='fiziki'?(br.fizikiRate||0):(br.sanalRates[(inst||1)-1]||0);
       customerComm=+(amt*custRate/100).toFixed(2);
       netToCustomer=+(amt-customerComm).toFixed(2);
       bankCost=+(amt*bankRate/100).toFixed(2);
-      profit=+(amt*(custRate-bankRate)/100).toFixed(2);
+      ownerFee=+((amt-bankCost)*(mc.ownerRate||0)/100).toFixed(2);
+      profit=+(amt*(custRate-bankRate)/100-ownerFee).toFixed(2);
     }else{
       const fb=banks.find(b=>b.name===bankName)||banks[0];
       const c2=calcCekim(amt,inst,custRate,fb);
-      bankRate=c2.bankRate;customerComm=c2.customerComm;netToCustomer=c2.netToCustomer;bankCost=c2.bankCost;profit=c2.profit;
+      bankRate=c2.bankRate;customerComm=c2.customerComm;netToCustomer=c2.netToCustomer;bankCost=c2.bankCost;profit=c2.profit;ownerFee=0;
     }
     const settlementDate=computeSettlementDate(entryBase.date);
     return{...entryBase,amount:amt,bank:bankName,installment:posType==='fiziki'?1:parseInt(inst),customerRate:custRate,
       companyId:selCompanyId,companyName:mc?.name||'',posType,settlementDate:settlementDate||'',
-      bankRate,customerComm,netToCustomer,bankCost,profit};
+      bankRate,customerComm,netToCustomer,bankCost,ownerFee,profit};
   };
 
   const handleSave=()=>{
@@ -1174,6 +1186,7 @@ function AddEntryModal({open,onClose,onSave,onUpdate,editingEntry,customer,banks
               {previewRow('Müşteri Komisyonu',fmtTL(calc.customerComm)+' (%'+(form.customerRate||0)+')','#a855f7')}
               {previewRow('Müşteriye Nakit',fmtTL(calc.netToCustomer),'#4f8ef7')}
               {previewRow('POS Maliyeti (%'+calc.bankRate+')',fmtTL(calc.bankCost),'#ef4444')}
+              {calc.ownerFee>0&&previewRow('Şirket Sahibi Payı (%'+(mc?.ownerRate||0)+')',fmtTL(calc.ownerFee),'#f59e0b')}
               {previewRow('NET KAR',fmtTL(calc.profit),calc.profit>=0?'#22c55e':'#ef4444')}
               {mc&&<div style={{color:'#64748b',fontSize:'11px',marginTop:'6px'}}>
                 {posType==='fiziki'?'Fiziki POS — Ertesi gün yatar (haftasonu dahil)':'Sanal POS — '+(mc.valorDays===1?'Ertesi iş günü':'2 iş günü')+' valör'}
@@ -1868,7 +1881,7 @@ function POSPage({customers,banks}){
     const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]!=null?parseFloat(bankObj.rates[taksit-1]):0;
     const bankCut=parseFloat((e.amount*bankRate/100).toFixed(2));
     const netDeposit=parseFloat((e.amount-bankCut).toFixed(2));
-    const ownerShare=+(netDeposit*0.01).toFixed(2);
+    const ownerShare=ownerFeeOf({...e,bankCost:bankCut});
     const customerComm=e.customerComm||0;
     const realProfit=+(customerComm-bankCut-ownerShare).toFixed(2);
     const bankNotFound=!bankObj;
@@ -2182,18 +2195,14 @@ function ProfitPage({customers,companies}){
   const totalC=rows.reduce((s,r)=>s+r.amount,0);
   const totalKom=rows.reduce((s,r)=>s+(r.customerComm||0),0);
   const totalBank=rows.reduce((s,r)=>s+(r.bankCost||0),0);
-  const totalOwner=rows.reduce((s,r)=>s+(((r.amount-(r.bankCost||0))*0.01).toFixed(2)*1),0);
-  const totalNet=rows.reduce((s,r)=>{
-    const ownerShare=+((r.amount-(r.bankCost||0))*0.01).toFixed(2);
-    return s+(r.profit||0)-ownerShare;
-  },0);
+  const totalOwner=rows.reduce((s,r)=>s+ownerFeeOf(r),0);
+  const totalNet=rows.reduce((s,r)=>s+netProfitOf(r),0);
   const totals={totalC,totalKom,totalBank,totalOwner,totalNet};
 
   // Müşteri bazlı özet
   const custMap={};
   rows.forEach(r=>{
-    const ownerShare=+((r.amount-(r.bankCost||0))*0.01).toFixed(2);
-    const realProfit=(r.profit||0)-ownerShare;
+    const realProfit=netProfitOf(r);
     if(!custMap[r.customerId])custMap[r.customerId]={id:r.customerId,name:r.customerName,code:r.customerCode,cnt:0,totalC:0,kom:0,bank:0,profit:0};
     custMap[r.customerId].cnt++;
     custMap[r.customerId].totalC+=r.amount;
@@ -2310,7 +2319,7 @@ function ProfitPage({customers,companies}){
                     <div style={{color:'#ef4444',fontWeight:600}}>{fmtTL(r.bankCost)}</div>
                     <div style={{color:'#64748b',fontSize:'11px'}}>%{r.bankRate}</div>
                   </td>
-                  <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'14px',color:((r.profit||0)-+((r.amount-(r.bankCost||0))*0.01).toFixed(2))>=0?'#22c55e':'#ef4444'}}>{fmtTL((r.profit||0)-+((r.amount-(r.bankCost||0))*0.01).toFixed(2))}</td>
+                  <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'14px',color:netProfitOf(r)>=0?'#22c55e':'#ef4444'}}>{fmtTL(netProfitOf(r))}</td>
                 </tr>
               ))}
               {rows.length===0&&<tr><td colSpan={8} style={{padding:'40px',textAlign:'center',color:'#64748b'}}>Seçilen dönemde işlem bulunamadı</td></tr>}
@@ -2497,13 +2506,13 @@ function ProfitPage({customers,companies}){
 function CompaniesPage({companies,onUpdateCompanies}){
   const[editId,setEditId]=useState(null);
   const[modalOpen,setModalOpen]=useState(false);
-  const[form,setForm]=useState({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},fizikiRate:'',bankRates:[]});
+  const[form,setForm]=useState({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},fizikiRate:'',ownerRate:'',bankRates:[]});
   const[openBank,setOpenBank]=useState(null);
   const[addBankSel,setAddBankSel]=useState('');
   const[bulkRate,setBulkRate]=useState('');
 
   const resetForm=()=>{
-    setForm({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},fizikiRate:'',bankRates:[]});
+    setForm({name:'',valorDays:1,posTypes:{sanal:true,fiziki:false},fizikiRate:'',ownerRate:'',bankRates:[]});
     setEditId(null);setOpenBank(null);setAddBankSel('');setBulkRate('');
   };
 
@@ -2522,7 +2531,7 @@ function CompaniesPage({companies,onUpdateCompanies}){
     const bankRates=(mc.bankRates||[]).filter(br=>(br.sanalRates||[]).some(r=>parseFloat(r)>0)||parseFloat(br.fizikiRate)>0).map(br=>({...br,sanalRates:[...(br.sanalRates||Array(12).fill(0))]}));
     const frFound=bankRates.find(b=>parseFloat(b.fizikiRate)>0);
     const fr=frFound?frFound.fizikiRate:0;
-    setForm({name:mc.name,valorDays:mc.valorDays||1,posTypes:mc.posTypes||{sanal:true,fiziki:true},fizikiRate:fr?String(fr):'',bankRates});
+    setForm({name:mc.name,valorDays:mc.valorDays||1,posTypes:mc.posTypes||{sanal:true,fiziki:true},fizikiRate:fr?String(fr):'',ownerRate:mc.ownerRate?String(mc.ownerRate):'',bankRates});
     setAddBankSel('');
     setModalOpen(true);
   };
@@ -2577,10 +2586,11 @@ function CompaniesPage({companies,onUpdateCompanies}){
     if(form.posTypes.fiziki&&!fizikiVal)return alert('Fiziki POS çekim oranı giriniz.');
     if(form.posTypes.sanal&&form.bankRates.length===0)return alert('Sanal POS için en az bir banka ekleyin ("Banka Ekle" butonu).');
     const bankRates=form.bankRates.map(br=>({...br,sanalRates:br.sanalRates.map(r=>parseFloat(r)||0),fizikiRate:fizikiVal}));
+    const ownerRate=parseFloat(String(form.ownerRate).replace(',','.'))||0;
     if(editId){
-      onUpdateCompanies(prev=>prev.map(c=>c.id===editId?{...c,name:form.name.trim(),valorDays:form.valorDays,posTypes:{...form.posTypes},bankRates}:c));
+      onUpdateCompanies(prev=>prev.map(c=>c.id===editId?{...c,name:form.name.trim(),valorDays:form.valorDays,posTypes:{...form.posTypes},bankRates,ownerRate}:c));
     }else{
-      onUpdateCompanies(prev=>[...prev,{id:uid(),name:form.name.trim(),valorDays:form.valorDays,posTypes:{...form.posTypes},bankRates,createdAt:new Date().toISOString()}]);
+      onUpdateCompanies(prev=>[...prev,{id:uid(),name:form.name.trim(),valorDays:form.valorDays,posTypes:{...form.posTypes},bankRates,ownerRate,createdAt:new Date().toISOString()}]);
     }
     resetForm();
     setModalOpen(false);
@@ -2650,6 +2660,11 @@ function CompaniesPage({companies,onUpdateCompanies}){
             </div>
           </div>
           )}
+          <div style={{display:'flex',flexDirection:'column',gap:'4px',minWidth:'200px'}}>
+            <label style={{fontSize:'11px',color:'#64748b',fontWeight:600}}>Şirket Sahibi Payı (%)</label>
+            <input type="number" step="0.01" min="0" value={form.ownerRate} onChange={e=>setForm(f=>({...f,ownerRate:e.target.value}))} placeholder="Örn: 1" style={inS}/>
+            <span style={{fontSize:'10px',color:'#64748b'}}>Kasaya yatan net tutardan bu oranda düşülüp kârdan ayrılır (kasa tutarı değişmez)</span>
+          </div>
         </div>
 
         {form.posTypes.fiziki&&(
@@ -3197,7 +3212,8 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const totalCekim=allCekim.reduce((s,r)=>s+r.amount,0);
   const totalKom=allCekim.reduce((s,r)=>s+(r.customerComm||0),0);
   const totalBankCost=allCekim.reduce((s,r)=>s+(r.bankCost||0),0);
-  const totalProfit=allCekim.reduce((s,r)=>s+(r.profit||0),0);
+  const totalOwnerFee=allCekim.reduce((s,r)=>s+ownerFeeOf(r),0);
+  const totalProfit=allCekim.reduce((s,r)=>s+netProfitOf(r),0);
 
   // Giderleri tarih aralığına göre filtrele
   const filteredExpenses=(allExpenses||[]).filter(e=>{
@@ -3303,6 +3319,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
         {[['Toplam Çekim',totalCekim,'text-primary','text-primary/60'],
           ['Müşteri Kom.',totalKom,'text-purple-400','text-purple-400/60'],
           ['POS Maliyeti',totalBankCost,'text-loss','text-loss/60'],
+          ['Şirket Sahibi Payı',totalOwnerFee,'text-warn','text-warn/60'],
           ['Brüt Kar',totalProfit,'text-gain','text-gain/60'],
           ['Giderler',totalExpenses,'text-loss','text-loss/60']
         ].map(([label,val,tcolor,icolor])=>(

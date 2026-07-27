@@ -5016,6 +5016,30 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
     setKapatOpen(false);setKapatErr('');
   };
 
+  const handleFixSettlementMismatches=()=>{
+    const cekimById={};
+    (customers||[]).forEach(c=>(c.cariEntries||[]).forEach(e=>{if(e.type==='cekim')cekimById[e.id]=e;}));
+    let fixedCount=0;let totalDiff=0;
+    const fixedList=[];
+    const newTransactions=transactions.map(t=>{
+      if(t.type!=='giris'||!t.auto||!Array.isArray(t.relatedEntryIds))return t;
+      const correctAmount=+t.relatedEntryIds.reduce((s,id)=>{
+        const e=cekimById[id];
+        if(!e)return s;
+        return s+((e.amount||0)-(e.bankCost||0));
+      },0).toFixed(2);
+      const diff=+(correctAmount-t.amount).toFixed(2);
+      if(Math.abs(diff)<0.5)return t;
+      fixedCount++;totalDiff+=diff;
+      fixedList.push(t.date+' — '+(t.description||'')+' : '+fmt(t.amount)+' → '+fmt(correctAmount));
+      return{...t,amount:correctAmount};
+    });
+    if(fixedCount===0){alert('Uyuşmayan gün sonu kaydı bulunamadı, hepsi doğru görünüyor.');return;}
+    if(!window.confirm(fixedCount+' gün sonu kaydında toplam '+fmt(totalDiff)+' TL eksik/fazla bulundu. Bu kayıtların tutarları, ilgili çekimlerin GÜNCEL net tutarına göre düzeltilecek. Devam edilsin mi?\n\n'+fixedList.join('\n')))return;
+    onUpdateKasa(prev=>({...prev,transactions:newTransactions}));
+    alert(fixedCount+' kayıt düzeltildi, toplam '+fmt(totalDiff)+' TL kasaya eklendi.');
+  };
+
   return(
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
@@ -5035,6 +5059,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
           </button>
           <button onClick={()=>{setKapatDate(today);setKapatErr('');setKapatOpen(true);}} className="inline-flex items-center gap-1.5 rounded-lg bg-warn px-4 py-2 text-[13px] font-bold text-black shadow-[0_4px_16px_-6px_rgba(245,158,11,.55)] transition-all duration-150 hover:bg-amber-400 hover:shadow-[0_6px_20px_-6px_rgba(245,158,11,.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warn/60">
             Günü Kapat / Kasaya Aktar
+          </button>
+          <button onClick={handleFixSettlementMismatches} title="Geçmiş gün sonu kayıtlarının tutarını, çekimlerin güncel net tutarıyla karşılaştırıp düzeltir" className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+            Gün Sonu Tutarlarını Doğrula
           </button>
         </div>
       </div>

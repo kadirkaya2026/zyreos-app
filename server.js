@@ -104,7 +104,8 @@ function readFreshUserData(username){
         partners:[],
         expenses:[],
         partnerPayments:[],
-        partnerAdjustments:[]
+        partnerAdjustments:[],
+        ownerPayments:[]
       }
     };
   }
@@ -118,6 +119,7 @@ function readFreshUserData(username){
   if(!Array.isArray(raw.expenses))raw.expenses=[];
   if(!Array.isArray(raw.partnerPayments))raw.partnerPayments=[];
   if(!Array.isArray(raw.partnerAdjustments))raw.partnerAdjustments=[];
+  if(!Array.isArray(raw.ownerPayments))raw.ownerPayments=[];
   const data=ensureDigerBanka(raw,file);
   if(!Array.isArray(data.customers))data.customers=[];
   if(!Array.isArray(data.banks))data.banks=[];
@@ -128,6 +130,7 @@ function readFreshUserData(username){
   if(!Array.isArray(data.expenses))data.expenses=[];
   if(!Array.isArray(data.partnerPayments))data.partnerPayments=[];
   if(!Array.isArray(data.partnerAdjustments))data.partnerAdjustments=[];
+  if(!Array.isArray(data.ownerPayments))data.ownerPayments=[];
   return{file,data};
 }
 function mergeCustomersPreservingExternal(existingCustomers, incomingCustomers, lastSavedAtInPanel) {

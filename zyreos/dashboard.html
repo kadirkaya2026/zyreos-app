@@ -3032,9 +3032,10 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack})
     const prof=profitByDate[d]?profitByDate[d].profit:0;
     const cnt=profitByDate[d]?profitByDate[d].count:0;
     const exp=expenseByDate[d]||0;
-    const share=+((prof-exp)*pct).toFixed(2);
-    if(!share)return;
-    rows.push({date:d,kind:'hakedis',desc:'Günlük Hakediş — '+cnt+' işlem, kâr '+fmt(prof)+(exp?', gider '+fmt(exp):'')+' (%'+partner.percent+')',amount:share});
+    const profShare=+(prof*pct).toFixed(2);
+    if(profShare)rows.push({date:d,kind:'hakedis',desc:'Günlük Hakediş — '+cnt+' işlem, kâr '+fmt(prof)+' (%'+partner.percent+')',amount:profShare});
+    const giderShare=+(exp*pct).toFixed(2);
+    if(giderShare)rows.push({date:d,kind:'gider',desc:'Gider Payı — '+fmt(exp)+' giderin %'+partner.percent+'\'i',amount:-giderShare});
   });
   (adjustments||[]).filter(a=>a.partnerId===partner.id&&inRange(a.date)).forEach(a=>{
     rows.push({date:a.date,kind:'duzeltme',desc:'Hakediş Düzeltme'+(a.note?': '+a.note:''),amount:a.amount||0});
@@ -3048,7 +3049,7 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack})
   const totalHak=rows.filter(r=>r.kind!=='odeme').reduce((s,r)=>s+r.amount,0);
   const totalPaid=rows.filter(r=>r.kind==='odeme').reduce((s,r)=>s-r.amount,0);
   const kalan=+(totalHak-totalPaid).toFixed(2);
-  const rowColor=k=>k==='odeme'?'#f59e0b':k==='duzeltme'?'#a855f7':'#22c55e';
+  const rowColor=k=>k==='odeme'?'#f59e0b':k==='duzeltme'?'#a855f7':k==='gider'?'#ef4444':'#22c55e';
   return(
     <div>
       <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
@@ -3080,7 +3081,7 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack})
                 <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.04)',borderLeft:'3px solid '+rowColor(r.kind)}}>
                   <td style={{padding:'10px 12px',whiteSpace:'nowrap'}}>{fmtDate(r.date)}</td>
                   <td style={{padding:'10px 12px',color:rowColor(r.kind)}}>{r.desc}</td>
-                  <td className="tabular-nums" style={{padding:'10px 12px',textAlign:'right',color:'#22c55e',fontWeight:600}}>{r.kind!=='odeme'?fmt(r.amount):''}</td>
+                  <td className="tabular-nums" style={{padding:'10px 12px',textAlign:'right',color:rowColor(r.kind),fontWeight:600}}>{r.kind!=='odeme'?fmt(r.amount):''}</td>
                   <td className="tabular-nums" style={{padding:'10px 12px',textAlign:'right',color:'#f59e0b',fontWeight:600}}>{r.kind==='odeme'?fmt(-r.amount):''}</td>
                   <td className="tabular-nums" style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:r.running>=0?'#e2e8f0':'#22c55e'}}>{fmt(r.running)}</td>
                 </tr>

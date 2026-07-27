@@ -1776,7 +1776,8 @@ function exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo}){
       <td style="padding:6px 10px;font-size:11px;color:#1d4ed8;text-align:right;font-weight:600">₺${fmt(r.amount)}</td>
       <td style="padding:6px 10px;font-size:11px;text-align:right;color:#7c3aed">₺${fmt(r.customerComm)}<br><span style="color:#9ca3af;font-size:10px">%${r.customerRate}</span></td>
       <td style="padding:6px 10px;font-size:11px;text-align:right;color:#dc2626">₺${fmt(r.bankCost)}<br><span style="color:#9ca3af;font-size:10px">%${r.bankRate}</span></td>
-      <td style="padding:6px 10px;font-size:12px;text-align:right;font-weight:800;color:${r.profit>=0?'#16a34a':'#dc2626'}">₺${fmt(r.profit)}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;color:#d97706">₺${fmt(ownerFeeOf(r))}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;font-weight:800;color:${netProfitOf(r)>=0?'#16a34a':'#dc2626'}">₺${fmt(netProfitOf(r))}</td>
     </tr>`).join('');
   const custHTML=custStats.map((r,i)=>`
     <tr style="background:${i%2===0?'#fff':'#f8fafc'}">
@@ -1825,6 +1826,7 @@ function exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo}){
   <div class="scard" style="background:#eff6ff;border-color:#bfdbfe"><label>Toplam Çekim</label><span style="color:#1d4ed8">₺${fmt(totals.totalC)}</span></div>
   <div class="scard" style="background:#f5f3ff;border-color:#ddd6fe"><label>Müşteri Komisyonu</label><span style="color:#7c3aed">₺${fmt(totals.totalKom)}</span></div>
   <div class="scard" style="background:#fef2f2;border-color:#fecaca"><label>Banka Maliyeti</label><span style="color:#dc2626">₺${fmt(totals.totalBank)}</span></div>
+  <div class="scard" style="background:#fffbeb;border-color:#fde68a"><label>Şirket Sahibi Payı</label><span style="color:#d97706">₺${fmt(totals.totalOwner)}</span></div>
   <div class="scard" style="background:${totals.totalNet>=0?'#f0fdf4':'#fef2f2'};border-color:${totals.totalNet>=0?'#bbf7d0':'#fecaca'}"><label>NET KAR</label><span style="color:${totals.totalNet>=0?'#16a34a':'#dc2626'}">₺${fmt(totals.totalNet)}</span></div>
 </div>
 <div class="section-title">İşlem Detayları</div>
@@ -1832,7 +1834,7 @@ function exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo}){
   <thead><tr>
     <th>Tarih</th><th>Müşteri</th><th>Banka</th><th style="text-align:center">Taksit</th>
     <th style="text-align:right">Çekim</th><th style="text-align:right">Müşteri Kom.</th>
-    <th style="text-align:right">Banka Maliyeti</th><th style="text-align:right">NET KAR</th>
+    <th style="text-align:right">Banka Maliyeti</th><th style="text-align:right">Şirket Sahibi Payı</th><th style="text-align:right">NET KAR</th>
   </tr></thead>
   <tbody>${rowsHTML}</tbody>
   <tfoot><tr>
@@ -1840,6 +1842,7 @@ function exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo}){
     <td style="text-align:right;color:#1d4ed8">₺${fmt(totals.totalC)}</td>
     <td style="text-align:right;color:#7c3aed">₺${fmt(totals.totalKom)}</td>
     <td style="text-align:right;color:#dc2626">₺${fmt(totals.totalBank)}</td>
+    <td style="text-align:right;color:#d97706">₺${fmt(totals.totalOwner)}</td>
     <td style="text-align:right;color:${totals.totalNet>=0?'#16a34a':'#dc2626'}">₺${fmt(totals.totalNet)}</td>
   </tr></tfoot>
 </table>
@@ -2277,6 +2280,7 @@ function ProfitPage({customers,companies}){
         <MetricCard label="Toplam Çekim" value={fmtTL(totalC)} color="#4f8ef7"/>
         <MetricCard label="Müşteri Komisyonu" value={fmtTL(totalKom)} color="#a855f7"/>
         <MetricCard label="Banka Maliyeti" value={fmtTL(totalBank)} color="#ef4444"/>
+        <MetricCard label="Şirket Sahibi Payı" value={fmtTL(totalOwner)} color="#f59e0b"/>
         <MetricCard label={`NET KAR (${rows.length} işlem)`} value={fmtTL(totalNet)} color={totalNet>=0?'#22c55e':'#ef4444'} large/>
       </div>
 
@@ -2290,7 +2294,7 @@ function ProfitPage({customers,companies}){
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
             <thead>
               <tr>
-                {['Tarih','Müşteri','Banka','Taksit','Çekim Tutarı','Müşteri Kom. (%)','Banka Maliyeti (%)','NET KAR'].map(h=>(
+                {['Tarih','Müşteri','Banka','Taksit','Çekim Tutarı','Müşteri Kom. (%)','Banka Maliyeti (%)','Şirket Sahibi Payı','NET KAR'].map(h=>(
                   <th key={h} style={thS}>{h}</th>
                 ))}
               </tr>
@@ -2319,10 +2323,11 @@ function ProfitPage({customers,companies}){
                     <div style={{color:'#ef4444',fontWeight:600}}>{fmtTL(r.bankCost)}</div>
                     <div style={{color:'#64748b',fontSize:'11px'}}>%{r.bankRate}</div>
                   </td>
+                  <td className="tabular-nums" style={{...s,color:'#f59e0b',fontWeight:600}}>{fmtTL(ownerFeeOf(r))}</td>
                   <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'14px',color:netProfitOf(r)>=0?'#22c55e':'#ef4444'}}>{fmtTL(netProfitOf(r))}</td>
                 </tr>
               ))}
-              {rows.length===0&&<tr><td colSpan={8} style={{padding:'40px',textAlign:'center',color:'#64748b'}}>Seçilen dönemde işlem bulunamadı</td></tr>}
+              {rows.length===0&&<tr><td colSpan={9} style={{padding:'40px',textAlign:'center',color:'#64748b'}}>Seçilen dönemde işlem bulunamadı</td></tr>}
             </tbody>
             {rows.length>0&&(
               <tfoot>
@@ -2331,6 +2336,7 @@ function ProfitPage({customers,companies}){
                   <td className="tabular-nums" style={{...s,color:'#4f8ef7',fontWeight:800}}>{fmtTL(totalC)}</td>
                   <td className="tabular-nums" style={{...s,color:'#a855f7',fontWeight:800}}>{fmtTL(totalKom)}</td>
                   <td className="tabular-nums" style={{...s,color:'#ef4444',fontWeight:800}}>{fmtTL(totalBank)}</td>
+                  <td className="tabular-nums" style={{...s,color:'#f59e0b',fontWeight:800}}>{fmtTL(totalOwner)}</td>
                   <td className="tabular-nums" style={{...s,fontWeight:800,fontSize:'15px',color:totalNet>=0?'#22c55e':'#ef4444'}}>{fmtTL(totalNet)}</td>
                 </tr>
               </tfoot>

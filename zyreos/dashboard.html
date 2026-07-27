@@ -2195,7 +2195,7 @@ function ReportsPage({customers}){
 }
 
 /* ── KAR ANALİZİ SAYFASI ── */
-function ProfitPage({customers,companies}){
+function ProfitPage({customers,companies,onUpdateCustomers}){
   const[dateFrom,setDateFrom]=useState('');
   const[dateTo,setDateTo]=useState('');
   const[filterCustomer,setFilterCustomer]=useState('');
@@ -2203,6 +2203,29 @@ function ProfitPage({customers,companies}){
   const[rptCompany,setRptCompany]=useState('');
   const[rptFrom,setRptFrom]=useState('');
   const[rptTo,setRptTo]=useState('');
+
+  const handleRecalcOwnerFees=()=>{
+    if(!window.confirm('Tüm şirketlerin "Şirket Sahibi Payı" oranı, o şirketin GEÇMİŞTEKİ tüm çekimlerine yeniden uygulanacak. Kâr rakamları değişebilir. Devam edilsin mi?'))return;
+    let changedCount=0;
+    const updated=customers.map(c=>({
+      ...c,
+      cariEntries:(c.cariEntries||[]).map(e=>{
+        if(e.type!=='cekim')return e;
+        const comp=companies.find(co=>co.id===e.companyId);
+        if(!comp)return e;
+        const ownerRate=comp.ownerRate||0;
+        const bankCost=e.bankCost||0;
+        const newOwnerFee=+(((e.amount||0)-bankCost)*ownerRate/100).toFixed(2);
+        const grossProfit=+((e.customerComm||0)-bankCost).toFixed(2);
+        const newProfit=+(grossProfit-newOwnerFee).toFixed(2);
+        if(e.ownerFee===newOwnerFee&&e.profit===newProfit)return e;
+        changedCount++;
+        return{...e,ownerFee:newOwnerFee,profit:newProfit};
+      })
+    }));
+    onUpdateCustomers(()=>updated);
+    alert(changedCount+' çekim kaydı güncellendi. Ortaklar sayfasındaki bakiyeleri kontrol et — geçmiş kâr düştüğü için bazı ortaklar "fazla ödenmiş" görünebilir.');
+  };
 
   // Tüm çekim kayıtları (müşteri adıyla birleştirilmiş)
   const allCekim=customers.flatMap(c=>
@@ -2291,8 +2314,12 @@ function ProfitPage({customers,companies}){
               Filtreyi Temizle
             </button>
           )}
+          <button onClick={handleRecalcOwnerFees} title="Şirketlerdeki güncel 'Şirket Sahibi Payı' oranını geçmiş çekimlere yeniden uygular"
+            className="ml-auto inline-flex items-center gap-1.5 self-end rounded-lg border border-line px-4 py-2 text-[13px] font-semibold text-muted transition-colors duration-150 hover:border-linehi hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+            Kâr Rakamlarını Yeniden Hesapla
+          </button>
           <button onClick={()=>exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo})}
-            className="ml-auto inline-flex items-center gap-1.5 self-end rounded-lg bg-primary px-4 py-2 text-[13px] font-bold text-white shadow-[0_4px_16px_-6px_rgba(79,142,247,.55)] transition-all duration-150 hover:bg-blue-500 hover:shadow-[0_6px_20px_-6px_rgba(79,142,247,.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
+            className="inline-flex items-center gap-1.5 self-end rounded-lg bg-primary px-4 py-2 text-[13px] font-bold text-white shadow-[0_4px_16px_-6px_rgba(79,142,247,.55)] transition-all duration-150 hover:bg-blue-500 hover:shadow-[0_6px_20px_-6px_rgba(79,142,247,.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 2 14 9 21 9"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
             PDF Rapor Al
           </button>
@@ -5404,7 +5431,7 @@ function App(){
           )}
           {activePage==='kasalar'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))}/>}
           {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
-          {activePage==='profit'&&<ProfitPage customers={customers} companies={companies}/>}
+          {activePage==='profit'&&<ProfitPage customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
           {activePage==='companies'&&<CompaniesPage companies={companies} onUpdateCompanies={(updater)=>markDirty(()=>setCompanies(updater))}/>}
           {activePage==='expenses'&&<ExpensesPage expenses={expenses} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} bankAccounts={bankAccounts}/>}

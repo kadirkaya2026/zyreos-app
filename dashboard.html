@@ -3009,14 +3009,17 @@ function ExpensesPage({expenses,onUpdateExpenses,kasa,onUpdateKasa,bankAccounts}
 }
 
 /* ── ORTAKLAR PAGE ── */
-function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack,from,to}){
+function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack}){
   const pct=(partner.percent||0)/100;
-  const inRange=d=>!!d&&(!from||d>=from)&&(!to||d<=to);
+  // Ortağın bakiyesi her zaman tüm zamanları kapsar — ana sayfadaki Kalan ile birebir
+  // eşleşsin diye burada tarih filtresi uygulanmaz (aksi halde kapatılmış bir dönem
+  // filtre dışında kalınca "borç" tekrar görünür).
+  const inRange=d=>!!d;
   const profitByDate={};
   (customers||[]).forEach(c=>(c.cariEntries||[]).forEach(e=>{
     if(e.type!=='cekim'||!inRange(e.date))return;
     if(!profitByDate[e.date])profitByDate[e.date]={profit:0,count:0};
-    profitByDate[e.date].profit+=(e.profit||0);
+    profitByDate[e.date].profit+=netProfitOf(e);
     profitByDate[e.date].count++;
   }));
   const expenseByDate={};
@@ -3052,7 +3055,7 @@ function PartnerDetail({partner,customers,expenses,payments,adjustments,onBack,f
         <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 14px',color:'#94a3b8',cursor:'pointer',fontWeight:600,fontSize:'13px'}}><IcoArrowLeft size={16}/>Geri</button>
         <div>
           <h2 style={{fontWeight:800,fontSize:'20px',margin:0}}>{partner.name}</h2>
-          <div style={{fontSize:'12px',color:'#64748b'}}>Ortaklık Payı: %{partner.percent}{(from||to)&&<span style={{marginLeft:'10px',color:'#f59e0b'}}>Filtre: {from?fmtDate(from):'başlangıç'} — {to?fmtDate(to):'bugün'}</span>}</div>
+          <div style={{fontSize:'12px',color:'#64748b'}}>Ortaklık Payı: %{partner.percent}</div>
         </div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'12px',marginBottom:'20px'}}>
@@ -3224,6 +3227,16 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const totalExpenses=filteredExpenses.reduce((s,e)=>s+(e.amount||0),0);
   const netProfit=totalProfit-totalExpenses;
 
+  // Ortak bakiyeleri (Pay/Ödenen/Kalan) her zaman TÜM ZAMANLAR üzerinden hesaplanır —
+  // "Karlılık Filtresi" sadece üstteki özet ve "Hesabı Kapat" için dönem seçer, ortak
+  // bakiyesi filtreye göre değişip eski borç tekrar görünmesin diye tarihten bağımsızdır.
+  const allCekimAllTime=customers.flatMap(c=>
+    (c.cariEntries||[]).filter(e=>e.type==='cekim').map(e=>({...e,customerName:c.name}))
+  );
+  const totalProfitAllTime=allCekimAllTime.reduce((s,r)=>s+netProfitOf(r),0);
+  const totalExpensesAllTime=(allExpenses||[]).reduce((s,e)=>s+(e.amount||0),0);
+  const netProfitAllTime=totalProfitAllTime-totalExpensesAllTime;
+
   const payments=Array.isArray(partnerPayments)?partnerPayments:[];
   const getPartnerPayments=(pid)=>payments.filter(p=>p.partnerId===pid);
   const getPartnerTotalPaid=(pid)=>getPartnerPayments(pid).reduce((s,p)=>s+p.amount,0);
@@ -3266,7 +3279,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const inS={background:'#182238',border:'1px solid #1e2a44',borderRadius:'8px',padding:'8px 12px',color:'#e2e8f0',fontSize:'13px'};
 
   const detailPartner=detailId?partners.find(p=>p.id===detailId):null;
-  if(detailPartner)return <PartnerDetail partner={detailPartner} customers={customers} expenses={allExpenses} payments={payments} adjustments={adjustments} from={dateFrom} to={dateTo} onBack={()=>setDetailId(null)}/>;
+  if(detailPartner)return <PartnerDetail partner={detailPartner} customers={customers} expenses={allExpenses} payments={payments} adjustments={adjustments} onBack={()=>setDetailId(null)}/>;
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:'20px'}}>
@@ -3346,7 +3359,7 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {partners.map(p=>{
             const adj=getPartnerAdjTotal(p.id);
-            const share=netProfit*(p.percent/100)+adj;
+            const share=netProfitAllTime*(p.percent/100)+adj;
             const paid=getPartnerTotalPaid(p.id);
             const remaining=share-paid;
             const accent=remaining>0?'#f59e0b':'#22c55e';

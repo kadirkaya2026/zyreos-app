@@ -578,14 +578,32 @@ const MetricCard=({label,value,color='#4f8ef7',sub,large=false})=>(
 );
 
 /* ── MODAL ── */
+// Popup pencerelerini fare ile sürüklenebilir yapan ortak hook — her modal kendi
+// pozisyonunu tutar, açılınca (isOpen true'ya dönünce) merkeze sıfırlanır.
+function useModalDrag(isOpen){
+  const[pos,setPos]=useState({x:0,y:0});
+  useEffect(()=>{if(isOpen)setPos({x:0,y:0});},[isOpen]);
+  const onHeaderMouseDown=(e)=>{
+    if(e.button!==0)return;
+    e.preventDefault();
+    const startX=e.clientX,startY=e.clientY;
+    const startPos=pos;
+    const onMove=(ev)=>setPos({x:startPos.x+(ev.clientX-startX),y:startPos.y+(ev.clientY-startY)});
+    const onUp=()=>{window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);};
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  };
+  return{pos,onHeaderMouseDown};
+}
 const Modal=({open,onClose,title,children,width=480})=>{
+  const{pos,onHeaderMouseDown}=useModalDrag(open);
   if(!open)return null;
   return(
-    <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)',backdropFilter:'blur(4px)'}}>
-      <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'16px',width:'100%',maxWidth:width,maxHeight:'90vh',overflowY:'auto',margin:'16px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid #1e2a44'}}>
+    <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.7)'}}>
+      <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'16px',width:'100%',maxWidth:width,maxHeight:'90vh',overflowY:'auto',margin:'16px',transform:`translate(${pos.x}px,${pos.y}px)`}}>
+        <div onMouseDown={onHeaderMouseDown} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid #1e2a44',cursor:'move',userSelect:'none'}}>
           <span style={{fontWeight:700,fontSize:'16px'}}>{title}</span>
-          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',padding:'4px',borderRadius:'6px',display:'flex',alignItems:'center',justifyContent:'center'}} className="hover:text-white"><IcoX size={18}/></button>
+          <button onClick={onClose} onMouseDown={e=>e.stopPropagation()} style={{background:'none',border:'none',cursor:'pointer',color:'#94a3b8',padding:'4px',borderRadius:'6px',display:'flex',alignItems:'center',justifyContent:'center'}} className="hover:text-white"><IcoX size={18}/></button>
         </div>
         <div style={{padding:'24px'}}>{children}</div>
       </div>
@@ -1325,6 +1343,7 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
   const[editOpen,setEditOpen]=useState(false);
   const[editingEntry,setEditingEntry]=useState(null);
   const[waOpen,setWaOpen]=useState(false);
+  const waDrag=useModalDrag(waOpen);
   const[exFrom,setExFrom]=useState('');
   const[exTo,setExTo]=useState('');
   const yesterday=(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
@@ -1590,8 +1609,8 @@ function CustomerDetail({customer,banks,companies,onBack,onUpdateCustomer,onUpda
         };
         return(
           <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{background:'#182238',borderRadius:'12px',padding:'28px',width:'420px',maxWidth:'95vw',boxShadow:'0 8px 40px rgba(0,0,0,0.5)'}}>
-              <h3 style={{margin:'0 0 20px',fontSize:'16px',fontWeight:700}}>WA Ekstre Gönder</h3>
+            <div style={{background:'#182238',borderRadius:'12px',padding:'28px',width:'420px',maxWidth:'95vw',boxShadow:'0 8px 40px rgba(0,0,0,0.5)',transform:`translate(${waDrag.pos.x}px,${waDrag.pos.y}px)`}}>
+              <h3 onMouseDown={waDrag.onHeaderMouseDown} style={{margin:'0 0 20px',fontSize:'16px',fontWeight:700,cursor:'move',userSelect:'none'}}>WA Ekstre Gönder</h3>
               <div style={{marginBottom:'14px'}}>
                 <label style={{display:'block',fontSize:'12px',color:'#94a3b8',marginBottom:'6px'}}>Bakiye tarihi (bu tarihe kadar olan tüm kayıtlar dahil edilir)</label>
                 <input type="date" value={waDate} onChange={e=>setWaDate(e.target.value)} style={{width:'100%',background:'#182238',border:'1px solid #2b3b60',borderRadius:'6px',padding:'8px 10px',color:'#e2e8f0',fontSize:'13px',boxSizing:'border-box'}}/>
@@ -3121,6 +3140,9 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
   const[detailId,setDetailId]=useState(null);
   const[closeModalOpen,setCloseModalOpen]=useState(false);
   const[closeRows,setCloseRows]=useState([]);
+  const payDrag=useModalDrag(!!payModal);
+  const adjDrag=useModalDrag(!!adjModal);
+  const closeDrag=useModalDrag(closeModalOpen);
 
   const totalPercent=partners.reduce((s,p)=>s+(p.percent||0),0);
 
@@ -3500,8 +3522,8 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       {/* Ödeme Modalı */}
       {payModal&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
-            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>{editPayId?'Ödeme Düzenle':'Ortak Ödeme'} — {(partners.find(p=>p.id===payModal)||{}).name}</h3>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw',transform:`translate(${payDrag.pos.x}px,${payDrag.pos.y}px)`}}>
+            <h3 onMouseDown={payDrag.onHeaderMouseDown} style={{fontWeight:700,marginBottom:'20px',fontSize:'15px',cursor:'move',userSelect:'none'}}>{editPayId?'Ödeme Düzenle':'Ortak Ödeme'} — {(partners.find(p=>p.id===payModal)||{}).name}</h3>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
                 <input type="date" value={payForm.date} onChange={e=>setPayForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
@@ -3530,8 +3552,8 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
       {/* Hakediş Düzeltme Modalı */}
       {adjModal&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
-            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>{editAdjId?'Düzeltme Düzenle':'Hakediş Düzeltme'} — {(partners.find(p=>p.id===adjModal)||{}).name}</h3>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw',transform:`translate(${adjDrag.pos.x}px,${adjDrag.pos.y}px)`}}>
+            <h3 onMouseDown={adjDrag.onHeaderMouseDown} style={{fontWeight:700,marginBottom:'20px',fontSize:'15px',cursor:'move',userSelect:'none'}}>{editAdjId?'Düzeltme Düzenle':'Hakediş Düzeltme'} — {(partners.find(p=>p.id===adjModal)||{}).name}</h3>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
                 <input type="date" value={adjForm.date} onChange={e=>setAdjForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/>
@@ -3563,8 +3585,8 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
         const periodLabel=(dateFrom?fmtDate(dateFrom):'başlangıç')+' – '+(dateTo?fmtDate(dateTo):'bugün');
         return(
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6">
-            <h3 className="mb-1 text-[15px] font-bold text-slate-100">Hesap Kapatma</h3>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6" style={{transform:`translate(${closeDrag.pos.x}px,${closeDrag.pos.y}px)`}}>
+            <h3 onMouseDown={closeDrag.onHeaderMouseDown} className="mb-1 cursor-move select-none text-[15px] font-bold text-slate-100">Hesap Kapatma</h3>
             <div className="mb-3 text-xs text-dim">Dönem: {periodLabel} · Net Kâr: <span className="font-semibold text-gain">{fmtTL(netProfit)}</span></div>
             <div className="mb-4 rounded-lg border border-warn/30 bg-warn/10 px-3.5 py-2.5 text-xs text-amber-300">
               ⚠ Bu işlem seçili dönemin kârını ortaklara dağıtır. Aynı dönemi tekrar kapatırsanız kâr iki kez ödenmiş sayılır — tarih aralığını kontrol edin.
@@ -4561,6 +4583,9 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
   const[bankModalOpen,setBankModalOpen]=useState(false);
   const[bankEditId,setBankEditId]=useState(null);
   const[bankForm,setBankForm]=useState({kasaType:'banka',name:'',companyId:'',bankName:INIT_BANKS[0]?.name||'',monthlyRate:''});
+  const addDrag=useModalDrag(addOpen);
+  const virmanDrag=useModalDrag(virmanOpen);
+  const kapatDrag=useModalDrag(kapatOpen);
 
   const fmt=n=>(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate=d=>d?d.split('-').reverse().join('.'):'';
@@ -5017,8 +5042,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       </div>
       {kapatOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'500px',maxWidth:'95vw',maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
-            <h3 style={{fontWeight:700,marginBottom:'6px',fontSize:'15px'}}>Hangi POS Hesabının Kasasını Kapatmak İstersiniz?</h3>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'500px',maxWidth:'95vw',maxHeight:'80vh',display:'flex',flexDirection:'column',transform:`translate(${kapatDrag.pos.x}px,${kapatDrag.pos.y}px)`}}>
+            <h3 onMouseDown={kapatDrag.onHeaderMouseDown} style={{fontWeight:700,marginBottom:'6px',fontSize:'15px',cursor:'move',userSelect:'none'}}>Hangi POS Hesabının Kasasını Kapatmak İstersiniz?</h3>
             <div style={{fontSize:'11px',color:'#64748b',marginBottom:'16px'}}>Her POS hesabı, bağlı olduğu firmanın valörüne göre farklı tarihte kasaya aktarılabilir hale gelir.</div>
             <div style={{marginBottom:'16px'}}>
               <label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label>
@@ -5118,8 +5143,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       )}
       {addOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw'}}>
-            <h3 style={{fontWeight:700,marginBottom:'20px',fontSize:'15px'}}>Manuel Hareket Ekle</h3>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'360px',maxWidth:'95vw',transform:`translate(${addDrag.pos.x}px,${addDrag.pos.y}px)`}}>
+            <h3 onMouseDown={addDrag.onHeaderMouseDown} style={{fontWeight:700,marginBottom:'20px',fontSize:'15px',cursor:'move',userSelect:'none'}}>Manuel Hareket Ekle</h3>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label><input type="date" value={addForm.date} onChange={e=>setAddForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tür</label>
@@ -5146,8 +5171,8 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       )}
       {virmanOpen&&(
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw'}}>
-            <h3 style={{fontWeight:700,marginBottom:'6px',fontSize:'15px'}}>Kasalar Arası Virman</h3>
+          <div style={{background:'#121a2e',border:'1px solid #1e2a44',borderRadius:'14px',padding:'28px',width:'380px',maxWidth:'95vw',transform:`translate(${virmanDrag.pos.x}px,${virmanDrag.pos.y}px)`}}>
+            <h3 onMouseDown={virmanDrag.onHeaderMouseDown} style={{fontWeight:700,marginBottom:'6px',fontSize:'15px',cursor:'move',userSelect:'none'}}>Kasalar Arası Virman</h3>
             <div style={{fontSize:'11px',color:'#64748b',marginBottom:'16px'}}>Bir kasadan diğerine para aktarır — kaynaktan çıkış, hedefe giriş olarak birlikte kaydedilir.</div>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               <div><label style={{fontSize:'12px',color:'#94a3b8',display:'block',marginBottom:'4px'}}>Tarih</label><input type="date" value={virmanForm.date} onChange={e=>setVirmanForm(p=>({...p,date:e.target.value}))} style={{...inS,width:'100%',boxSizing:'border-box'}}/></div>

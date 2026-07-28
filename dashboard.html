@@ -867,7 +867,7 @@ function DashboardPage({customers,onNavigateCustomer}){
                     <td style={{padding:'8px',color:'#94a3b8',whiteSpace:'nowrap'}}>{renderDateCell(e)}</td>
                     <td style={{padding:'8px'}}><span style={{fontWeight:600}}>{e.customerName}</span></td>
                     <td className="tabular-nums" style={{padding:'8px',color:'#4f8ef7',fontWeight:600}}>{fmtTL(e.amount)}</td>
-                    <td className="tabular-nums" style={{padding:'8px',color:e.profit>=0?'#22c55e':'#ef4444',fontWeight:700}}>{fmtTL(e.profit)}</td>
+                    <td className="tabular-nums" style={{padding:'8px',color:netProfitOf(e)>=0?'#22c55e':'#ef4444',fontWeight:700}}>{fmtTL(netProfitOf(e))}</td>
                   </tr>
                 ))}
                 {recentCekim.length===0&&<tr><td colSpan={4} style={{padding:'20px',textAlign:'center',color:'#64748b'}}>Henüz çekim yok</td></tr>}
@@ -1890,36 +1890,44 @@ function exportProfitPDF({rows,custStats,bankStats,totals,dateFrom,dateTo}){
 }
 
 /* ── POS HESAP SAYFASI ── */
-function POSPage({customers,banks}){
+function POSPage({customers,companies}){
   const[selDate,setSelDate]=useState(todayStr());
   const fmtLongDate=dateStr=>new Date(dateStr+'T12:00:00').toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',weekday:'long'});
 
+  // Kaydın kendi yatış tarihi zaten oluşturulurken şirketin gerçek valörüne (1/2 iş günü)
+  // ve POS tipine (fiziki=ertesi takvim günü) göre hesaplanıp saklanıyor — bunu kullanıyoruz.
+  // Sadece bu alan yoksa (çok eski kayıt) aynı mantıkla geriye dönük hesaplıyoruz.
+  const entrySettlementDate=(e)=>{
+    if(e.settlementDate)return e.settlementDate;
+    if(e.posType==='fiziki')return addCalendarDays(e.date,1);
+    const comp=(companies||[]).find(c=>c.id===e.companyId);
+    return addBusinessDays(e.date,comp?comp.valorDays:1);
+  };
+
   // Seçilen tarihte bankaya yatacak tüm çekim kayıtları
   const dayEntries=customers.flatMap(c=>
-    (c.cariEntries||[]).filter(e=>e.type==='cekim'&&getSettlementDate(e.date)===selDate)
-      .map(e=>({...e,customerName:c.name,customerCode:c.code,settlementDate:getSettlementDate(e.date)}))
+    (c.cariEntries||[]).filter(e=>e.type==='cekim'&&entrySettlementDate(e)===selDate)
+      .map(e=>({...e,customerName:c.name,customerCode:c.code,settlementDate:entrySettlementDate(e)}))
   );
 
-  // Banka bazında grupla
+  // Banka bazında grupla — banka maliyeti, kaydın oluşturulduğu anda ŞİRKETE ÖZEL orana göre
+  // zaten hesaplanıp e.bankCost/e.bankRate'e yazılmıştı, burada tekrar (genel/eski bir banka
+  // tablosundan) hesaplamıyoruz — aksi halde şirkete özel oranlarla uyuşmaz.
   const bankMap={};
   dayEntries.forEach(e=>{
-    const bankObj=banks.find(b=>b.name===e.bank);
-    const taksit=parseInt(e.installment)||1;
-    const bankRate=bankObj&&bankObj.rates&&bankObj.rates[taksit-1]!=null?parseFloat(bankObj.rates[taksit-1]):0;
-    const bankCut=parseFloat((e.amount*bankRate/100).toFixed(2));
-    const netDeposit=parseFloat((e.amount-bankCut).toFixed(2));
-    const ownerShare=ownerFeeOf({...e,bankCost:bankCut});
+    const bankRate=e.bankRate||0;
+    const bankCut=e.bankCost||0;
+    const netDeposit=+((e.amount||0)-bankCut).toFixed(2);
+    const ownerShare=ownerFeeOf(e);
     const customerComm=e.customerComm||0;
-    const realProfit=+(customerComm-bankCut-ownerShare).toFixed(2);
-    const bankNotFound=!bankObj;
-    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0,totalOwnerShare:0,totalRealProfit:0,hasUnknown:false};
-    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit,ownerShare,customerComm,realProfit,bankNotFound});
+    const realProfit=netProfitOf(e);
+    if(!bankMap[e.bank])bankMap[e.bank]={bank:e.bank,entries:[],totalAmount:0,totalBankCut:0,totalNet:0,totalOwnerShare:0,totalRealProfit:0};
+    bankMap[e.bank].entries.push({...e,bankRate,bankCut,netDeposit,ownerShare,customerComm,realProfit});
     bankMap[e.bank].totalAmount+=e.amount;
     bankMap[e.bank].totalBankCut+=bankCut;
     bankMap[e.bank].totalNet+=netDeposit;
     bankMap[e.bank].totalOwnerShare+=ownerShare;
     bankMap[e.bank].totalRealProfit+=realProfit;
-    if(bankNotFound)bankMap[e.bank].hasUnknown=true;
   });
   const bankRows=Object.values(bankMap).sort((a,b)=>b.totalNet-a.totalNet);
 
@@ -1961,7 +1969,7 @@ function POSPage({customers,banks}){
         <MetricCard label="Toplam POS Çekim" value={fmtTL(grandTotal)} color="#4f8ef7"/>
         <MetricCard label="Toplam Banka Kesintisi" value={fmtTL(grandCut)} color="#ef4444"/>
         <MetricCard label={`Seçilen Gün Yatacak (${bankRows.length} banka)`} value={fmtTL(grandNet)} color="#22c55e" large/>
-        <MetricCard label="Şirket Sahibi Payı (%1)" value={fmtTL(grandOwnerShare)} color="#f59e0b"/>
+        <MetricCard label="Şirket Sahibi Payı" value={fmtTL(grandOwnerShare)} color="#f59e0b"/>
         <MetricCard label="Net Kârım" value={fmtTL(grandRealProfit)} color="#a855f7" large/>
       </div>
 
@@ -1996,7 +2004,7 @@ function POSPage({customers,banks}){
                       <td className="tabular-nums" style={{...td,fontWeight:700,color:'#22c55e'}}>{fmtTL(r.totalNet)}</td>
                       <td className="tabular-nums" style={{...td,color:'#f59e0b',fontWeight:600}}>
                         <div>{fmtTL(r.totalOwnerShare)}</div>
-                        <div style={{fontSize:'11px',color:'#64748b'}}>%1</div>
+                        <div style={{fontSize:'11px',color:'#64748b'}}>%{r.totalNet>0?+(r.totalOwnerShare/r.totalNet*100).toFixed(2):0} ort.</div>
                       </td>
                       <td className="tabular-nums" style={{...td,fontWeight:800,fontSize:'16px',color:'#a855f7'}}>{fmtTL(r.totalRealProfit)}</td>
                     </tr>
@@ -3454,8 +3462,10 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
 
   const openCloseModal=()=>{
     const rows=partners.map(p=>{
+      // "Kalan" kartlarıyla tutarlı olması için burada da tüm-zamanlı kâr kullanılıyor —
+      // "Karlılık Filtresi" sadece üstteki özet içindir, dağıtılacak payı etkilemez.
       const adj=getPartnerAdjTotal(p.id);
-      const share=netProfit*(p.percent/100)+adj;
+      const share=netProfitAllTime*(p.percent/100)+adj;
       const paid=getPartnerTotalPaid(p.id);
       const remaining=share-paid;
       return{partnerId:p.id,name:p.name,percent:p.percent,suggested:remaining,
@@ -3759,9 +3769,9 @@ function PartnersPage({partners,onUpdatePartners,customers,partnerPayments,onUpd
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6" style={{transform:`translate(${closeDrag.pos.x}px,${closeDrag.pos.y}px)`}}>
             <h3 onMouseDown={closeDrag.onHeaderMouseDown} className="mb-1 cursor-move select-none text-[15px] font-bold text-slate-100">Hesap Kapatma</h3>
-            <div className="mb-3 text-xs text-dim">Dönem: {periodLabel} · Net Kâr: <span className="font-semibold text-gain">{fmtTL(netProfit)}</span></div>
+            <div className="mb-3 text-xs text-dim">Toplam Dağıtılabilir Net Kâr (tüm zamanlar): <span className="font-semibold text-gain">{fmtTL(netProfitAllTime)}</span></div>
             <div className="mb-4 rounded-lg border border-warn/30 bg-warn/10 px-3.5 py-2.5 text-xs text-amber-300">
-              ⚠ Bu işlem seçili dönemin kârını ortaklara dağıtır. Aynı dönemi tekrar kapatırsanız kâr iki kez ödenmiş sayılır — tarih aralığını kontrol edin.
+              ⚠ Tutarlar, her ortağın şu ana kadarki toplam hakedişinden zaten ödenmiş kısmı düşülerek öneriliyor — istersen değiştirip kısmi ödeyebilirsin.
             </div>
             <div className="flex flex-col gap-3">
               {closeRows.map((r,i)=>(
@@ -4837,7 +4847,7 @@ function KasaPage({kasa,onUpdateKasa,customers,companies,onUpdateCustomers,onUpd
       }
       if(!dailyCekimMap[tDate])dailyCekimMap[tDate]={amount:0,entries:[]};
       dailyCekimMap[tDate].amount=+(dailyCekimMap[tDate].amount+amount).toFixed(2);
-      dailyCekimMap[tDate].entries.push({id:e.id,amount,companyId:e.companyId||'',companyName:e.companyName||'',bank:e.bank||'',posType:e.posType||'sanal',profit:e.profit||0});
+      dailyCekimMap[tDate].entries.push({id:e.id,amount,companyId:e.companyId||'',companyName:e.companyName||'',bank:e.bank||'',posType:e.posType||'sanal',profit:netProfitOf(e)});
     });
   });
 
@@ -5605,7 +5615,7 @@ function App(){
             />
           )}
           {activePage==='kasalar'&&<KasaPage kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))} onUpdateExpenses={(updater)=>markDirty(()=>setExpenses(updater))} onUpdatePartnerPayments={(updater)=>markDirty(()=>setPartnerPayments(updater))} bankAccounts={bankAccounts} onUpdateBankAccounts={(updater)=>markDirty(()=>setBankAccounts(updater))}/>}
-          {activePage==='pos'&&<POSPage customers={customers} banks={banks}/>}
+          {activePage==='pos'&&<POSPage customers={customers} companies={companies}/>}
           {activePage==='profit'&&<ProfitPage customers={customers} companies={companies} onUpdateCustomers={(updater)=>markDirty(()=>setCustomers(updater))}/>}
           {activePage==='reports'&&<ReportsPage customers={customers}/>}
           {activePage==='companies'&&<CompaniesPage companies={companies} onUpdateCompanies={(updater)=>markDirty(()=>setCompanies(updater))} customers={customers} kasa={kasa} onUpdateKasa={(updater)=>markDirty(()=>setKasa(updater))} bankAccounts={bankAccounts} ownerPayments={ownerPayments} onUpdateOwnerPayments={(updater)=>markDirty(()=>setOwnerPayments(updater))}/>}
